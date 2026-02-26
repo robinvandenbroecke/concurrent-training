@@ -175,3 +175,30 @@ class WorkoutPlan(Base):
     )
     
     athlete = relationship("Athlete")
+
+
+class PerformanceSnapshot(Base):
+    """Performance snapshots for trend analysis"""
+    __tablename__ = "performance_snapshots"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
+    snapshot_date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    days_analyzed = Column(Integer, default=28)
+    
+    # Complete performance report as JSON
+    metrics_json = Column(JSON, nullable=False)
+    
+    # Summary fields for quick queries
+    overall_signal = Column(String(30), default="maintain")
+    suggest_deload = Column(Boolean, default=False)
+    volume_adjustment_pct = Column(Float, default=0.0)
+    intensity_adjustment_pct = Column(Float, default=0.0)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('athlete_id', 'snapshot_date', name='uq_athlete_perf_date'),
+    )
+    
+    athlete = relationship("Athlete")

@@ -91,6 +91,25 @@ from .program_engine import (
     replan_missed_sessions,
 )
 
+from .performance_engine import (
+    TrendDirection,
+    PerformanceSignal,
+    StrengthSessionMetrics,
+    EnduranceSessionMetrics,
+    LiftPerformanceTrend,
+    EndurancePerformanceTrend,
+    PerformanceReport,
+    compute_session_e1rm,
+    compute_session_perf_y,
+    compute_strength_metrics,
+    analyze_lift_trend,
+    compute_endurance_metrics,
+    analyze_endurance_trend,
+    generate_performance_report,
+    apply_performance_adjustments,
+    should_adjust_microcycle,
+)
+
 __all__ = [
     # Original model exports
     "ConcurrentTrainingModel",
@@ -174,4 +193,21 @@ __all__ = [
     "should_deload",
     # Sprint 5: Priority-aware replanning
     "replan_missed_sessions",
+    # Sprint 6: Performance engine exports
+    "TrendDirection",
+    "PerformanceSignal",
+    "StrengthSessionMetrics",
+    "EnduranceSessionMetrics",
+    "LiftPerformanceTrend",
+    "EndurancePerformanceTrend",
+    "PerformanceReport",
+    "compute_session_e1rm",
+    "compute_session_perf_y",
+    "compute_strength_metrics",
+    "analyze_lift_trend",
+    "compute_endurance_metrics",
+    "analyze_endurance_trend",
+    "generate_performance_report",
+    "apply_performance_adjustments",
+    "should_adjust_microcycle",
 ]
