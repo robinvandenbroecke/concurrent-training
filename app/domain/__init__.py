@@ -11,7 +11,22 @@ from .model import (
     SystemParameters,
 )
 
+from .rep_engine import (
+    LiftVelocityProfile,
+    RepEngineParams,
+    RepInput,
+    SetInput,
+    SessionInput,
+    RepOutput,
+    SetOutput,
+    SessionOutput,
+    simulate_strength_session,
+    LimitingFactor,
+    RepState,
+)
+
 __all__ = [
+    # Original model exports
     "ConcurrentTrainingModel",
     "Autoregulator",
     "LiftProfile",
@@ -21,4 +36,16 @@ __all__ = [
     "DayLevelState",
     "RepLevelState",
     "SystemParameters",
+    # New rep-engine exports
+    "LiftVelocityProfile",
+    "RepEngineParams",
+    "RepInput",
+    "SetInput",
+    "SessionInput",
+    "RepOutput",
+    "SetOutput",
+    "SessionOutput",
+    "simulate_strength_session",
+    "LimitingFactor",
+    "RepState",
 ]
