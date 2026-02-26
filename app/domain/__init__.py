@@ -89,6 +89,9 @@ from .program_engine import (
     should_deload,
     # Sprint 5: Priority-aware replanning
     replan_missed_sessions,
+    # Sprint 6: Performance integration
+    create_microcycle_with_performance,
+    advance_microcycle_with_performance,
 )
 
 from .performance_engine import (
@@ -197,6 +200,9 @@ __all__ = [
     "should_deload",
     # Sprint 5: Priority-aware replanning
     "replan_missed_sessions",
+    # Sprint 6: Performance integration
+    "create_microcycle_with_performance",
+    "advance_microcycle_with_performance",
     # Sprint 6: Performance engine exports
     "TrendDirection",
     "PerformanceSignal",

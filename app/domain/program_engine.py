@@ -964,3 +964,157 @@ def replan_missed_sessions(
         dropped_sessions=dropped_sessions,
         explanation="; ".join(explanations)
     )
+
+
+# ============================================================================
+# Performance Integration (Sprint 6)
+# ============================================================================
+
+def create_microcycle_with_performance(
+    config: ProgramConfig,
+    block_type: BlockType,
+    week_index: int,
+    start_date: date,
+    performance_adjustment: Optional[Dict] = None
+) -> MicrocyclePlan:
+    """
+    Create microcycle with optional performance-based adjustments.
+
+    This function wraps create_microcycle_template and applies performance
+    feedback to adjust progression targets and session structure.
+
+    Args:
+        config: Program configuration
+        block_type: Current block type
+        week_index: Week within block
+        start_date: Start date
+        performance_adjustment: Optional dict with performance signals:
+            - force_deload: bool - Force deload block
+            - reduce_key_intensity: bool - Reduce key session intensity
+            - add_stimulus_lifts: List[str] - Lifts needing extra stimulus
+            - replace_z2_with_tempo: bool - Replace Z2 with tempo
+            - add_hiit_intervals: int - Additional HIIT intervals
+            - hold_volume_constant: bool - Skip planned volume increase
+            - prioritize_lift: Optional[str] - Lift to prioritize
+
+    Returns:
+        MicrocyclePlan with adjustments applied
+    """
+    # Check for forced deload
+    if performance_adjustment and performance_adjustment.get("force_deload"):
+        block_type = BlockType.DELOAD
+        week_index = 0
+
+    # Create base microcycle
+    microcycle = create_microcycle_template(
+        config=config,
+        block_type=block_type,
+        week_index=week_index,
+        start_date=start_date
+    )
+
+    if not performance_adjustment:
+        return microcycle
+
+    # Apply volume adjustments
+    if performance_adjustment.get("hold_volume_constant"):
+        # Set progression multiplier to 1.0 (no change)
+        microcycle.progression.volume_progression = 1.0
+
+    # Apply intensity reduction for key sessions
+    if performance_adjustment.get("reduce_key_intensity"):
+        microcycle.progression.target_avg_intensity *= 0.95
+
+    # Add stimulus to specific lifts
+    stimulus_lifts = performance_adjustment.get("add_stimulus_lifts", [])
+    if stimulus_lifts:
+        for day in microcycle.days:
+            if day.key_session and day.session_domain in ["strength", "concurrent"]:
+                # Check if this day includes a stimulus lift
+                if any(lift in day.primary_lifts for lift in stimulus_lifts):
+                    day.notes += " [+1 backoff set added]"
+                    # Could also adjust sets here
+
+    # Prioritize specific lift
+    prioritize_lift = performance_adjustment.get("prioritize_lift")
+    if prioritize_lift:
+        for day in microcycle.days:
+            if day.session_domain in ["strength", "concurrent"]:
+                if prioritize_lift in day.primary_lifts:
+                    day.key_session = True
+                    day.notes += f" [Prioritized {prioritize_lift}]"
+                    break  # Only prioritize first matching day
+
+    # Replace Z2 with tempo
+    if performance_adjustment.get("replace_z2_with_tempo"):
+        z2_days = [d for d in microcycle.days if d.endurance_zone == "z2"]
+        if z2_days:
+            # Replace first Z2 day with tempo
+            z2_days[0].endurance_zone = "tempo"
+            z2_days[0].notes += " [Z2→tempo for stagnation]"
+
+    # Add HIIT intervals
+    additional_hiit = performance_adjustment.get("add_hiit_intervals", 0)
+    if additional_hiit > 0:
+        for day in microcycle.days:
+            if day.endurance_zone == "hiit":
+                day.notes += f" [+{additional_hiit} interval sets]"
+                break
+
+    return microcycle
+
+
+def advance_microcycle_with_performance(
+    state: ProgramState,
+    performance_report: Optional[Dict] = None,
+    completed_workouts: List[Dict] = None
+) -> Tuple[ProgramState, MicrocyclePlan]:
+    """
+    Advance to next microcycle with performance-based adjustments.
+
+    Args:
+        state: Current program state
+        performance_report: Optional performance report with adjustments
+        completed_workouts: Summary of completed workouts
+
+    Returns:
+        Tuple of (updated ProgramState, next MicrocyclePlan)
+    """
+    # Update state
+    state.microcycle_index += 1
+    state.block_week_index += 1
+    state.current_week_start += timedelta(days=7)
+
+    # Check if block should change
+    if state.block_week_index >= state.config.weeks_per_block:
+        state.block_week_index = 0
+
+        # Block progression
+        if state.current_block == BlockType.BASE:
+            state.current_block = BlockType.BUILD
+        elif state.current_block == BlockType.BUILD:
+            state.current_block = BlockType.PEAK
+        elif state.current_block == BlockType.PEAK:
+            if state.config.include_deload:
+                state.current_block = BlockType.DELOAD
+            else:
+                state.current_block = BlockType.BASE
+        elif state.current_block == BlockType.DELOAD:
+            state.current_block = BlockType.BASE
+            state.last_deload_date = state.current_week_start - timedelta(days=7)
+
+    # Extract adjustment from performance report
+    adjustment = None
+    if performance_report:
+        adjustment = performance_report.get("microcycle_adjustment", {})
+
+    # Generate next microcycle with performance adjustments
+    microcycle = create_microcycle_with_performance(
+        config=state.config,
+        block_type=state.current_block,
+        week_index=state.block_week_index,
+        start_date=state.current_week_start,
+        performance_adjustment=adjustment
+    )
+
+    return state, microcycle

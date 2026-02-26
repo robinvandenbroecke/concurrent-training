@@ -17,6 +17,10 @@ from app.services import (
     AthleteService, SessionService, DayUpdateService,
     ReadinessService, AutoregulationService
 )
+from app.performance_service import (
+    get_or_compute_performance_report,
+    compute_and_store_performance_report
+)
 from app.types import LiftType, EnduranceSport
 from app.config import settings
 
@@ -234,4 +238,50 @@ def update_day_state(
         "D_sys": state.D_sys,
         "R_mito": state.R_mito,
         "E_fat": state.E_fat
+    }
+
+
+# Performance endpoints (Sprint 6)
+@app.get("/performance/report")
+def get_performance_report(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    days: int = Query(28, ge=7, le=90, description="Days to analyze"),
+    force_recompute: bool = Query(False, description="Force recompute even if cached"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get performance report for an athlete.
+
+    Computes strength and endurance performance metrics, detects trends
+    (progress, stagnation, regression), and provides program adjustment signals.
+
+    Returns:
+        PerformanceReport JSON with trends, signals, and recommendations
+    """
+    report = get_or_compute_performance_report(
+        db, athlete_id, days=days, force_recompute=force_recompute
+    )
+    return report.to_dict()
+
+
+@app.post("/performance/compute/{athlete_id}")
+def compute_performance(
+    athlete_id: int,
+    days: int = Query(28, ge=7, le=90),
+    db: Session = Depends(get_db),
+    api_key: str = Security(verify_admin_api_key)
+):
+    """
+    Manually trigger performance computation and storage.
+    Protected endpoint for admin use.
+    """
+    report = compute_and_store_performance_report(db, athlete_id, days=days)
+    return {
+        "status": "computed",
+        "athlete_id": athlete_id,
+        "report_date": report.report_date.isoformat(),
+        "overall_signal": report.overall_signal.value,
+        "suggest_deload": report.suggest_deload,
+        "lift_trends": list(report.lift_trends.keys()),
+        "endurance_trends": list(report.endurance_trends.keys())
     }
