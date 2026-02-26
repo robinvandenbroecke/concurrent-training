@@ -43,6 +43,28 @@ from .day_engine import (
     create_initial_state,
 )
 
+from .coach_engine import (
+    GoalMode,
+    WorkoutType,
+    LoadMethod,
+    ActionType,
+    CoachParams,
+    SetPrescription,
+    ExerciseBlock,
+    StrengthWorkout,
+    EnduranceSession,
+    ConcurrentWorkout,
+    WorkoutPlan,
+    IntraSetState,
+    IntraSetAction,
+    determine_workout_type,
+    generate_strength_workout,
+    generate_endurance_workout,
+    generate_workout,
+    adapt_workout,
+    intra_set_decision,
+)
+
 __all__ = [
     # Original model exports
     "ConcurrentTrainingModel",
@@ -82,4 +104,24 @@ __all__ = [
     "compute_readiness",
     "simulate_day_transition",
     "create_initial_state",
+    # Coach-engine exports
+    "GoalMode",
+    "WorkoutType",
+    "LoadMethod",
+    "ActionType",
+    "CoachParams",
+    "SetPrescription",
+    "ExerciseBlock",
+    "StrengthWorkout",
+    "EnduranceSession",
+    "ConcurrentWorkout",
+    "WorkoutPlan",
+    "IntraSetState",
+    "IntraSetAction",
+    "determine_workout_type",
+    "generate_strength_workout",
+    "generate_endurance_workout",
+    "generate_workout",
+    "adapt_workout",
+    "intra_set_decision",
 ]
