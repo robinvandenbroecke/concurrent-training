@@ -70,6 +70,24 @@ from .coach_engine import (
     next_set_adjustment,
 )
 
+from .program_engine import (
+    ProgramMode,
+    BlockType,
+    Priority,
+    ProgramConfig,
+    ProgramState,
+    MicrocyclePlan,
+    DayTemplate,
+    ProgressionTargets,
+    FatigueGuardrails,
+    distribute_training_days,
+    create_microcycle_template,
+    start_program,
+    advance_microcycle,
+    get_day_workout_spec,
+    should_deload,
+)
+
 __all__ = [
     # Original model exports
     "ConcurrentTrainingModel",
@@ -134,4 +152,20 @@ __all__ = [
     "generate_workout",
     "adapt_workout",
     "next_set_adjustment",
+    # Program-engine exports
+    "ProgramMode",
+    "BlockType",
+    "Priority",
+    "ProgramConfig",
+    "ProgramState",
+    "MicrocyclePlan",
+    "DayTemplate",
+    "ProgressionTargets",
+    "FatigueGuardrails",
+    "distribute_training_days",
+    "create_microcycle_template",
+    "start_program",
+    "advance_microcycle",
+    "get_day_workout_spec",
+    "should_deload",
 ]
