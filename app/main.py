@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, engine, Base
@@ -37,6 +38,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS for web UI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,6 +46,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/")
+def root():
+    """Redirect to UI"""
+    return {"message": "Concurrent Training API", "ui": "/static/index.html"}
 
 
 @app.get("/health")
