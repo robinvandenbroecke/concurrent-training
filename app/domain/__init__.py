@@ -136,6 +136,7 @@ from .goal_engine import (
     get_microcycle_targets_for_phase,
     should_prioritize_lift_for_goal,
     get_endurance_focus_for_goal,
+    should_apply_phase_guardrails,
 )
 
 __all__ = [
@@ -264,4 +265,5 @@ __all__ = [
     "get_microcycle_targets_for_phase",
     "should_prioritize_lift_for_goal",
     "get_endurance_focus_for_goal",
+    "should_apply_phase_guardrails",
 ]

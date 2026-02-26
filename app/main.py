@@ -21,16 +21,7 @@ from app.performance_service import (
     get_or_compute_performance_report,
     compute_and_store_performance_report
 )
-from app.goal_service import (
-    create_goal,
-    get_goal,
-    get_active_goal,
-    activate_goal,
-    deactivate_goal,
-    list_goals,
-    get_goal_context_for_program,
-    delete_goal
-)
+from app.goal_service import GoalService, get_goal_context_for_program
 from app.domain.goal_engine import GoalConfig, GoalType
 from app.types import LiftType, EnduranceSport
 from app.config import settings
@@ -311,42 +302,40 @@ def create_goal_endpoint(
     {
         "goal_id": "spring_5k_2024",
         "athlete_id": "123",
-        "goal_type": "endurance_event",  // or "strength_peak", "concurrent_event"
+        "goal_type": "endurance_event",
         "target_date": "2024-05-15",
-        "priority": "endurance",  // or "strength", "balanced"
+        "priority": "endurance",
         "strength_targets": [{"lift": "squat", "metric": "3rm", "target_value": 140}],
         "endurance_targets": [{"sport": "running", "event_type": "5k", "target_value": 20.0}],
         "notes": "Spring 5K race goal"
     }
     """
     goal_config = GoalConfig.from_dict(goal_data)
-    goal_db = create_goal(db, goal_config)
+    goal_db = GoalService.create_goal(db, goal_config)
     return {
         "status": "created",
         "goal_id": goal_db.goal_id,
         "athlete_id": goal_db.athlete_id,
         "goal_type": goal_db.goal_type,
-        "target_date": goal_db.target_date,
-        "current_phase": goal_db.current_phase
+        "target_date": goal_db.target_date
     }
 
 
-@app.post("/goals/activate")
+@app.post("/goals/activate/{goal_id}")
 def activate_goal_endpoint(
-    athlete_id: int,
     goal_id: str,
     db: Session = Depends(get_db)
 ):
     """
     Activate a goal (deactivates other goals for athlete).
     """
-    goal_db = activate_goal(db, athlete_id, goal_id)
+    goal_db = GoalService.activate_goal(db, goal_id)
     if not goal_db:
         raise HTTPException(status_code=404, detail="Goal not found")
     return {
         "status": "activated",
         "goal_id": goal_db.goal_id,
-        "current_phase": goal_db.current_phase,
+        "goal_type": goal_db.goal_type,
         "target_date": goal_db.target_date
     }
 
@@ -359,7 +348,7 @@ def get_active_goal_endpoint(
     """
     Get active goal for athlete with current phase info.
     """
-    goal_db = get_active_goal(db, athlete_id)
+    goal_db = GoalService.get_active_goal(db, athlete_id)
     if not goal_db:
         return {"has_goal": False}
 
@@ -370,31 +359,27 @@ def get_active_goal_endpoint(
         "goal_type": goal_db.goal_type,
         "target_date": goal_db.target_date,
         "priority": goal_db.priority,
-        "current_phase": goal_db.current_phase,
-        "phase_start_date": goal_db.phase_start_date,
-        "phase_end_date": goal_db.phase_end_date,
         "block_type": context.get("block_type") if context else None,
-        "targets": context.get("targets") if context else None
+        "microcycle_targets": context.get("microcycle_targets") if context else None
     }
 
 
 @app.get("/goals/list")
 def list_goals_endpoint(
     athlete_id: int = Query(..., description="Athlete ID"),
-    active_only: bool = Query(False, description="Only active goals"),
+    include_inactive: bool = Query(False, description="Include inactive goals"),
     db: Session = Depends(get_db)
 ):
     """
     List all goals for athlete.
     """
-    goals = list_goals(db, athlete_id, active_only=active_only)
+    goals = GoalService.get_all_goals(db, athlete_id, include_inactive=include_inactive)
     return {
         "goals": [
             {
                 "goal_id": g.goal_id,
                 "goal_type": g.goal_type,
                 "target_date": g.target_date,
-                "current_phase": g.current_phase,
                 "active": g.active,
                 "created_at": g.created_at.isoformat() if g.created_at else None
             }
@@ -405,14 +390,13 @@ def list_goals_endpoint(
 
 @app.delete("/goals/{goal_id}")
 def delete_goal_endpoint(
-    athlete_id: int,
     goal_id: str,
     db: Session = Depends(get_db)
 ):
     """
     Delete a goal.
     """
-    success = delete_goal(db, athlete_id, goal_id)
+    success = GoalService.delete_goal(db, goal_id)
     if not success:
         raise HTTPException(status_code=404, detail="Goal not found")
     return {"status": "deleted", "goal_id": goal_id}

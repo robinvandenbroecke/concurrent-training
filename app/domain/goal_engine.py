@@ -614,3 +614,52 @@ def get_endurance_focus_for_goal(
     if goal_config.endurance_targets:
         return goal_config.endurance_targets[0].event_type
     return None
+
+
+# ============================================================================
+# Phase Guardrails for Performance Adjustments
+# ============================================================================
+
+def should_apply_phase_guardrails(
+    phase: str,
+    proposed_adjustment: Dict
+) -> Dict:
+    """
+    Apply phase guardrails to performance adjustments.
+    
+    Rules:
+    - Taper: cannot increase volume, only small intensity touches
+    - Peak: no extra volume, allow slight intensity adjustment
+    - Base/Build: normal performance feedback
+    
+    Args:
+        phase: Current phase string
+        proposed_adjustment: Performance adjustment dict
+    
+    Returns:
+        Adjusted adjustment dict
+    """
+    adjusted = dict(proposed_adjustment)
+    
+    if phase == PhaseType.TAPER.value:
+        # Taper: cannot increase volume
+        if adjusted.get("volume_adjustment_pct", 0) > 0:
+            adjusted["volume_adjustment_pct"] = 0
+        if adjusted.get("add_stimulus_lifts"):
+            adjusted["add_stimulus_lifts"] = []
+        if adjusted.get("add_hiit_intervals", 0) > 0:
+            adjusted["add_hiit_intervals"] = 0
+        # Allow small intensity adjustment only
+        if adjusted.get("intensity_adjustment_pct", 0) > 0.02:
+            adjusted["intensity_adjustment_pct"] = 0.02
+        adjusted["phase_guardrail_applied"] = "taper_volume_locked"
+    
+    elif phase == PhaseType.PEAK.value:
+        # Peak: no extra volume
+        if adjusted.get("volume_adjustment_pct", 0) > 0:
+            adjusted["volume_adjustment_pct"] = 0
+        if adjusted.get("add_stimulus_lifts"):
+            adjusted["add_stimulus_lifts"] = []
+        adjusted["phase_guardrail_applied"] = "peak_no_extra_volume"
+    
+    return adjusted

@@ -223,52 +223,17 @@ class Goal(Base):
     # Active status
     active = Column(Boolean, default=True)
     
-    # Macrocycle context (computed from goal)
-    macrocycle_json = Column(JSON, nullable=True)
-    
     # Goal state (current phase, etc.)
     goal_state_json = Column(JSON, nullable=True)
+    
+    # Macrocycle context (computed from goal)
+    macrocycle_json = Column(JSON, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     __table_args__ = (
         UniqueConstraint('athlete_id', 'active', name='uq_athlete_active_goal'),
-    )
-    
-    athlete = relationship("Athlete")
-
-
-class Goal(Base):
-    """Training goals and event targets"""
-    __tablename__ = "goals"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    goal_id = Column(String(50), unique=True, nullable=False)
-    athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
-    
-    # Goal configuration
-    goal_type = Column(String(30), nullable=False)  # strength_peak, endurance_event, concurrent_event
-    target_date = Column(String(10), nullable=False)  # YYYY-MM-DD
-    priority = Column(String(20), default="balanced")  # strength, endurance, balanced
-    
-    # Complete goal config as JSON
-    goal_json = Column(JSON, nullable=False)
-    
-    # Goal state
-    active = Column(Boolean, default=True)
-    current_phase = Column(String(20), default="base")  # base, build, peak, taper
-    phase_start_date = Column(String(10), nullable=True)
-    phase_end_date = Column(String(10), nullable=True)
-    
-    # Macrocycle context
-    macrocycle_json = Column(JSON, nullable=True)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    __table_args__ = (
-        UniqueConstraint('athlete_id', 'goal_id', name='uq_athlete_goal'),
     )
     
     athlete = relationship("Athlete")

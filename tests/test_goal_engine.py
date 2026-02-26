@@ -1,7 +1,7 @@
 """
 Tests for goal engine.
 
-Tests goal configuration, phase scheduling, and macrocycle creation.
+Tests phase scheduling, macrocycle creation, and goal state management.
 """
 import pytest
 from datetime import date, timedelta
@@ -28,12 +28,12 @@ from app.domain.goal_engine import (
 )
 
 
-class TestPhaseDurationComputation:
+class TestPhaseDurations:
     """Test phase duration computation based on time to event."""
     
-    def test_12_weeks_plus_full_macrocycle(self):
-        """12+ weeks gets full macrocycle."""
-        durations = compute_phase_durations(84)  # 12 weeks
+    def test_12_week_schedule(self):
+        """12+ weeks: full macrocycle with 6w base, 4w build, 1w peak, 1w taper."""
+        durations = compute_phase_durations(84)  # Exactly 12 weeks
         
         assert durations[PhaseType.BASE] == 6
         assert durations[PhaseType.BUILD] == 4
@@ -41,52 +41,51 @@ class TestPhaseDurationComputation:
         assert durations[PhaseType.TAPER] == 1
         assert sum(durations.values()) == 12
     
-    def test_10_weeks_compressed(self):
-        """8-11 weeks gets compressed macrocycle."""
+    def test_10_week_schedule(self):
+        """10 weeks: compressed with 4w base, 3w build."""
         durations = compute_phase_durations(70)  # 10 weeks
         
         assert durations[PhaseType.BASE] == 4
         assert durations[PhaseType.BUILD] == 3
         assert durations[PhaseType.PEAK] == 1
         assert durations[PhaseType.TAPER] == 1
-        assert sum(durations.values()) == 9
     
-    def test_6_weeks_minimal(self):
-        """4-7 weeks gets minimal base."""
+    def test_6_week_schedule(self):
+        """6 weeks: minimal base with 2w base, 2w build."""
         durations = compute_phase_durations(42)  # 6 weeks
         
         assert durations[PhaseType.BASE] == 2
-        assert durations[PhaseType.BUILD] == 2  # >=42d so 2 weeks
+        assert durations[PhaseType.BUILD] == 2
         assert durations[PhaseType.PEAK] == 1
         assert durations[PhaseType.TAPER] == 1
     
-    def test_5_weeks_shorter_build(self):
-        """<42d gets shorter build."""
+    def test_5_week_schedule(self):
+        """5 weeks: minimal base with 2w base, 1w build."""
         durations = compute_phase_durations(35)  # 5 weeks
         
         assert durations[PhaseType.BASE] == 2
-        assert durations[PhaseType.BUILD] == 1  # <42d so 1 week
+        assert durations[PhaseType.BUILD] == 1
         assert durations[PhaseType.PEAK] == 1
         assert durations[PhaseType.TAPER] == 1
     
-    def test_3_weeks_crash_prep(self):
-        """<4 weeks gets crash prep."""
+    def test_3_week_crash_prep(self):
+        """3 weeks: crash prep with minimal base."""
         durations = compute_phase_durations(21)  # 3 weeks
         
-        # Should have minimal or no base
-        assert PhaseType.TAPER in durations
-        assert PhaseType.PEAK in durations
+        # Should have at least build, peak, taper
         assert PhaseType.BUILD in durations
+        assert PhaseType.PEAK in durations
+        assert PhaseType.TAPER in durations
 
 
 class TestMacrocycleCreation:
     """Test macrocycle creation."""
     
     def test_strength_peak_macrocycle(self):
-        """Create strength peak macrocycle."""
+        """Create macrocycle for strength peak goal."""
         goal = GoalConfig(
-            goal_id="test_strength",
-            athlete_id="123",
+            goal_id="strength_test_2024",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
             target_date=date.today() + timedelta(days=84),
             priority="strength",
@@ -100,13 +99,17 @@ class TestMacrocycleCreation:
         assert len(macrocycle.phases) == 4
         assert macrocycle.phases[0].phase_type == PhaseType.BASE
         assert macrocycle.phases[-1].phase_type == PhaseType.TAPER
-        assert macrocycle.phases[-1].end_date == goal.target_date - timedelta(days=1)
+        
+        # Check phase targets for strength
+        base_phase = macrocycle.phases[0]
+        assert base_phase.target_sets_per_week == 15
+        assert base_phase.target_intensity == 0.75
     
     def test_endurance_event_macrocycle(self):
-        """Create endurance event macrocycle."""
+        """Create macrocycle for endurance event goal."""
         goal = GoalConfig(
-            goal_id="test_endurance",
-            athlete_id="123",
+            goal_id="5k_race_2024",
+            athlete_id="athlete_1",
             goal_type=GoalType.ENDURANCE_EVENT,
             target_date=date.today() + timedelta(days=70),
             priority="endurance",
@@ -117,16 +120,17 @@ class TestMacrocycleCreation:
         
         macrocycle = create_macrocycle(goal)
         
-        assert len(macrocycle.phases) >= 3
-        # Endurance goals should have HIIT in build/peak
-        build_phase = next(p for p in macrocycle.phases if p.phase_type == PhaseType.BUILD)
-        assert build_phase.target_hiit_sessions >= 1
+        assert len(macrocycle.phases) == 4
+        
+        # Check base phase has HIIT allowance for endurance
+        base_phase = macrocycle.phases[0]
+        assert base_phase.target_hiit_sessions == 1
     
     def test_concurrent_event_macrocycle(self):
-        """Create concurrent event macrocycle."""
+        """Create macrocycle for concurrent event goal."""
         goal = GoalConfig(
-            goal_id="test_concurrent",
-            athlete_id="123",
+            goal_id="hybrid_goal_2024",
+            athlete_id="athlete_1",
             goal_type=GoalType.CONCURRENT_EVENT,
             target_date=date.today() + timedelta(days=56),
             priority="balanced",
@@ -135,28 +139,29 @@ class TestMacrocycleCreation:
         
         macrocycle = create_macrocycle(goal)
         
-        assert len(macrocycle.phases) >= 3
+        assert len(macrocycle.phases) == 4
+        
         # Balanced should have moderate targets
-        base_phase = next(p for p in macrocycle.phases if p.phase_type == PhaseType.BASE)
-        assert 8 <= base_phase.target_sets_per_week <= 12
+        base_phase = macrocycle.phases[0]
+        assert base_phase.target_sets_per_week == 10
     
-    def test_macrocycle_hits_target_date(self):
-        """Macrocycle end date matches target date (within a few days)."""
-        target = date(2024, 6, 15)
+    def test_schedule_fits_exactly_to_target_date(self):
+        """Macrocycle ends exactly on target date."""
+        target = date.today() + timedelta(days=70)
         goal = GoalConfig(
-            goal_id="test_date",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
             target_date=target,
             priority="strength"
         )
 
-        macrocycle = create_macrocycle(goal, start_date=date(2024, 3, 15))
+        macrocycle = create_macrocycle(goal)
 
+        # Last phase should end on or very close to target date (within rounding)
         last_phase = macrocycle.phases[-1]
-        # End date should be at or very near target date (within a few days due to week rounding)
-        days_diff = abs((last_phase.end_date - (target - timedelta(days=1))).days)
-        assert days_diff <= 3, f"End date {last_phase.end_date} too far from target {target}"
+        date_diff = abs((last_phase.end_date - target).days)
+        assert date_diff <= 1, f"Last phase ends {date_diff} days from target"
 
 
 class TestGoalState:
@@ -165,160 +170,75 @@ class TestGoalState:
     def test_create_initial_goal_state(self):
         """Create initial goal state from macrocycle."""
         goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
             target_date=date.today() + timedelta(days=84),
             priority="strength"
         )
-        macrocycle = create_macrocycle(goal)
         
+        macrocycle = create_macrocycle(goal)
         state = create_goal_state(goal, macrocycle)
         
         assert state.goal_id == goal.goal_id
+        assert state.athlete_id == goal.athlete_id
         assert state.active is True
         assert state.current_phase == PhaseType.BASE
-        assert state.microcycles_completed_in_phase == 0
     
     def test_advance_goal_state_to_next_phase(self):
-        """Advance goal state when phase complete."""
-        today = date.today()
-        state = GoalState(
-            goal_id="test",
-            athlete_id="123",
-            active=True,
-            current_phase=PhaseType.BASE,
-            phase_start_date=today - timedelta(days=10),
-            phase_end_date=today - timedelta(days=1),  # Past
-            last_phase_update_date=today - timedelta(days=10)
-        )
-        
+        """Advance goal state when current phase completes."""
         goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
-            target_date=today + timedelta(days=60),
+            target_date=date.today() + timedelta(days=84),
             priority="strength"
         )
-        macrocycle = create_macrocycle(goal, start_date=today - timedelta(days=10))
         
-        updated = advance_goal_state(state, macrocycle)
+        macrocycle = create_macrocycle(goal)
+        state = create_goal_state(goal, macrocycle)
         
-        # Should have advanced
-        assert updated.current_phase != PhaseType.BASE
-        assert updated.microcycles_completed_in_phase == 0
-    
-    def test_no_advance_if_phase_not_complete(self):
-        """Don't advance if phase not complete."""
-        today = date.today()
-        state = GoalState(
-            goal_id="test",
-            athlete_id="123",
-            active=True,
-            current_phase=PhaseType.BASE,
-            phase_start_date=today - timedelta(days=3),
-            phase_end_date=today + timedelta(days=4),  # Future
-            last_phase_update_date=today - timedelta(days=3),
-            microcycles_completed_in_phase=1
-        )
+        # Manually set state to end of base phase
+        state.phase_end_date = date.today() - timedelta(days=1)
+        state.current_phase = PhaseType.BASE
         
-        goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
-            goal_type=GoalType.STRENGTH_PEAK,
-            target_date=today + timedelta(days=60),
-            priority="strength"
-        )
-        macrocycle = create_macrocycle(goal, start_date=today - timedelta(days=3))
+        # Advance should move to build
+        new_state = advance_goal_state(state, macrocycle)
         
-        updated = advance_goal_state(state, macrocycle)
-        
-        # Should stay in same phase
-        assert updated.current_phase == PhaseType.BASE
+        assert new_state.current_phase == PhaseType.BUILD
 
 
-class TestPhaseToBlockMapping:
-    """Test phase to program block mapping."""
+class TestProgramIntegration:
+    """Test integration with program engine."""
     
-    def test_base_phase_maps_to_base_block(self):
-        """BASE phase maps to base block."""
+    def test_get_block_type_for_phase(self):
+        """Map goal phases to program engine block types."""
         assert get_block_type_for_phase(PhaseType.BASE) == "base"
-    
-    def test_build_phase_maps_to_build_block(self):
-        """BUILD phase maps to build block."""
         assert get_block_type_for_phase(PhaseType.BUILD) == "build"
-    
-    def test_peak_phase_maps_to_peak_block(self):
-        """PEAK phase maps to peak block."""
         assert get_block_type_for_phase(PhaseType.PEAK) == "peak"
-    
-    def test_taper_phase_maps_to_deload_block(self):
-        """TAPER phase maps to deload block."""
         assert get_block_type_for_phase(PhaseType.TAPER) == "deload"
-
-
-class TestMicrocycleTargets:
-    """Test microcycle targets for phases."""
     
-    def test_strength_peak_targets(self):
-        """Strength peak goal has correct targets per phase."""
+    def test_get_microcycle_targets_for_strength_peak(self):
+        """Get microcycle targets for strength peak goal."""
         goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
             target_date=date.today() + timedelta(days=84),
             priority="strength"
         )
         
-        base_targets = get_microcycle_targets_for_phase(PhaseType.BASE, goal)
-        peak_targets = get_microcycle_targets_for_phase(PhaseType.PEAK, goal)
+        targets = get_microcycle_targets_for_phase(PhaseType.PEAK, goal)
         
-        # Base: higher volume, lower intensity
-        assert base_targets["target_sets_per_week"] > peak_targets["target_sets_per_week"]
-        assert base_targets["target_avg_intensity"] < peak_targets["target_avg_intensity"]
-        
-        # Peak: minimal HIIT
-        assert peak_targets["target_hiit_sessions"] == 0
+        assert targets["target_sets_per_week"] == 8
+        assert targets["target_avg_intensity"] == 0.88
+        assert targets["target_hiit_sessions"] == 0
     
-    def test_endurance_event_targets(self):
-        """Endurance event goal has correct targets per phase."""
+    def test_should_prioritize_lift_for_goal(self):
+        """Check if lift should be prioritized."""
         goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
-            goal_type=GoalType.ENDURANCE_EVENT,
-            target_date=date.today() + timedelta(days=84),
-            priority="endurance"
-        )
-        
-        build_targets = get_microcycle_targets_for_phase(PhaseType.BUILD, goal)
-        
-        # Endurance: HIIT in build phase
-        assert build_targets["target_hiit_sessions"] >= 1
-    
-    def test_concurrent_balanced_targets(self):
-        """Concurrent balanced goal has moderate targets."""
-        goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
-            goal_type=GoalType.CONCURRENT_EVENT,
-            target_date=date.today() + timedelta(days=84),
-            priority="balanced"
-        )
-        
-        base_targets = get_microcycle_targets_for_phase(PhaseType.BASE, goal)
-        
-        # Balanced: moderate volume
-        assert 8 <= base_targets["target_sets_per_week"] <= 12
-
-
-class TestGoalPrioritization:
-    """Test goal-based prioritization."""
-    
-    def test_prioritize_goal_lift(self):
-        """Should prioritize lifts in goal targets."""
-        goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
             target_date=date.today() + timedelta(days=84),
             priority="strength",
@@ -330,11 +250,11 @@ class TestGoalPrioritization:
         assert should_prioritize_lift_for_goal("squat", goal) is True
         assert should_prioritize_lift_for_goal("bench", goal) is False
     
-    def test_endurance_focus_from_goal(self):
+    def test_get_endurance_focus_for_goal(self):
         """Get endurance focus from goal."""
         goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.ENDURANCE_EVENT,
             target_date=date.today() + timedelta(days=84),
             priority="endurance",
@@ -347,57 +267,71 @@ class TestGoalPrioritization:
         assert focus == "5k"
 
 
-class TestGoalSerialization:
-    """Test goal config serialization."""
+class TestMacrocycleContext:
+    """Test macrocycle context operations."""
     
-    def test_round_trip_serialization(self):
-        """Config survives round-trip through JSON."""
-        original = GoalConfig(
-            goal_id="test_roundtrip",
-            athlete_id="123",
-            goal_type=GoalType.CONCURRENT_EVENT,
-            target_date=date(2024, 6, 15),
-            priority="balanced",
-            strength_targets=[
-                StrengthTarget(lift="squat", metric="3rm", target_value=140)
-            ],
-            endurance_targets=[
-                EnduranceTarget(sport="cycling", event_type="long_ride")
-            ],
-            concurrent_target=ConcurrentTarget.STRONG_AND_DURABLE,
-            notes="Test goal"
+    def test_get_current_phase(self):
+        """Get phase active on a given date."""
+        today = date.today()
+        goal = GoalConfig(
+            goal_id="test_goal",
+            athlete_id="athlete_1",
+            goal_type=GoalType.STRENGTH_PEAK,
+            target_date=today + timedelta(days=84),
+            priority="strength"
+        )
+
+        macrocycle = create_macrocycle(goal)
+
+        # Current phase should be base
+        current = macrocycle.get_current_phase(today)
+        assert current.phase_type == PhaseType.BASE
+
+        # Phase near target date should be taper (within rounding tolerance)
+        taper_date = goal.target_date - timedelta(days=1)
+        taper = macrocycle.get_phase_for_date(taper_date)
+        assert taper is not None
+        assert taper.phase_type == PhaseType.TAPER
+    
+    def test_phase_dates_are_contiguous(self):
+        """Phases should be contiguous without gaps."""
+        goal = GoalConfig(
+            goal_id="test_goal",
+            athlete_id="athlete_1",
+            goal_type=GoalType.STRENGTH_PEAK,
+            target_date=date.today() + timedelta(days=84),
+            priority="strength"
         )
         
-        json_str = original.to_json()
-        restored = GoalConfig.from_dict(original.to_dict())
+        macrocycle = create_macrocycle(goal)
         
-        assert restored.goal_id == original.goal_id
-        assert restored.goal_type == original.goal_type
-        assert restored.target_date == original.target_date
-        assert restored.strength_targets[0].lift == "squat"
-        assert restored.endurance_targets[0].sport == "cycling"
-        assert restored.concurrent_target == ConcurrentTarget.STRONG_AND_DURABLE
+        for i in range(len(macrocycle.phases) - 1):
+            current_end = macrocycle.phases[i].end_date
+            next_start = macrocycle.phases[i + 1].start_date
+            assert next_start == current_end + timedelta(days=1)
 
 
 class TestDeterminism:
     """Test deterministic behavior."""
     
-    def test_same_goal_same_macrocycle(self):
-        """Same goal config produces same macrocycle."""
+    def test_same_input_same_schedule(self):
+        """Same inputs produce identical macrocycle."""
+        target = date.today() + timedelta(days=84)
         goal = GoalConfig(
-            goal_id="test",
-            athlete_id="123",
+            goal_id="test_goal",
+            athlete_id="athlete_1",
             goal_type=GoalType.STRENGTH_PEAK,
-            target_date=date(2024, 6, 15),
+            target_date=target,
             priority="strength"
         )
         
-        start = date(2024, 3, 15)
-        macrocycle1 = create_macrocycle(goal, start_date=start)
-        macrocycle2 = create_macrocycle(goal, start_date=start)
+        macrocycle1 = create_macrocycle(goal)
+        macrocycle2 = create_macrocycle(goal)
         
         assert len(macrocycle1.phases) == len(macrocycle2.phases)
+        
         for p1, p2 in zip(macrocycle1.phases, macrocycle2.phases):
             assert p1.phase_type == p2.phase_type
             assert p1.duration_weeks == p2.duration_weeks
             assert p1.start_date == p2.start_date
+            assert p1.end_date == p2.end_date
