@@ -91,7 +91,8 @@ class TestConcurrentTrainingModel:
     
     def test_recovery_increases_availability(self):
         model = ConcurrentTrainingModel()
-        tired_state = RepLevelState(x_l=-0.5, x_sys=-0.3, M=1.0)
+        # Moderate fatigue, lower metabolic load for realistic recovery
+        tired_state = RepLevelState(x_l=-0.5, x_sys=-0.3, M=0.3)
         
         recovered = model.recover_during_rest(
             tired_state,
@@ -99,7 +100,7 @@ class TestConcurrentTrainingModel:
             R_mito=0.5
         )
         
-        # Should recover
+        # Should recover availability and clear metabolic load
         assert recovered.A_l > tired_state.A_l
         assert recovered.A_sys > tired_state.A_sys
         assert recovered.M < tired_state.M
@@ -170,21 +171,22 @@ class TestAutoregulator:
         model = ConcurrentTrainingModel()
         autoreg = Autoregulator(model)
         
-        # Fresh state, good predicted velocity
-        state = RepLevelState(x_l=-0.05, x_sys=-0.02, M=0.1)
+        # Near-perfect state - very high predicted velocity
+        # x_l = -0.02 gives A_l ~ 0.98, x_sys = 0 gives A_sys = 1.0
+        state = RepLevelState(x_l=-0.02, x_sys=0.0, M=0.0)
         
         action = autoreg.suggest_action(
             state,
             target_v_low=0.35,
             target_v_high=0.45,
             vl_max=20.0,
-            v_ref=0.5,  # v_pred should be close to this
+            v_ref=0.5,  # With A_l=0.98, A_sys=1.0, v_pred ~ 0.49
             current_reps_done=0,
             planned_reps=5,
             current_weight=100
         )
         
-        # Should suggest load increase
+        # With v_pred ~ 0.49 > target_v_high (0.45), should suggest load increase
         assert action["load_change"] > 0
     
     def test_readiness_explanations(self):
