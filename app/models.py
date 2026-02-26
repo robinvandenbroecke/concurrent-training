@@ -1,7 +1,7 @@
 """Database models"""
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, ForeignKey, 
-    JSON, Enum as SQLEnum, UniqueConstraint
+    JSON, Enum as SQLEnum, UniqueConstraint, Boolean
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -146,3 +146,32 @@ class SystemParameters(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class WorkoutPlan(Base):
+    """Generated workout plans"""
+    __tablename__ = "workout_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
+    date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    mode = Column(String(20), nullable=False)  # strength/endurance/concurrent
+    
+    # Plan stored as JSON
+    plan_json = Column(JSON, nullable=False)
+    
+    # Readiness snapshot at generation time
+    readiness_snapshot = Column(JSON, default=dict)
+    
+    # Status
+    is_adapted = Column(Boolean, default=False)
+    original_plan_id = Column(Integer, ForeignKey("workout_plans.id"), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('athlete_id', 'date', name='uq_athlete_workout_date'),
+    )
+    
+    athlete = relationship("Athlete")
