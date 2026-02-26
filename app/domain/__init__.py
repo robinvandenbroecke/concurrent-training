@@ -41,6 +41,10 @@ from .day_engine import (
     compute_readiness,
     simulate_day_transition,
     create_initial_state,
+    # H1: Hardened model functions
+    update_R_mito,
+    update_capacity_with_saturation,
+    update_T_legs,
 )
 
 from .coach_engine import (
@@ -115,6 +119,8 @@ from .performance_engine import (
     compute_microcycle_adjustment,
     should_force_deload,
     get_lift_priority_ranking,
+    # H1: EWMA trends
+    compute_ewma,
 )
 
 from .goal_engine import (
@@ -246,6 +252,11 @@ __all__ = [
     "compute_microcycle_adjustment",
     "should_force_deload",
     "get_lift_priority_ranking",
+    # H1: Hardened model exports
+    "compute_ewma",
+    "update_R_mito",
+    "update_capacity_with_saturation",
+    "update_T_legs",
     # Sprint 7: Goal engine exports
     "GoalType",
     "ConcurrentTarget",

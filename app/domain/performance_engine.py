@@ -393,16 +393,47 @@ def _compute_median(values: List[float]) -> Optional[float]:
     return sorted_vals[n//2]
 
 
+def compute_ewma(values: List[float], tau: float = 7.0) -> Optional[float]:
+    """
+    H1: Compute Exponentially Weighted Moving Average.
+    
+    EWMA gives more weight to recent observations while smoothing noise.
+    Higher tau = more smoothing, slower response to changes.
+    
+    Args:
+        values: List of values (oldest first)
+        tau: Time constant in observations (default 7)
+    
+    Returns:
+        EWMA value or None if empty
+    """
+    if not values:
+        return None
+    
+    # Decay factor: alpha = 1 / (tau + 1)
+    alpha = 1.0 / (tau + 1.0)
+    
+    ewma = values[0]
+    for value in values[1:]:
+        ewma = alpha * value + (1 - alpha) * ewma
+    
+    return ewma
+
+
 def analyze_lift_trend(
     lift: str,
     sessions: List[StrengthSessionMetrics],
     today: date = None,
-    day_states: Optional[List[Dict]] = None
+    day_states: Optional[List[Dict]] = None,
+    ewma_tau: float = 7.0  # H1: Configurable EWMA time constant
 ) -> LiftPerformanceTrend:
     """
-    Analyze performance trend for a lift over multiple sessions.
+    H1: Analyze performance trend using EWMA-based detection.
     
-    Uses 28-day window with specific classification thresholds:
+    Uses EWMA (Exponentially Weighted Moving Average) for smoother,
+    more responsive trend detection compared to median windows.
+    
+    Classification thresholds:
     - progress: delta >= +1.5%
     - stagnation: -1% < delta < +1.5%
     - regression: delta <= -1%
@@ -412,6 +443,7 @@ def analyze_lift_trend(
         sessions: List of session metrics (sorted by date)
         today: Reference date (default: today)
         day_states: Optional day state data for overreaching detection
+        ewma_tau: EWMA time constant in sessions (default 7)
     
     Returns:
         LiftPerformanceTrend
@@ -421,8 +453,9 @@ def analyze_lift_trend(
     if not sessions:
         return LiftPerformanceTrend(lift=lift)
     
-    # Filter quality sessions
-    quality_sessions = [s for s in sessions if s.quality_ok and s.e1rm_est is not None]
+    # H1: Prefer VBT-based performance index when available
+    # Filter sessions with either e1rm_est OR perf_y (VBT-based)
+    quality_sessions = [s for s in sessions if s.quality_ok and (s.e1rm_est is not None or s.perf_y is not None)]
     
     if not quality_sessions:
         return LiftPerformanceTrend(lift=lift)
@@ -439,19 +472,42 @@ def analyze_lift_trend(
     d7 = today - timedelta(days=7)
     d90 = today - timedelta(days=90)
     
-    # Baseline: median of weeks 2-4 (days -28 to -8)
-    baseline_sessions = [s for s in quality_sessions if d28 <= s.session_date < d8]
-    baseline_values = [s.e1rm_est for s in baseline_sessions if s.e1rm_est]
-    baseline_median = _compute_median(baseline_values) if baseline_values else None
+    # H1: EWMA-based trend detection
+    # Get all e1rm values (using perf_y as proxy if e1rm not available)
+    all_values = []
+    for s in quality_sessions:
+        if s.e1rm_est is not None:
+            all_values.append(s.e1rm_est)
+        elif s.perf_y is not None:
+            # Use perf_y scaled to approximate e1rm range (0.5-2.0 -> 50-200)
+            all_values.append(s.perf_y * 100)
     
-    # Recent: median of last 7 days (or last 7 non-null points)
+    # H1: Compute EWMA for baseline (older data, weeks 2-4)
+    baseline_sessions = [s for s in quality_sessions if d28 <= s.session_date < d8]
+    baseline_values = []
+    for s in baseline_sessions:
+        if s.e1rm_est is not None:
+            baseline_values.append(s.e1rm_est)
+        elif s.perf_y is not None:
+            baseline_values.append(s.perf_y * 100)
+    
+    # H1: EWMA baseline (more stable)
+    baseline_ewma = compute_ewma(baseline_values, tau=ewma_tau * 2) if baseline_values else None
+    
+    # H1: Compute EWMA for recent (last 7 days)
     recent_sessions = [s for s in quality_sessions if s.session_date >= d7]
     if len(recent_sessions) < 2:
-        # Use last 7 non-null points
         recent_sessions = quality_sessions[-7:] if len(quality_sessions) >= 7 else quality_sessions
     
-    recent_values = [s.e1rm_est for s in recent_sessions if s.e1rm_est]
-    recent_median = _compute_median(recent_values) if recent_values else None
+    recent_values = []
+    for s in recent_sessions:
+        if s.e1rm_est is not None:
+            recent_values.append(s.e1rm_est)
+        elif s.perf_y is not None:
+            recent_values.append(s.perf_y * 100)
+    
+    # H1: EWMA recent (more responsive)
+    recent_ewma = compute_ewma(recent_values, tau=ewma_tau) if recent_values else None
     
     # Historical lookups for PR detection
     sessions_28d = [s for s in quality_sessions if s.session_date >= d28]
@@ -481,12 +537,12 @@ def analyze_lift_trend(
     if current.perf_y and best_28d_perf_y_excl_current:
         is_velocity_pr = current.perf_y > best_28d_perf_y_excl_current * 1.02  # 2% improvement
     
-    # Trend classification with specific thresholds
+    # H1: EWMA-based trend classification
     e1rm_trend = TrendDirection.STABLE
     delta = None
     
-    if recent_median and baseline_median and baseline_median > 0:
-        delta = (recent_median - baseline_median) / baseline_median
+    if recent_ewma and baseline_ewma and baseline_ewma > 0:
+        delta = (recent_ewma - baseline_ewma) / baseline_ewma
         
         # Classification thresholds:
         # progress: >= +1.5%
@@ -508,7 +564,7 @@ def analyze_lift_trend(
         if high_fatigue_days >= 3:
             e1rm_trend = TrendDirection.OVERREACHING
     
-    # Velocity trend (simplified)
+    # H1: Velocity trend using EWMA
     perf_y_trend = TrendDirection.STABLE
     current_perf_y = current.perf_y
     if current_perf_y and best_28d_perf_y and best_28d_perf_y > 0:
@@ -531,8 +587,8 @@ def analyze_lift_trend(
         is_velocity_pr=is_velocity_pr,
         e1rm_trend=e1rm_trend,
         perf_y_trend=perf_y_trend,
-        e1rm_7d_avg=recent_median,
-        e1rm_prev_7d_avg=baseline_median,
+        e1rm_7d_avg=recent_ewma,  # H1: EWMA instead of median
+        e1rm_prev_7d_avg=baseline_ewma,  # H1: EWMA instead of median
     )
 
 

@@ -1,9 +1,17 @@
 """
-Day-level state engine for concurrent training.
+Day-level state engine for concurrent training (HARDENED - Sprint H1).
+
+SPRINT H1: MODEL HARDENING & IDENTIFIABILITY
+- Added capacity saturation: C_l update includes (1 - C_l/C_max_l) term
+- Bound R_mito in [0,1] with enhanced Z2/HIIT updates and overload penalty
+- All interference terms are explicit functions (no placeholders)
+- Added T_legs structural/connective tissue state with slow tau (14-28d)
+- T_legs guards heavy lower body work readiness
 
 Maintains and updates daily states:
-- Per-lift: D_l (fatigue), F_l (fitness), C_l (capacity)
-- System: D_sys (system fatigue), R_mito (recovery capacity), E_fat (endurance fatigue)
+- Per-lift: D_l (fatigue), F_l (fitness), C_l (capacity, now with saturation)
+- System: D_sys (system fatigue), R_mito (recovery capacity, bounded [0,1]), E_fat (endurance fatigue)
+- Structural: T_legs (connective tissue fatigue, slow recovery)
 
 Deterministic, pure Python domain logic.
 """
@@ -57,6 +65,12 @@ class DayEngineParams:
         'clean': 0.8,
     })
     
+    # H1: Structural/connective tissue parameters
+    tau_T_legs: float = 21.0  # Slow recovery for connective tissue (14-28d range)
+    k_T_legs: float = 0.0002  # Tissue fatigue accumulation rate
+    k_T_high_intensity: float = 0.0004  # Extra tissue cost for high intensity (>85%)
+    T_legs_guardrail_threshold: float = 0.35  # Threshold for heavy legs guardrail
+    
     # Time constants (days)
     tau_mito: float = 45.0
     tau_Efat: float = 3.0
@@ -86,13 +100,23 @@ class DayEngineParams:
     k_SE: float = 0.00012  # Strength-to-endurance coupling
     k_Fl: float = 0.00008
     
-    # Capacity update
+    # Capacity update (H1: added saturation)
     g_l: float = 0.015  # Fitness contribution to capacity
     h_l: float = 0.010  # Fatigue reduction of capacity
     lambda_l: float = 0.0  # Detraining (v1: none)
     C_min: float = 20.0  # Minimum capacity floor
+    C_max: float = 200.0  # H1: Maximum capacity ceiling (saturation)
+    capacity_saturation_alpha: float = 1.0  # H1: Saturation curve steepness
     
-    # Interference coefficients
+    # H1: Enhanced R_mito parameters
+    k_mito_z2: float = 0.0010  # R_mito gain from Z2 (separate from HIIT)
+    k_mito_hiit: float = 0.0003  # R_mito gain from HIIT (smaller)
+    k_mito_decay: float = 0.02  # R_mito decay rate
+    k_mito_overload: float = 0.0005  # R_mito penalty from overload
+    R_mito_max: float = 1.0  # H1: Hard upper bound
+    R_mito_min: float = 0.0  # H1: Hard lower bound
+    
+    # Interference coefficients (H1: all explicit, no placeholders)
     k_ES_l: Dict[str, float] = field(default_factory=lambda: {
         'deadlift': 0.00035,
         'squat': 0.00030,
@@ -146,6 +170,7 @@ class SetImpulse:
     velocity_factor: float  # V = mean(v_ref/v_obs)
     vl: float  # Velocity loss
     reps: int
+    avg_intensity_pct: float = 0.0  # H1: Average %1RM for tissue fatigue
 
 
 @dataclass
@@ -155,6 +180,7 @@ class StrengthImpulses:
     u_sys: float  # System impulse
     u_legs: float  # Legs aggregate
     u_met: float  # Metabolic strength impulse
+    u_legs_high_intensity: float  # H1: High intensity legs impulse for T_legs
     sets: List[SetImpulse]  # Raw set data
 
 
@@ -187,12 +213,13 @@ class PerLiftState:
 
 @dataclass
 class DayState:
-    """Full day state for an athlete."""
+    """Full day state for an athlete (H1: added T_legs)."""
     date: date
     per_lift: Dict[str, PerLiftState] = field(default_factory=dict)
     D_sys: float = 0.0  # System fatigue (0-1+)
-    R_mito: float = 0.0  # Recovery capacity (0+)
+    R_mito: float = 0.0  # Recovery capacity (0-1, H1: now bounded)
     E_fat: float = 0.0  # Endurance fatigue (0-1+)
+    T_legs: float = 0.0  # H1: Structural/connective tissue fatigue (0-1+)
     
     def get_lift(self, lift: str) -> PerLiftState:
         """Get or create per-lift state."""
@@ -207,6 +234,7 @@ class ReadinessOutput:
     per_lift: Dict[str, float]  # 0-1 scale
     endurance: float  # 0-1 scale
     overall: float  # Weighted average
+    legs_structural: float  # H1: T_legs readiness for heavy lower
     explanations: List[str]
 
 
@@ -228,6 +256,7 @@ def compute_strength_impulses(
     u_sys = 0.0
     u_legs = 0.0
     u_met = 0.0
+    u_legs_high_intensity = 0.0  # H1: For T_legs
     
     for s in sets:
         # Fatigue cost factor: P = 1 + p_VL * VL
@@ -249,6 +278,12 @@ def compute_strength_impulses(
         # Legs aggregate
         if s.lift in params.legs_weights:
             u_legs += params.legs_weights[s.lift] * u_set
+            
+            # H1: High intensity sets (>85%) contribute more to T_legs
+            if s.avg_intensity_pct > 0.85:
+                u_legs_high_intensity += params.legs_weights[s.lift] * u_set * (
+                    (s.avg_intensity_pct - 0.85) / 0.15  # Scale 0-1 based on how far above 85%
+                )
         
         # Metabolic impulse (simple: all high-rep sets count)
         if s.reps >= 8:
@@ -259,6 +294,7 @@ def compute_strength_impulses(
         u_sys=u_sys,
         u_legs=u_legs,
         u_met=u_met,
+        u_legs_high_intensity=u_legs_high_intensity,  # H1
         sets=sets
     )
 
@@ -318,27 +354,148 @@ def compute_interference(
     timing_factor: float = 1.0
 ) -> Tuple[Dict[str, float], float]:
     """
-    Compute interference from endurance to strength.
+    H1: Compute interference from endurance to strength (all explicit terms).
     
     Returns:
         Tuple of (per_lift_interference, system_interference)
     """
     if not endurance.has_HIIT or endurance.u_E_HIIT <= 0:
+        # H1: Explicit - return zero interference, not placeholder
         return ({lift: 0.0 for lift in params.omega.keys()}, 0.0)
     
     mode_factor = params.get_mode_factor(endurance.mode)
+    
+    # H1: Explicit interference calculation
+    # Interference = k_ES * u_E_HIIT * mode_factor * timing_factor
     base_interf = endurance.u_E_HIIT * mode_factor * timing_factor
     
-    # Per-lift interference
+    # Per-lift interference (explicit coefficients)
     per_lift = {}
     for lift in params.omega.keys():
         k_ES = params.get_k_ES(lift)
         per_lift[lift] = k_ES * base_interf
     
-    # System interference
+    # System interference (explicit coefficient)
     sys_interf = params.k_ES_sys * base_interf
     
     return (per_lift, sys_interf)
+
+
+def update_R_mito(
+    current_R: float,
+    impulses: EnduranceImpulses,
+    overload_indicator: float,
+    params: DayEngineParams
+) -> float:
+    """
+    H1: Update R_mito with bounded [0,1], Z2/HIIT split, and overload penalty.
+    
+    R_mito update rules:
+    - Base decay: R * exp(-decay_rate)
+    - Z2 gain: +k_mito_z2 * u_E_Z2 (builds recovery capacity)
+    - HIIT gain: +k_mito_hiit * u_E_HIIT (smaller, acute)
+    - Overload penalty: -k_mito_overload * overload_indicator
+    - Hard bounds: [R_mito_min, R_mito_max]
+    
+    Args:
+        current_R: Current R_mito value
+        impulses: Endurance impulses
+        overload_indicator: 1.0 if overload detected, 0.0 otherwise
+        params: Engine parameters
+    
+    Returns:
+        New R_mito value (bounded [0,1])
+    """
+    # Base decay
+    R_new = current_R * math.exp(-params.k_mito_decay)
+    
+    # Z2 contribution (builds mitochondrial capacity)
+    R_new += params.k_mito_z2 * impulses.u_E_Z2
+    
+    # HIIT contribution (acute, smaller)
+    R_new += params.k_mito_hiit * impulses.u_E_HIIT
+    
+    # Overload penalty
+    R_new -= params.k_mito_overload * overload_indicator
+    
+    # H1: Hard bounds [0, 1]
+    return max(params.R_mito_min, min(params.R_mito_max, R_new))
+
+
+def update_capacity_with_saturation(
+    current_C: float,
+    F_l: float,
+    D_l: float,
+    params: DayEngineParams
+) -> float:
+    """
+    H1: Update capacity with saturation term preventing divergence.
+    
+    C_new = C + g_l * F_l * (1 - C/C_max)^alpha - h_l * D_l - lambda_l
+    
+    The saturation term (1 - C/C_max)^alpha ensures:
+    - Near C_max: diminishing returns (hard to increase further)
+    - Far from C_max: normal adaptation
+    - Prevents unbounded growth
+    
+    Args:
+        current_C: Current capacity
+        F_l: Fitness level
+        D_l: Fatigue level
+        params: Engine parameters
+    
+    Returns:
+        New capacity value
+    """
+    # Saturation factor: (1 - C/C_max)^alpha
+    # As C approaches C_max, this goes to 0
+    saturation_ratio = current_C / params.C_max
+    saturation_factor = (1.0 - saturation_ratio) ** params.capacity_saturation_alpha
+    
+    # Fitness contribution with saturation
+    fitness_contrib = params.g_l * F_l * saturation_factor
+    
+    # Fatigue reduction
+    fatigue_contrib = params.h_l * D_l
+    
+    # Detraining
+    detraining = params.lambda_l
+    
+    # Update with floor
+    C_new = current_C + fitness_contrib - fatigue_contrib - detraining
+    
+    return max(params.C_min, C_new)
+
+
+def update_T_legs(
+    current_T: float,
+    impulses: StrengthImpulses,
+    params: DayEngineParams
+) -> float:
+    """
+    H1: Update connective tissue fatigue with slow recovery.
+    
+    T_legs represents structural fatigue in legs (tendons, ligaments, fascia).
+    - Updates slowly (tau 14-28 days)
+    - Accumulates from high-intensity legs work
+    - Decays exponentially
+    
+    Args:
+        current_T: Current T_legs value
+        impulses: Strength impulses
+        params: Engine parameters
+    
+    Returns:
+        New T_legs value
+    """
+    # Exponential decay
+    T_new = current_T * math.exp(-1.0 / params.tau_T_legs)
+    
+    # Accumulation from high-intensity legs work
+    T_new += params.k_T_legs * impulses.u_legs
+    T_new += params.k_T_high_intensity * impulses.u_legs_high_intensity
+    
+    return max(0.0, min(1.0, T_new))
 
 
 def update_day_state(
@@ -348,7 +505,13 @@ def update_day_state(
     has_priming: bool = False
 ) -> DayState:
     """
-    Update day state from day d to d+1 using impulses.
+    H1: Update day state with hardened model.
+    
+    Key changes:
+    - R_mito bounded [0,1] with Z2/HIIT split and overload penalty
+    - Capacity update includes saturation term
+    - T_legs tracking for structural fatigue
+    - All interference terms explicit
     
     Args:
         current: Current day state
@@ -359,13 +522,26 @@ def update_day_state(
     Returns:
         Updated DayState
     """
-    R = current.R_mito
+    # H1: Detect overload condition (excessive HIIT + strength)
+    overload_indicator = 1.0 if (
+        impulses.endurance.u_E_HIIT > 50 and impulses.strength.u_sys > 30
+    ) else 0.0
     
-    # Recovery capacity update
-    new_R_mito = R * math.exp(-1.0 / params.tau_mito) + params.k_mito * impulses.endurance.u_E_Z2
+    # H1: Update R_mito with bounded model
+    new_R_mito = update_R_mito(
+        current.R_mito,
+        impulses.endurance,
+        overload_indicator,
+        params
+    )
     
-    # Compute interference
+    R = new_R_mito  # Use bounded value
+    
+    # Compute interference (explicit terms only)
     interf_per_lift, interf_sys = compute_interference(impulses.endurance, params)
+    
+    # H1: Update T_legs structural fatigue
+    new_T_legs = update_T_legs(current.T_legs, impulses.strength, params)
     
     # Create new state
     new_state = DayState(
@@ -373,7 +549,8 @@ def update_day_state(
         per_lift={},
         D_sys=0.0,  # Will compute below
         R_mito=new_R_mito,
-        E_fat=0.0   # Will compute below
+        E_fat=0.0,   # Will compute below
+        T_legs=new_T_legs  # H1
     )
     
     # Per-lift updates
@@ -391,10 +568,12 @@ def update_day_state(
         priming = 1.0 + params.priming_gain if has_priming else 1.0
         F_new += params.k_Fl * impulses.strength.per_lift.get(lift, 0.0) * priming
         
-        # Capacity update
-        C_new = max(
-            params.C_min,
-            current_lift.C_l + params.g_l * F_new - params.h_l * D_new - params.lambda_l
+        # H1: Capacity update with saturation
+        C_new = update_capacity_with_saturation(
+            current_lift.C_l,
+            F_new,
+            D_new,
+            params
         )
         
         new_state.per_lift[lift] = PerLiftState(
@@ -424,7 +603,7 @@ def compute_readiness(
     params: DayEngineParams
 ) -> ReadinessOutput:
     """
-    Compute readiness scores from current state.
+    H1: Compute readiness scores including T_legs guardrail.
     
     Args:
         state: Current day state
@@ -436,10 +615,20 @@ def compute_readiness(
     per_lift = {}
     explanations = []
     
+    # H1: Legs structural readiness
+    # T_legs > threshold reduces readiness for heavy lower body
+    legs_structural_ready = max(0.0, 1.0 - state.T_legs / params.T_legs_guardrail_threshold)
+    
     # Per-lift readiness
     for lift, lift_state in state.per_lift.items():
-        # Readiness = 1 - D_l - w_sys * D_sys
+        # Base readiness
         readiness = 1.0 - lift_state.D_l - params.w_sys * state.D_sys
+        
+        # H1: Apply legs structural guardrail for lower body lifts
+        if lift in ['squat', 'deadlift', 'clean']:
+            # Heavy legs work readiness is gated by structural state
+            readiness = min(readiness, legs_structural_ready)
+        
         per_lift[lift] = max(0.0, min(1.0, readiness))
     
     # Endurance readiness
@@ -456,11 +645,19 @@ def compute_readiness(
     if state.D_sys > 0.4:
         explanations.append("System fatigue high - consider lighter session")
     
-    if state.R_mito > 0.3:
+    if state.R_mito > 0.5:
         explanations.append("Recovery capacity elevated from recent Z2 work")
+    elif state.R_mito < 0.2:
+        explanations.append("Recovery capacity depleted - prioritize rest/Z2")
     
     if state.E_fat > 0.3:
         explanations.append("Endurance fatigue elevated - monitor HIIT volume")
+    
+    # H1: T_legs explanation
+    if state.T_legs > params.T_legs_guardrail_threshold:
+        explanations.append("Legs structural fatigue high - avoid heavy lower body")
+    elif state.T_legs > 0.5 * params.T_legs_guardrail_threshold:
+        explanations.append("Legs structural fatigue building - monitor heavy work")
     
     # Per-lift explanations
     for lift, lift_state in state.per_lift.items():
@@ -468,6 +665,10 @@ def compute_readiness(
             explanations.append(f"{lift}: local fatigue elevated")
         if lift_state.C_l > 110:  # Improved capacity
             explanations.append(f"{lift}: capacity trending up")
+        # H1: Capacity saturation note
+        saturation_ratio = lift_state.C_l / params.C_max
+        if saturation_ratio > 0.9:
+            explanations.append(f"{lift}: approaching capacity ceiling")
     
     if not explanations:
         explanations.append("Readiness neutral - train as planned")
@@ -476,6 +677,7 @@ def compute_readiness(
         per_lift=per_lift,
         endurance=endurance_ready,
         overall=overall,
+        legs_structural=legs_structural_ready,  # H1
         explanations=explanations[:5]  # Max 5 explanations
     )
 
@@ -488,7 +690,7 @@ def simulate_day_transition(
     has_priming: bool = False
 ) -> Tuple[DayState, DailyImpulses, ReadinessOutput]:
     """
-    Main entry point: simulate one day transition.
+    H1: Main entry point - simulate one day transition with hardened model.
     
     Args:
         current_state: State at start of day
@@ -550,5 +752,6 @@ def create_initial_state(
         per_lift=per_lift,
         D_sys=0.0,
         R_mito=0.0,
-        E_fat=0.0
+        E_fat=0.0,
+        T_legs=0.0  # H1
     )
