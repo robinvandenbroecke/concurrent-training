@@ -167,8 +167,34 @@ def upgrade():
     op.create_index(op.f('ix_performance_snapshots_athlete_id'), 'performance_snapshots', ['athlete_id'], unique=False)
     op.create_index(op.f('ix_performance_snapshots_snapshot_date'), 'performance_snapshots', ['snapshot_date'], unique=False)
 
+    # Create goals table (Sprint 7)
+    op.create_table(
+        'goals',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('goal_id', sa.String(50), nullable=False, unique=True),
+        sa.Column('athlete_id', sa.Integer(), nullable=False),
+        sa.Column('goal_type', sa.String(30), nullable=False),
+        sa.Column('target_date', sa.String(10), nullable=False),
+        sa.Column('priority', sa.String(20), default='balanced'),
+        sa.Column('goal_json', sa.JSON(), nullable=False),
+        sa.Column('active', sa.Boolean(), default=True),
+        sa.Column('current_phase', sa.String(20), default='base'),
+        sa.Column('phase_start_date', sa.String(10), nullable=True),
+        sa.Column('phase_end_date', sa.String(10), nullable=True),
+        sa.Column('macrocycle_json', sa.JSON(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column('updated_at', sa.DateTime(timezone=True), onupdate=sa.func.now()),
+        sa.ForeignKeyConstraint(['athlete_id'], ['athletes.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('athlete_id', 'goal_id', name='uq_athlete_goal')
+    )
+    op.create_index(op.f('ix_goals_id'), 'goals', ['id'], unique=False)
+    op.create_index(op.f('ix_goals_goal_id'), 'goals', ['goal_id'], unique=False)
+    op.create_index(op.f('ix_goals_athlete_id'), 'goals', ['athlete_id'], unique=False)
+
 
 def downgrade():
+    op.drop_table('goals')
     op.drop_table('performance_snapshots')
     op.drop_table('workout_plans')
     op.drop_table('system_parameters')

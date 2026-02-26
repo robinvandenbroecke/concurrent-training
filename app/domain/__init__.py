@@ -117,6 +117,27 @@ from .performance_engine import (
     get_lift_priority_ranking,
 )
 
+from .goal_engine import (
+    GoalType,
+    ConcurrentTarget,
+    PhaseType,
+    StrengthTarget,
+    EnduranceTarget,
+    GoalConstraints,
+    GoalConfig,
+    PhasePlan,
+    MacrocycleContext,
+    GoalState,
+    compute_phase_durations,
+    create_macrocycle,
+    create_goal_state,
+    advance_goal_state,
+    get_block_type_for_phase,
+    get_microcycle_targets_for_phase,
+    should_prioritize_lift_for_goal,
+    get_endurance_focus_for_goal,
+)
+
 __all__ = [
     # Original model exports
     "ConcurrentTrainingModel",
@@ -224,4 +245,23 @@ __all__ = [
     "compute_microcycle_adjustment",
     "should_force_deload",
     "get_lift_priority_ranking",
+    # Sprint 7: Goal engine exports
+    "GoalType",
+    "ConcurrentTarget",
+    "PhaseType",
+    "StrengthTarget",
+    "EnduranceTarget",
+    "GoalConstraints",
+    "GoalConfig",
+    "PhasePlan",
+    "MacrocycleContext",
+    "GoalState",
+    "compute_phase_durations",
+    "create_macrocycle",
+    "create_goal_state",
+    "advance_goal_state",
+    "get_block_type_for_phase",
+    "get_microcycle_targets_for_phase",
+    "should_prioritize_lift_for_goal",
+    "get_endurance_focus_for_goal",
 ]
