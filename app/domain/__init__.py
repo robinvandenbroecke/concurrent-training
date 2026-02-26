@@ -86,6 +86,11 @@ from .program_engine import (
     advance_microcycle,
     get_day_workout_spec,
     should_deload,
+    # Sprint 5: Priority-aware replanning
+    get_priority_weekly_targets,
+    replan_missed_session,
+    compress_week,
+    get_weekly_summary,
 )
 
 __all__ = [
@@ -168,4 +173,9 @@ __all__ = [
     "advance_microcycle",
     "get_day_workout_spec",
     "should_deload",
+    # Sprint 5: Priority-aware replanning
+    "get_priority_weekly_targets",
+    "replan_missed_session",
+    "compress_week",
+    "get_weekly_summary",
 ]

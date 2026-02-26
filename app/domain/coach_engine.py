@@ -679,14 +679,19 @@ def generate_workout(
 
 def adapt_workout(
     plan: WorkoutPlan,
-    day_state: DayStateSnapshot
+    day_state: DayStateSnapshot,
+    is_key_session: bool = False,
+    priority: str = "balanced"
 ) -> WorkoutPlan:
     """
     Adapt an existing workout based on current state.
+    PRIORITY-AWARE: Key sessions are protected, non-key sessions downgraded freely.
     
     Args:
         plan: Original workout plan
         day_state: Current day state
+        is_key_session: Whether this is a key session (must be protected)
+        priority: Training priority ("strength", "endurance", "balanced")
     
     Returns:
         Adapted WorkoutPlan
@@ -695,6 +700,14 @@ def adapt_workout(
     explanations = plan.explanations.copy()
     explanations.append("--- Adaptation ---")
     
+    # Priority-aware scaling factors
+    if is_key_session:
+        load_scale_min, load_scale_max = 0.92, 0.97
+        sets_reduction_max = 1
+    else:
+        load_scale_min, load_scale_max = 0.80, 0.95
+        sets_reduction_max = 2  # Can halve sets
+    
     if plan.mode == "strength":
         adapted_blocks = []
         
@@ -702,47 +715,106 @@ def adapt_workout(
             lift = block.lift
             readiness = day_state.readiness_per_lift.get(lift, 0.7)
             
-            # Check if adaptation needed
-            if readiness < params.readiness_low:
-                # Switch to technique
-                new_block, exps = generate_strength_block(
-                    lift, readiness,
-                    day_state.capacities_per_lift.get(lift, 100.0),
-                    day_state.D_sys, day_state.E_fat,
-                    params,
-                    force_intent="technique"
-                )
-                adapted_blocks.append(new_block)
-                explanations.extend(exps)
-                explanations.append(f"{lift}: switched to technique (readiness {readiness:.2f})")
-            elif readiness > params.readiness_high:
-                # Add a set or increase load
-                new_prescription = block.prescription
-                if isinstance(new_prescription.target_value, tuple):
-                    low, high = new_prescription.target_value
-                    new_target = (low * 1.025, high * 1.025)
+            # PRIORITY-AWARE adaptation
+            if is_key_session:
+                # Key sessions: do NOT delete, reduce load only
+                if readiness < params.readiness_low:
+                    # Reduce load by 5-8%, increase rest, keep session
+                    load_scale = load_scale_min + (1 - readiness) * 0.03
+                    new_prescription = block.prescription
+                    if isinstance(new_prescription.target_value, tuple):
+                        low, high = new_prescription.target_value
+                        new_target = (low * load_scale, high * load_scale)
+                    else:
+                        new_target = new_prescription.target_value * load_scale
+                    
+                    new_prescription = SetPrescription(
+                        set_number=new_prescription.set_number,
+                        target_reps=new_prescription.target_reps,
+                        load_method=new_prescription.load_method,
+                        target_value=new_target,
+                        rest_seconds=int(new_prescription.rest_seconds * 1.2),  # +20% rest
+                        vl_max=new_prescription.vl_max,
+                        notes=f"{new_prescription.notes} -load (key session)"
+                    )
+                    
+                    adapted_blocks.append(ExerciseBlock(
+                        lift=lift,
+                        intent=block.intent,
+                        prescription=new_prescription
+                    ))
+                    explanations.append(f"{lift}: KEY SESSION - load reduced {load_scale:.0%}, rest +20%")
                 else:
-                    new_target = new_prescription.target_value * 1.025
-                
-                new_prescription = SetPrescription(
-                    set_number=new_prescription.set_number,
-                    target_reps=new_prescription.target_reps,
-                    load_method=new_prescription.load_method,
-                    target_value=new_target,
-                    rest_seconds=new_prescription.rest_seconds,
-                    vl_max=new_prescription.vl_max,
-                    notes=f"{new_prescription.notes} +load"
-                )
-                
-                adapted_blocks.append(ExerciseBlock(
-                    lift=lift,
-                    intent=block.intent,
-                    prescription=new_prescription
-                ))
-                explanations.append(f"{lift}: readiness high ({readiness:.2f}) → load +2.5%")
+                    adapted_blocks.append(block)
             else:
-                # Keep as is
-                adapted_blocks.append(block)
+                # Non-key sessions: downgrade freely
+                if readiness < params.readiness_low:
+                    # Can switch to technique or reduce significantly
+                    if priority == "endurance":
+                        # Endurance priority: reduce strength significantly
+                        new_block, exps = generate_strength_block(
+                            lift, readiness,
+                            day_state.capacities_per_lift.get(lift, 100.0),
+                            day_state.D_sys, day_state.E_fat,
+                            params,
+                            force_intent="technique"
+                        )
+                        adapted_blocks.append(new_block)
+                        explanations.extend(exps)
+                        explanations.append(f"{lift}: NON-KEY → technique (endurance priority)")
+                    else:
+                        # Reduce load by 10-20%
+                        load_scale = load_scale_min
+                        new_prescription = block.prescription
+                        if isinstance(new_prescription.target_value, tuple):
+                            low, high = new_prescription.target_value
+                            new_target = (low * load_scale, high * load_scale)
+                        else:
+                            new_target = new_prescription.target_value * load_scale
+                        
+                        new_prescription = SetPrescription(
+                            set_number=new_prescription.set_number,
+                            target_reps=max(3, new_prescription.target_reps - sets_reduction_max) if isinstance(new_prescription.target_reps, int) else new_prescription.target_reps,
+                            load_method=new_prescription.load_method,
+                            target_value=new_target,
+                            rest_seconds=new_prescription.rest_seconds,
+                            vl_max=new_prescription.vl_max,
+                            notes=f"{new_prescription.notes} -load (non-key)"
+                        )
+                        
+                        adapted_blocks.append(ExerciseBlock(
+                            lift=lift,
+                            intent=block.intent,
+                            prescription=new_prescription
+                        ))
+                        explanations.append(f"{lift}: NON-KEY - load {load_scale:.0%}, sets -{sets_reduction_max}")
+                elif readiness > params.readiness_high:
+                    # Add a set or increase load
+                    new_prescription = block.prescription
+                    if isinstance(new_prescription.target_value, tuple):
+                        low, high = new_prescription.target_value
+                        new_target = (low * 1.025, high * 1.025)
+                    else:
+                        new_target = new_prescription.target_value * 1.025
+                    
+                    new_prescription = SetPrescription(
+                        set_number=new_prescription.set_number,
+                        target_reps=new_prescription.target_reps,
+                        load_method=new_prescription.load_method,
+                        target_value=new_target,
+                        rest_seconds=new_prescription.rest_seconds,
+                        vl_max=new_prescription.vl_max,
+                        notes=f"{new_prescription.notes} +load"
+                    )
+                    
+                    adapted_blocks.append(ExerciseBlock(
+                        lift=lift,
+                        intent=block.intent,
+                        prescription=new_prescription
+                    ))
+                    explanations.append(f"{lift}: readiness high ({readiness:.2f}) → load +2.5%")
+                else:
+                    adapted_blocks.append(block)
         
         adapted_workout = StrengthWorkout(
             blocks=adapted_blocks,
@@ -757,30 +829,48 @@ def adapt_workout(
         )
     
     elif plan.mode == "endurance":
-        # Cascade HIIT→tempo→Z2 based on readiness
+        # Priority-aware endurance cascade
         original_zone = plan.workout.intent
         new_zone = original_zone
         
-        if day_state.readiness_endurance < params.readiness_low:
-            new_zone = "z2"
-        elif day_state.E_fat > 0.4 and original_zone == "hiit":
-            new_zone = "tempo"
-        elif day_state.E_fat > 0.5:
-            new_zone = "z2"
-        
-        if new_zone != original_zone:
-            explanations.append(f"Endurance: {original_zone} → {new_zone} (E_fat {day_state.E_fat:.2f}, readiness {day_state.readiness_endurance:.2f})")
+        # Determine cascade based on priority and key status
+        if is_key_session:
+            # Key endurance: HIIT → reduced HIIT, NOT removed unless extremely low readiness
+            if day_state.readiness_endurance < 0.30:  # Extremely low
+                new_zone = "z2"
+                explanations.append(f"Endurance KEY: {original_zone} → {new_zone} (readiness extremely low {day_state.readiness_endurance:.2f})")
+            elif original_zone == "hiit" and day_state.readiness_endurance < params.readiness_low:
+                new_zone = "tempo"  # Reduced, not removed
+                explanations.append(f"Endurance KEY: HIIT → {new_zone} (readiness low but protected)")
+            elif day_state.E_fat > 0.5:
+                new_zone = "tempo"  # Reduced from HIIT
+                explanations.append(f"Endurance KEY: {original_zone} → {new_zone} (fatigue high)")
+        else:
+            # Non-key: standard cascade HIIT → tempo → Z2
+            if day_state.readiness_endurance < params.readiness_low:
+                new_zone = "z2"
+            elif day_state.E_fat > 0.4 and original_zone == "hiit":
+                new_zone = "tempo"
+            elif day_state.E_fat > 0.5:
+                new_zone = "z2"
             
+            if new_zone != original_zone:
+                explanations.append(f"Endurance: {original_zone} → {new_zone} (non-key, E_fat {day_state.E_fat:.2f})")
+        
+        if new_zone != original_zone or is_key_session:
             # Adjust duration
-            if new_zone == "z2" and day_state.readiness_endurance < params.readiness_low:
-                new_duration = 30
+            if new_zone == "z2":
+                if is_key_session:
+                    new_duration = max(45, plan.workout.duration_min * 0.8)  # Keep some duration
+                else:
+                    new_duration = 30 if day_state.readiness_endurance < params.readiness_low else plan.workout.duration_min
             else:
                 new_duration = plan.workout.duration_min
             
             adapted_workout = EnduranceWorkout(
                 sport=plan.workout.sport,
                 intent=new_zone,
-                duration_min=new_duration,
+                duration_min=int(new_duration),
                 structure=plan.workout.structure,
                 targets={"rpe": params.endurance_zones[new_zone]["rpe"]},
                 notes=explanations
@@ -796,8 +886,8 @@ def adapt_workout(
         return plan
     
     else:  # concurrent
-        # Adapt both components
-        # For now, simplified: keep structure but note if changes needed
+        # Adapt both components with priority awareness
+        # In V1: simplified - just note if changes needed
         return plan
 
 

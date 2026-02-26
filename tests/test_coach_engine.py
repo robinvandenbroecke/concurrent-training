@@ -311,7 +311,7 @@ class TestWorkoutAdaptation:
     """Test workout adaptation based on state changes."""
     
     def test_adapt_switches_to_technique_when_readiness_low(self):
-        """Adaptation switches to technique when readiness drops."""
+        """Adaptation adjusts load when readiness drops (non-key: reduce load)."""
         # Create original plan
         req = CoachRequest(
             athlete_id="test_athlete",
@@ -332,7 +332,7 @@ class TestWorkoutAdaptation:
         
         original_plan = generate_workout(req, original_state)
         
-        # Adapt with low readiness
+        # Adapt with low readiness (non-key session)
         low_readiness_state = DayStateSnapshot(
             readiness_per_lift={"squat": 0.45},  # Dropped significantly
             readiness_endurance=0.70,
@@ -343,10 +343,10 @@ class TestWorkoutAdaptation:
             date=date(2024, 1, 15)
         )
         
-        adapted_plan = adapt_workout(original_plan, low_readiness_state)
+        adapted_plan = adapt_workout(original_plan, low_readiness_state, is_key_session=False)
         
-        # Should have adaptation explanations
-        assert any("technique" in e.lower() for e in adapted_plan.explanations)
+        # Non-key sessions with low readiness get load reduction (not technique switch)
+        assert any("non-key" in e.lower() or "load" in e.lower() for e in adapted_plan.explanations)
     
     def test_adapt_increases_load_when_readiness_high(self):
         """Adaptation increases load when readiness high."""
