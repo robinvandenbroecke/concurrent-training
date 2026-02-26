@@ -6,21 +6,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
-import enum
-
-
-class LiftType(str, enum.Enum):
-    SQUAT = "squat"
-    BENCH = "bench"
-    DEADLIFT = "deadlift"
-    PRESS = "press"
-    POWER_CLEAN = "power_clean"
-
-
-class EnduranceSport(str, enum.Enum):
-    RUNNING = "running"
-    CYCLING = "cycling"
-    SWIMMING = "swimming"
+from app.types import LiftType, EnduranceSport
 
 
 class Athlete(Base):
@@ -43,7 +29,7 @@ class StrengthSession(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
-    lift = Column(SQLEnum(LiftType), nullable=False)
+    lift = Column(SQLEnum(LiftType, name="lift_type"), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True))
     
@@ -65,7 +51,7 @@ class EnduranceSession(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
-    sport = Column(SQLEnum(EnduranceSport), nullable=False)
+    sport = Column(SQLEnum(EnduranceSport, name="endurance_sport"), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     duration_minutes = Column(Float, nullable=False)
     intensity_type = Column(String(20))  # z2, hiit, mixed
@@ -87,7 +73,7 @@ class LiftProfile(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
-    lift = Column(SQLEnum(LiftType), nullable=False)
+    lift = Column(SQLEnum(LiftType, name="lift_type"), nullable=False)
     
     # VBT profile: v = a - b*w
     a = Column(Float, nullable=False, default=0.5)  # velocity intercept
@@ -131,7 +117,7 @@ class LiftDayState(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
-    lift = Column(SQLEnum(LiftType), nullable=False)
+    lift = Column(SQLEnum(LiftType, name="lift_type"), nullable=False)
     date = Column(String(10), nullable=False)
     
     D_l = Column(Float, default=0.0)  # Per-lift fatigue

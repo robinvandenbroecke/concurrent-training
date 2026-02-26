@@ -6,27 +6,9 @@ in concurrent strength and endurance training.
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
-from enum import Enum
 import math
 
-
-class LiftType(str, Enum):
-    SQUAT = "squat"
-    BENCH = "bench"
-    DEADLIFT = "deadlift"
-    PRESS = "press"
-    POWER_CLEAN = "power_clean"
-
-
-class EnduranceSport(str, Enum):
-    RUNNING = "running"
-    CYCLING = "cycling"
-    SWIMMING = "swimming"
-
-
-class EnduranceIntensity(str, Enum):
-    Z2 = "z2"  # Zone 2, aerobic, builds R_mito
-    HIIT = "hiit"  # High intensity, adds E_fat and interference
+from app.types import LiftType, EnduranceSport, EnduranceIntensity
 
 
 @dataclass
@@ -176,15 +158,28 @@ class ConcurrentTrainingModel:
         v_ref: float,
         rep_num: int,
         rest_before: float,
-        is_legs: bool = False
+        is_legs: bool = False,
+        capacity: Optional[float] = None
     ) -> RepLevelState:
         """
         Update rep-level state after a rep
+        
+        Args:
+            state: Current rep-level state
+            weight: Weight lifted (kg)
+            v_obs: Observed velocity (m/s)
+            v_ref: Reference velocity for this weight (m/s)
+            rep_num: Repetition number in the set
+            rest_before: Rest time before this rep (seconds)
+            is_legs: Whether this is a leg exercise
+            capacity: Athlete's capacity (e1RM) for this lift. If None, uses 100kg default.
         """
         p = self.params
         
-        # Compute drives
-        intensity = min(0.95, weight / 100)  # Simplified, should use e1RM
+        # Compute drives using capacity-based intensity
+        if capacity is None or capacity <= 0:
+            capacity = 100.0  # Fallback default
+        intensity = min(0.95, weight / capacity)
         v_ratio = v_ref / max(v_obs, 0.01)
         phi = self.compute_phi(intensity, v_ratio)
         chi = self.compute_chi(rep_num, rest_before)

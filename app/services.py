@@ -1,12 +1,13 @@
 """
 Services layer - connects domain model to persistence
 """
-from datetime import datetime, date
+from datetime import datetime, date, time as dt_time
 from typing import Optional, Dict, List
 from sqlalchemy.orm import Session
 
+from app.types import LiftType, EnduranceSport
 from app.domain.model import (
-    ConcurrentTrainingModel, Autoregulator, LiftType, EnduranceSport,
+    ConcurrentTrainingModel, Autoregulator,
     DayLevelState, RepLevelState, SystemParameters as DomainParams
 )
 from app import models as db_models
@@ -116,11 +117,14 @@ class SessionService:
         total_intensity = 0
         total_reps = 0
         
+        # Get capacity for intensity calculation
+        capacity = lift_day_state.C_l if lift_day_state else 100.0
+        
         for set_data in sets_data:
             v_ref = profile.a - profile.b * set_data.weight
             
             for rep in set_data.reps:
-                # Update rep state
+                # Update rep state with capacity-based intensity
                 rep_state = self.model.update_rep_level(
                     rep_state,
                     rep.weight,
@@ -128,7 +132,8 @@ class SessionService:
                     v_ref,
                     rep.rep_num,
                     rep.rest_before,
-                    is_legs=(lift in [LiftType.SQUAT, LiftType.DEADLIFT])
+                    is_legs=(lift in [LiftType.SQUAT, LiftType.DEADLIFT]),
+                    capacity=capacity
                 )
                 
                 rep_log.append({
@@ -278,35 +283,40 @@ class DayUpdateService:
         """
         target_date = target_date or date.today()
         date_str = target_date.isoformat()
-        yesterday = date.fromordinal(target_date.toordinal() - 1).isoformat()
+        yesterday = date.fromordinal(target_date.toordinal() - 1)
+        yesterday_str = yesterday.isoformat()
+        
+        # Create proper datetime objects for filtering
+        yesterday_start = datetime.combine(yesterday, dt_time.min)
+        yesterday_end = datetime.combine(target_date, dt_time.min)
         
         # Get yesterday's state or initialize
         yesterday_state = self.db.query(db_models.DayState).filter(
             db_models.DayState.athlete_id == athlete_id,
-            db_models.DayState.date == yesterday
+            db_models.DayState.date == yesterday_str
         ).first()
         
         if yesterday_state:
             current = DayLevelState(
-                date=yesterday,
+                date=yesterday_str,
                 D_sys=yesterday_state.D_sys,
                 R_mito=yesterday_state.R_mito,
                 E_fat=yesterday_state.E_fat
             )
         else:
-            current = DayLevelState(date=yesterday)
+            current = DayLevelState(date=yesterday_str)
         
-        # Get yesterday's sessions
+        # Get yesterday's sessions using proper datetime objects
         strength_sessions = self.db.query(db_models.StrengthSession).filter(
             db_models.StrengthSession.athlete_id == athlete_id,
-            db_models.StrengthSession.start_time >= f"{yesterday}T00:00:00",
-            db_models.StrengthSession.start_time < f"{date_str}T00:00:00"
+            db_models.StrengthSession.start_time >= yesterday_start,
+            db_models.StrengthSession.start_time < yesterday_end
         ).all()
         
         endurance_sessions = self.db.query(db_models.EnduranceSession).filter(
             db_models.EnduranceSession.athlete_id == athlete_id,
-            db_models.EnduranceSession.start_time >= f"{yesterday}T00:00:00",
-            db_models.EnduranceSession.start_time < f"{date_str}T00:00:00"
+            db_models.EnduranceSession.start_time >= yesterday_start,
+            db_models.EnduranceSession.start_time < yesterday_end
         ).all()
         
         # Compute impulses
@@ -570,29 +580,64 @@ class AutoregulationService:
         ).first()
         
         if not lift_state:
+            # Provide a sensible default capacity so intensity and fatigue reconstruction work
             lift_state = db_models.LiftDayState(
                 athlete_id=request.athlete_id,
                 lift=request.lift,
                 date=today,
-                D_l=0.0
+                D_l=0.0,
+                C_l=100.0
             )
         
-        # Initialize rep state
+        # Initialize rep state from day-level state
         model = ConcurrentTrainingModel()
         domain_day = DayLevelState(
             date=today,
             D_l={request.lift: lift_state.D_l},
+            C_l={request.lift: lift_state.C_l},  # Include capacity for intensity calc
             D_sys=day_state.D_sys,
             R_mito=day_state.R_mito,
             E_fat=day_state.E_fat
         )
         
-        rep_state = model.initialize_rep_state(domain_day, request.lift)
+        # Initialize rep state at start of session
+        M_base = model.compute_M_base(0, 0)  # Simplified for V1
+        rep_state = model.initialize_rep_state(domain_day, request.lift, M_base)
         
-        # Compute v_ref
+        # Compute v_ref for current weight
         v_ref = profile.a - profile.b * request.current_weight
         
-        # Get suggestion
+        # Get capacity for intensity calculation
+        capacity = lift_state.C_l if lift_state.C_l > 0 else 100.0
+        
+        # Apply actual rep observations from the request to reconstruct within-set fatigue.
+        # We don't persist per-rep state server-side, so we approximate by replaying the recent reps.
+        recent_velocities = request.recent_v_obs or []
+        recent_rests = request.recent_rest_before or []
+
+        # Align rep numbers with the set progression so chi(rep_num, ...) is meaningful.
+        # If caller sends only the last N velocities, we map them onto the last N reps completed.
+        start_rep_num = max(1, request.current_reps_done - len(recent_velocities) + 1)
+
+        for i, v_obs in enumerate(recent_velocities):
+            rep_num = start_rep_num + i
+            if i < len(recent_rests):
+                rest_before = float(recent_rests[i])
+            else:
+                rest_before = 0.0 if i == 0 else 2.0  # fallback assumption
+
+            rep_state = model.update_rep_level(
+                rep_state,
+                request.current_weight,
+                v_obs,
+                v_ref,
+                rep_num,
+                rest_before,
+                is_legs=(request.lift in [LiftType.SQUAT, LiftType.DEADLIFT]),
+                capacity=capacity
+            )
+        
+        # Get suggestion based on updated rep state (with within-set fatigue applied)
         action = self.autoreg.suggest_action(
             rep_state,
             request.target_v_low,

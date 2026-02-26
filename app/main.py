@@ -5,31 +5,42 @@ from contextlib import asynccontextmanager
 from datetime import date
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Security, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal, engine, Base
+from app.database import SessionLocal, engine, Base, get_db
 from app import models, schemas
 from app.services import (
     AthleteService, SessionService, DayUpdateService,
     ReadinessService, AutoregulationService
 )
-from app.domain.model import LiftType, EnduranceSport
+from app.types import LiftType, EnduranceSport
+from app.config import settings
 
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
 
 
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# API Key authentication
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_admin_api_key(api_key: str = Security(api_key_header)):
+    """Verify admin API key for protected endpoints"""
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key header missing"
+        )
+    if api_key != settings.admin_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API key"
+        )
+    return api_key
 
 
 app = FastAPI(
@@ -194,12 +205,13 @@ def get_endurance_trends(
     return service.get_endurance_trends(athlete_id, days)
 
 
-# Day update endpoint (for cron/manual trigger)
+# Day update endpoint (for cron/manual trigger) - Protected with API key
 @app.post("/admin/update-day/{athlete_id}")
 def update_day_state(
     athlete_id: int,
     date_str: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: str = Security(verify_admin_api_key)
 ):
     """
     Trigger day state update (normally run by cron)

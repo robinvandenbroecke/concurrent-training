@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     debug: bool = False
     log_level: str = "INFO"
+    admin_api_key: str = "dev-api-key-change-in-production"
     
     class Config:
         env_file = ".env"

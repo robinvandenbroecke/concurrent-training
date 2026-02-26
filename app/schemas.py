@@ -2,21 +2,8 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List, Any
 from datetime import datetime
-from enum import Enum
 
-
-class LiftType(str, Enum):
-    SQUAT = "squat"
-    BENCH = "bench"
-    DEADLIFT = "deadlift"
-    PRESS = "press"
-    POWER_CLEAN = "power_clean"
-
-
-class EnduranceSport(str, Enum):
-    RUNNING = "running"
-    CYCLING = "cycling"
-    SWIMMING = "swimming"
+from app.types import LiftType, EnduranceSport, EnduranceIntensity
 
 
 # Athlete schemas
@@ -102,7 +89,11 @@ class AutoregulateRequest(BaseModel):
     vl_max: float = 20.0  # %
     planned_reps: int = 5
     current_reps_done: int = 0
-    recent_v_obs: Optional[List[float]] = None  # Last few rep velocities
+
+    # Last few rep observations from the CURRENT set (most recent last).
+    # Used to reconstruct within-set fatigue without requiring server-side rep state.
+    recent_v_obs: Optional[List[float]] = None  # m/s
+    recent_rest_before: Optional[List[float]] = None  # seconds; same length as recent_v_obs
 
 
 class AutoregulateResponse(BaseModel):
