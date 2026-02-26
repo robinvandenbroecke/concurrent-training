@@ -8,15 +8,19 @@ from alembic import context
 
 # Import app models for autogenerate support
 import sys
-sys.path.append('.')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+# Import models to populate metadata
 from app.database import Base
-from app.config import settings
+from app import models  # noqa
 
 # this is the Alembic Config object
 config = context.config
 
-# Set database URL from app config
-config.set_main_option('sqlalchemy.url', settings.database_url)
+# Set database URL from config or env
+sqlalchemy_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/concurrent_training')
+config.set_main_option('sqlalchemy.url', sqlalchemy_url)
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:

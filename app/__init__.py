@@ -1,3 +1,2 @@
-"""Concurrent Training - Main Application"""
-
-__version__ = "0.1.0"
+"""Application package"""
+__version__ = "1.0.0"

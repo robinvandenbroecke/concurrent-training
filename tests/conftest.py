@@ -1,10 +1,9 @@
-"""Test configuration and fixtures"""
+"""Test configuration"""
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-
 
 # Use in-memory SQLite for tests
 TEST_DATABASE_URL = "sqlite:///./test.db"
