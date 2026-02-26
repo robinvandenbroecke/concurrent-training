@@ -80,6 +80,7 @@ from .program_engine import (
     DayTemplate,
     ProgressionTargets,
     FatigueGuardrails,
+    ReplanResult,
     distribute_training_days,
     create_microcycle_template,
     start_program,
@@ -87,10 +88,7 @@ from .program_engine import (
     get_day_workout_spec,
     should_deload,
     # Sprint 5: Priority-aware replanning
-    get_priority_weekly_targets,
-    replan_missed_session,
-    compress_week,
-    get_weekly_summary,
+    replan_missed_sessions,
 )
 
 __all__ = [
@@ -167,6 +165,7 @@ __all__ = [
     "DayTemplate",
     "ProgressionTargets",
     "FatigueGuardrails",
+    "ReplanResult",
     "distribute_training_days",
     "create_microcycle_template",
     "start_program",
@@ -174,8 +173,5 @@ __all__ = [
     "get_day_workout_spec",
     "should_deload",
     # Sprint 5: Priority-aware replanning
-    "get_priority_weekly_targets",
-    "replan_missed_session",
-    "compress_week",
-    "get_weekly_summary",
+    "replan_missed_sessions",
 ]

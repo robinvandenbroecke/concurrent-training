@@ -5,7 +5,7 @@ Manages multi-week training programs that compose rep_engine, day_engine, and co
 to create cohesive, progressive training plans.
 """
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 from enum import Enum
 from datetime import date, timedelta
 import json
@@ -107,11 +107,11 @@ class DayTemplate:
     endurance_zone: Optional[str] = None  # "z2", "tempo", "hiit"
     notes: str = ""
     
-    # Priority-aware fields (Sprint 5)
-    key_session: bool = False  # Is this a key session that should be preserved?
+    # Sprint 5: Priority-aware fields
+    key_session: bool = False  # Is this a key session that must be protected?
     session_domain: str = "rest"  # "strength", "endurance", "concurrent", "rest"
-    avoid_hiit: bool = False  # HIIT forbidden on/near this day
-    avoid_heavy_legs: bool = False  # Heavy lower body forbidden
+    avoid_hiit: bool = False  # HIIT should be avoided on this day
+    avoid_heavy_legs: bool = False  # Heavy leg work should be avoided
     must_include_lifts: List[str] = field(default_factory=list)  # Required lifts
     
     def to_dict(self) -> dict:
@@ -130,13 +130,6 @@ class DayTemplate:
             "avoid_heavy_legs": self.avoid_heavy_legs,
             "must_include_lifts": self.must_include_lifts,
         }
-    
-    # Priority-aware fields (Sprint 5)
-    key_session: bool = False  # Is this a key session that must be protected?
-    session_domain: str = "rest"  # "strength", "endurance", "concurrent", "rest"
-    avoid_hiit: bool = False  # HIIT should be avoided on this day
-    avoid_heavy_legs: bool = False  # Heavy leg work should be avoided
-    must_include_lifts: List[str] = field(default_factory=list)  # Required lifts
 
 
 @dataclass
@@ -161,23 +154,7 @@ class MicrocyclePlan:
             "end_date": self.end_date.isoformat(),
             "block_type": self.block_type.value,
             "week_index": self.week_index,
-            "days": [
-                {
-                    "day_index": d.day_index,
-                    "mode": d.mode,
-                    "priority": d.priority,
-                    "time_budget_min": d.time_budget_min,
-                    "primary_lifts": d.primary_lifts,
-                    "endurance_zone": d.endurance_zone,
-                    "notes": d.notes,
-                    "key_session": d.key_session,
-                    "session_domain": d.session_domain,
-                    "avoid_hiit": d.avoid_hiit,
-                    "avoid_heavy_legs": d.avoid_heavy_legs,
-                    "must_include_lifts": d.must_include_lifts,
-                }
-                for d in self.days
-            ],
+            "days": [d.to_dict() for d in self.days],
             "progression": {
                 "target_sets_per_week": self.progression.target_sets_per_week,
                 "target_avg_intensity": self.progression.target_avg_intensity,
@@ -186,6 +163,18 @@ class MicrocyclePlan:
                 "volume_progression": self.progression.volume_progression
             }
         }
+    
+    def get_key_sessions(self) -> List[DayTemplate]:
+        """Return all key sessions in this microcycle."""
+        return [d for d in self.days if d.key_session]
+    
+    def count_sessions_by_domain(self) -> Dict[str, int]:
+        """Count sessions by domain."""
+        counts = {"strength": 0, "endurance": 0, "concurrent": 0, "rest": 0}
+        for d in self.days:
+            if d.session_domain in counts:
+                counts[d.session_domain] += 1
+        return counts
 
 
 @dataclass
@@ -266,14 +255,6 @@ class ProgramState:
             self.key_strength_sessions = 1
             self.key_endurance_sessions = 1
     
-    # Priority-aware weekly targets (Sprint 5)
-    weekly_strength_sessions_target: int = 3
-    weekly_endurance_sessions_target: int = 3
-    weekly_hiit_cap: int = 1
-    weekly_heavy_legs_cap: int = 2
-    key_strength_sessions: int = 1
-    key_endurance_sessions: int = 1
-    
     def to_json(self) -> str:
         """Serialize to JSON string."""
         data = {
@@ -292,7 +273,7 @@ class ProgramState:
             "start_date": self.start_date.isoformat(),
             "current_week_start": self.current_week_start.isoformat(),
             "last_deload_date": self.last_deload_date.isoformat() if self.last_deload_date else None,
-            # Priority-aware weekly targets (Sprint 5)
+            # Sprint 5: Priority-aware targets
             "weekly_strength_sessions_target": self.weekly_strength_sessions_target,
             "weekly_endurance_sessions_target": self.weekly_endurance_sessions_target,
             "weekly_hiit_cap": self.weekly_hiit_cap,
@@ -323,55 +304,14 @@ class ProgramState:
             start_date=date.fromisoformat(data["start_date"]),
             current_week_start=date.fromisoformat(data["current_week_start"]),
             last_deload_date=date.fromisoformat(data["last_deload_date"]) if data.get("last_deload_date") else None,
-            # Priority-aware weekly targets (Sprint 5)
-            weekly_strength_sessions_target=data.get("weekly_strength_sessions_target", 3),
-            weekly_endurance_sessions_target=data.get("weekly_endurance_sessions_target", 3),
-            weekly_hiit_cap=data.get("weekly_hiit_cap", 1),
-            weekly_heavy_legs_cap=data.get("weekly_heavy_legs_cap", 2),
+            # Sprint 5: Restore priority-aware targets
+            weekly_strength_sessions_target=data.get("weekly_strength_sessions_target", 0),
+            weekly_endurance_sessions_target=data.get("weekly_endurance_sessions_target", 0),
+            weekly_hiit_cap=data.get("weekly_hiit_cap", 2),
+            weekly_heavy_legs_cap=data.get("weekly_heavy_legs_cap", 3),
             key_strength_sessions=data.get("key_strength_sessions", 1),
             key_endurance_sessions=data.get("key_endurance_sessions", 1),
         )
-
-
-def get_priority_weekly_targets(priority: Priority) -> Dict:
-    """
-    Get weekly training targets based on priority.
-    
-    Returns dict with:
-    - strength_sessions
-    - endurance_sessions
-    - hiit_cap
-    - heavy_legs_cap
-    - key_strength_sessions
-    - key_endurance_sessions
-    """
-    targets = {
-        Priority.STRENGTH: {
-            "strength_sessions": 4,
-            "endurance_sessions": 2,
-            "hiit_cap": 1,
-            "heavy_legs_cap": 3,
-            "key_strength_sessions": 2,
-            "key_endurance_sessions": 1,
-        },
-        Priority.ENDURANCE: {
-            "strength_sessions": 2,
-            "endurance_sessions": 5,
-            "hiit_cap": 2,
-            "heavy_legs_cap": 1,
-            "key_strength_sessions": 1,
-            "key_endurance_sessions": 2,
-        },
-        Priority.BALANCED: {
-            "strength_sessions": 3,
-            "endurance_sessions": 3,
-            "hiit_cap": 1,
-            "heavy_legs_cap": 2,
-            "key_strength_sessions": 1,
-            "key_endurance_sessions": 1,
-        },
-    }
-    return targets.get(priority, targets[Priority.BALANCED])
 
 
 def distribute_training_days(
@@ -410,96 +350,32 @@ def distribute_training_days(
     return sorted(selected)
 
 
-def _is_heavy_lower_day(lifts: List[str]) -> bool:
-    """Check if any lift is a heavy lower body movement."""
-    heavy_lower = {"squat", "deadlift", "front_squat", "romanian_deadlift"}
-    return any(l.lower() in heavy_lower for l in lifts)
+def _has_heavy_legs(lifts: List[str]) -> bool:
+    """Check if lifts include heavy leg work."""
+    heavy_legs = {"squat", "deadlift", "front squat", "romanian deadlift"}
+    return any(l.lower() in heavy_legs for l in lifts)
 
 
-def _apply_priority_guardrails(
-    days: List[DayTemplate],
-    priority: Priority,
-    strength_days: List[int],
-    endurance_days: List[int],
-    long_day: int
-) -> List[DayTemplate]:
-    """
-    Apply priority-aware guardrails to day templates.
-    
-    - Key strength sessions: protected, no HIIT ±1 day
-    - Key endurance sessions: protected
-    - Avoid heavy legs + HIIT on same day
-    """
-    # Identify heavy lower body days
-    heavy_lower_days = set()
-    for day in days:
-        if day.mode in ("strength", "concurrent") and _is_heavy_lower_day(day.primary_lifts):
-            heavy_lower_days.add(day.day_index)
-    
-    # Identify HIIT days
-    hiit_days = set()
-    for day in days:
-        if day.endurance_zone == "hiit":
-            hiit_days.add(day.day_index)
-    
-    # Apply guardrails
-    for day in days:
-        if day.mode == "rest":
-            continue
+def _is_hiit_session(zone: Optional[str]) -> bool:
+    """Check if endurance zone is HIIT."""
+    return zone == "hiit" if zone else False
+
+
+def _mark_guardrails(days: List[DayTemplate]) -> None:
+    """Mark guardrails for key sessions and interference."""
+    # Find key strength lower days and mark adjacent days
+    for i, day in enumerate(days):
+        if day.key_session and day.session_domain in ["strength", "concurrent"]:
+            if _has_heavy_legs(day.must_include_lifts or day.primary_lifts):
+                # Mark adjacent days to avoid HIIT
+                if i > 0:
+                    days[i-1].avoid_hiit = True
+                if i < len(days) - 1:
+                    days[i+1].avoid_hiit = True
         
-        # Set session domain
-        if day.mode == "strength":
-            day.session_domain = "strength"
-        elif day.mode == "endurance":
-            day.session_domain = "endurance"
-        elif day.mode == "concurrent":
-            day.session_domain = "concurrent"
-        
-        # Set avoid flags based on neighbors
-        day_before = (day.day_index - 1) % 7
-        day_after = (day.day_index + 1) % 7
-        
-        # Key session marking based on priority
-        if priority == Priority.STRENGTH:
-            # Heavy lower body sessions are key
-            if day.mode in ("strength", "concurrent") and _is_heavy_lower_day(day.primary_lifts):
-                day.key_session = True
-                day.avoid_hiit = True  # No HIIT near heavy lower
-            # First strength session of week is key
-            elif day.mode == "strength" and day.day_index in strength_days[:1]:
-                day.key_session = True
-        
-        elif priority == Priority.ENDURANCE:
-            # Long endurance day is key
-            if day.day_index == long_day and day.mode in ("endurance", "concurrent"):
-                day.key_session = True
-            # HIIT sessions are key (limited resource)
-            elif day.endurance_zone == "hiit":
-                day.key_session = True
-            # Keep strength maintenance minimal
-            if day.mode == "strength":
-                day.avoid_heavy_legs = True
-                day.must_include_lifts = ["bench", "press"][:1]  # Upper only
-        
-        else:  # BALANCED
-            # One key strength, one key endurance
-            if day.mode == "strength" and day.day_index == strength_days[0] if strength_days else False:
-                day.key_session = True
-            if day.mode in ("endurance", "concurrent") and day.day_index == long_day:
-                day.key_session = True
-        
-        # Universal: avoid HIIT on heavy lower day
-        if _is_heavy_lower_day(day.primary_lifts):
-            day.avoid_hiit = True
-            if day_after in hiit_days or day_before in hiit_days:
-                # Mark neighboring days to avoid HIIT
-                pass  # Already marked via day.avoid_hiit
-        
-        # Universal: avoid heavy legs near HIIT
-        if day.endurance_zone == "hiit":
+        # Mark HIIT days to avoid heavy legs
+        if day.session_domain in ["endurance", "concurrent"] and _is_hiit_session(day.endurance_zone):
             day.avoid_heavy_legs = True
-    
-    return days
 
 
 def create_microcycle_template(
@@ -509,8 +385,7 @@ def create_microcycle_template(
     start_date: date
 ) -> MicrocyclePlan:
     """
-    Create a 7-day microcycle template based on program config.
-    PRIORITY-AWARE: Structure varies by priority setting.
+    Create a 7-day microcycle template based on program config with priority awareness.
     
     Args:
         config: Program configuration
@@ -521,11 +396,35 @@ def create_microcycle_template(
     Returns:
         MicrocyclePlan
     """
-    days = []
-    effective_priority = config.effective_priority
+    # Compute priority-aware targets
+    priority = config.effective_priority
     
-    # Get priority-based targets
-    targets = get_priority_weekly_targets(effective_priority)
+    # Determine session counts based on priority
+    if config.mode == ProgramMode.STRENGTH:
+        strength_target = config.days_per_week_strength
+        endurance_target = 0
+        strength_key_count = 2
+        endurance_key_count = 0
+    elif config.mode == ProgramMode.ENDURANCE:
+        strength_target = 0
+        endurance_target = config.days_per_week_endurance
+        strength_key_count = 0
+        endurance_key_count = 2
+    elif priority == Priority.STRENGTH:
+        strength_target = max(3, config.days_per_week_strength)
+        endurance_target = min(3, config.days_per_week_endurance)
+        strength_key_count = 2
+        endurance_key_count = 1
+    elif priority == Priority.ENDURANCE:
+        strength_target = min(2, config.days_per_week_strength)
+        endurance_target = max(4, config.days_per_week_endurance)
+        strength_key_count = 1
+        endurance_key_count = 2
+    else:  # BALANCED
+        strength_target = config.days_per_week_strength
+        endurance_target = config.days_per_week_endurance
+        strength_key_count = 1
+        endurance_key_count = 1
     
     # Determine long session day (weekend)
     if config.long_session_day_preference == "sat":
@@ -533,112 +432,90 @@ def create_microcycle_template(
     elif config.long_session_day_preference == "sun":
         long_day = 6
     else:
-        long_day = 5 if config.mode != ProgramMode.ENDURANCE else 6
+        long_day = 5 if priority == Priority.STRENGTH else 6
     
-    # PRIORITY-AWARE day distribution
+    # Distribute training days
     if config.mode == ProgramMode.STRENGTH:
-        strength_days = distribute_training_days(
-            targets["strength_sessions"], "strength", long_day
-        )
+        strength_days = distribute_training_days(strength_target, "strength", long_day)
         endurance_days = []
     elif config.mode == ProgramMode.ENDURANCE:
         strength_days = []
+        endurance_days = distribute_training_days(endurance_target, "endurance", long_day)
+    else:  # CONCURRENT
+        strength_days = distribute_training_days(strength_target, "strength", long_day)
+        # Endurance on remaining days, with some overlap protection
+        avoid_count = 1 if priority == Priority.STRENGTH else (2 if priority == Priority.BALANCED else 0)
         endurance_days = distribute_training_days(
-            targets["endurance_sessions"], "endurance", long_day
+            endurance_target, "endurance", long_day,
+            avoid_days=strength_days[:avoid_count]
         )
-    else:  # CONCURRENT - priority affects distribution
-        if effective_priority == Priority.STRENGTH:
-            # More strength days, endurance secondary
-            strength_days = distribute_training_days(
-                targets["strength_sessions"], "strength", long_day
-            )
-            # Endurance on remaining days, avoiding heavy lower ±1
-            avoid_days = set(strength_days)
-            for sd in strength_days:
-                avoid_days.add((sd - 1) % 7)
-                avoid_days.add((sd + 1) % 7)
-            endurance_days = distribute_training_days(
-                targets["endurance_sessions"], "endurance", long_day,
-                avoid_days=list(avoid_days)
-            )
-        
-        elif effective_priority == Priority.ENDURANCE:
-            # More endurance days, strength maintenance only
-            endurance_days = distribute_training_days(
-                targets["endurance_sessions"], "endurance", long_day
-            )
-            # Strength on easy days, minimal
-            avoid_days = set(endurance_days)
-            # Avoid days with HIIT
-            for ed in endurance_days:
-                avoid_days.add(ed)
-            strength_days = distribute_training_days(
-                targets["strength_sessions"], "strength", long_day,
-                avoid_days=list(avoid_days)
-            )
-        
-        else:  # BALANCED - even distribution
-            strength_days = distribute_training_days(
-                targets["strength_sessions"], "strength", long_day
-            )
-            endurance_days = distribute_training_days(
-                targets["endurance_sessions"], "endurance", long_day,
-                avoid_days=strength_days[:2]
-            )
     
-    # Build daily templates
+    # Build daily templates with priority-aware key session marking
+    days: List[DayTemplate] = []
+    strength_key_assigned = 0
+    endurance_key_assigned = 0
+    
     for day_idx in range(7):
+        is_long = day_idx == long_day
+        
         if day_idx in strength_days and day_idx in endurance_days:
-            # Concurrent day - rare in priority modes
-            is_long = day_idx == long_day
-            is_key = day_idx == long_day  # Long day is key
+            # Concurrent day
+            is_key = False
+            domain = "concurrent"
+            
+            # Determine if this should be a key session
+            if priority == Priority.STRENGTH and strength_key_assigned < strength_key_count:
+                is_key = True
+                strength_key_assigned += 1
+                domain = "strength"
+            elif priority == Priority.ENDURANCE and endurance_key_assigned < endurance_key_count:
+                is_key = True
+                endurance_key_assigned += 1
+                domain = "endurance"
+            elif priority == Priority.BALANCED:
+                # Balanced: first concurrent day is key for whichever needs it
+                if strength_key_assigned < strength_key_count and endurance_key_assigned < endurance_key_count:
+                    is_key = True
+                    strength_key_assigned += 1
+                    endurance_key_assigned += 1
+            
+            # Zone selection with priority awareness
+            if block_type == BlockType.DELOAD:
+                zone = "z2"
+            elif priority == Priority.ENDURANCE and endurance_key_assigned <= endurance_key_count:
+                zone = "hiit" if week_index >= 1 else "tempo"
+            elif priority == Priority.STRENGTH:
+                zone = "z2"  # Minimize interference
+            else:
+                zone = "tempo" if week_index >= 1 else "z2"
+            
             days.append(DayTemplate(
                 day_index=day_idx,
                 mode="concurrent",
-                priority=effective_priority.value,
+                priority=priority.value if config.mode == ProgramMode.CONCURRENT else None,
                 time_budget_min=config.time_budget_weekend_min if is_long else config.time_budget_weekday_min,
-                primary_lifts=config.primary_lifts[:2] if effective_priority != Priority.ENDURANCE else ["bench", "press"],
-                endurance_zone="z2" if block_type == BlockType.BASE else ("tempo" if week_index < 2 else "hiit"),
+                primary_lifts=config.primary_lifts[:2] if config.mode != ProgramMode.ENDURANCE else [],
+                endurance_zone=zone,
                 notes="Concurrent training day",
                 key_session=is_key,
-                session_domain="concurrent",
+                session_domain=domain,
+                must_include_lifts=config.primary_lifts[:1] if is_key and domain == "strength" else []
             ))
-        
+            
         elif day_idx in strength_days:
             # Strength only
-            is_long = day_idx == long_day
-            
-            # Priority-aware lift selection
-            if effective_priority == Priority.STRENGTH:
-                if block_type == BlockType.DELOAD:
-                    lifts = config.primary_lifts[:2]
-                elif block_type == BlockType.PEAK:
-                    lifts = config.primary_lifts[:3]  # More lifts in peak
-                else:
-                    lifts = config.primary_lifts[:2]
-                # First strength day is heavy lower
-                if day_idx == strength_days[0]:
-                    lifts = ["squat"] + [l for l in lifts if l != "squat"][:2]
-            
-            elif effective_priority == Priority.ENDURANCE:
-                # Maintenance: upper body focus, minimal lower
-                lifts = ["bench", "press"][:2]
-                if block_type == BlockType.PEAK:
-                    lifts.append("squat")  # Keep some leg strength
-            
-            else:  # BALANCED
-                if block_type == BlockType.DELOAD:
-                    lifts = config.primary_lifts[:2]
-                elif block_type == BlockType.PEAK:
-                    lifts = config.primary_lifts[:3]
-                else:
-                    lifts = config.primary_lifts[:2]
+            is_key = strength_key_assigned < strength_key_count
+            if is_key:
+                strength_key_assigned += 1
             
             if block_type == BlockType.DELOAD:
+                lifts = config.primary_lifts[:2]
                 intent = "technique"
             elif block_type == BlockType.PEAK:
+                lifts = config.primary_lifts[:3] if is_key else config.primary_lifts[:2]
                 intent = "strength"
             else:
+                lifts = config.primary_lifts[:2] if is_key else [config.primary_lifts[0]]
                 intent = "volume" if block_type == BlockType.BASE else "strength"
             
             days.append(DayTemplate(
@@ -647,51 +524,25 @@ def create_microcycle_template(
                 time_budget_min=config.time_budget_weekend_min if is_long else config.time_budget_weekday_min,
                 primary_lifts=lifts,
                 notes=f"{block_type.value} block - {intent} focus",
+                key_session=is_key,
                 session_domain="strength",
+                must_include_lifts=lifts if is_key else []
             ))
-        
+            
         elif day_idx in endurance_days:
             # Endurance only
-            is_long = day_idx == long_day
+            is_key = endurance_key_assigned < endurance_key_count
+            if is_key:
+                endurance_key_assigned += 1
             
-            # Priority-aware zone selection
-            if effective_priority == Priority.ENDURANCE:
-                # More aggressive progression
-                if block_type == BlockType.BASE:
-                    zone = "z2"
-                elif block_type == BlockType.BUILD:
-                    zone = "tempo" if week_index >= 0 else "z2"
-                elif block_type == BlockType.PEAK:
-                    zone = "hiit" if week_index < 2 else "tempo"
-                else:
-                    zone = "z2"
-            
-            elif effective_priority == Priority.STRENGTH:
-                # Conservative, more Z2 for recovery
-                if block_type == BlockType.BASE:
-                    zone = "z2"
-                elif block_type == BlockType.BUILD:
-                    zone = "z2"  # No tempo for strength priority
-                elif block_type == BlockType.PEAK:
-                    zone = "tempo" if week_index == 0 else "z2"  # Minimal intensity
-                else:
-                    zone = "z2"
-            
-            else:  # BALANCED
-                if block_type == BlockType.BASE:
-                    zone = "z2"
-                elif block_type == BlockType.BUILD:
-                    zone = "tempo" if week_index >= 1 else "z2"
-                elif block_type == BlockType.PEAK:
-                    zone = "hiit" if week_index == 0 else "tempo"
-                else:
-                    zone = "z2"
-            
-            # Cap HIIT per priority
-            if zone == "hiit":
-                hiit_count = sum(1 for d in days if d.endurance_zone == "hiit")
-                if hiit_count >= targets["hiit_cap"]:
-                    zone = "tempo"
+            if block_type == BlockType.BASE:
+                zone = "z2"
+            elif block_type == BlockType.BUILD:
+                zone = "tempo" if week_index >= 1 else "z2"
+            elif block_type == BlockType.PEAK:
+                zone = "hiit" if (is_key and week_index == 0) else "tempo"
+            else:  # DELOAD
+                zone = "z2"
             
             days.append(DayTemplate(
                 day_index=day_idx,
@@ -699,9 +550,10 @@ def create_microcycle_template(
                 time_budget_min=config.time_budget_weekend_min if is_long else config.time_budget_weekday_min,
                 endurance_zone=zone,
                 notes=f"{block_type.value} block - {zone} focus",
-                session_domain="endurance",
+                key_session=is_key,
+                session_domain="endurance"
             ))
-        
+            
         else:
             # Rest day
             days.append(DayTemplate(
@@ -709,30 +561,29 @@ def create_microcycle_template(
                 mode="rest",
                 time_budget_min=0,
                 notes="Rest and recovery",
-                session_domain="rest",
+                key_session=False,
+                session_domain="rest"
             ))
     
-    # Apply priority guardrails
-    days = _apply_priority_guardrails(
-        days, effective_priority, strength_days, endurance_days, long_day
-    )
+    # Apply guardrails: mark adjacent days for key strength lower and HIIT avoidance
+    _mark_guardrails(days)
     
-    # Set progression targets based on block AND priority
+    # Set progression targets based on block and priority
     if block_type == BlockType.BASE:
-        if effective_priority == Priority.STRENGTH:
+        if priority == Priority.STRENGTH:
             progression = ProgressionTargets(
                 target_sets_per_week=18,
-                target_avg_intensity=0.78,
+                target_avg_intensity=0.75,
                 target_minutes_z2=90,
                 target_hiit_sessions=0,
                 volume_progression=1.05
             )
-        elif effective_priority == Priority.ENDURANCE:
+        elif priority == Priority.ENDURANCE:
             progression = ProgressionTargets(
                 target_sets_per_week=8,
                 target_avg_intensity=0.70,
-                target_minutes_z2=240,
-                target_hiit_sessions=0,
+                target_minutes_z2=180,
+                target_hiit_sessions=1,
                 volume_progression=1.08
             )
         else:  # BALANCED
@@ -743,25 +594,24 @@ def create_microcycle_template(
                 target_hiit_sessions=0,
                 volume_progression=1.05
             )
-    
     elif block_type == BlockType.BUILD:
-        if effective_priority == Priority.STRENGTH:
+        if priority == Priority.STRENGTH:
             progression = ProgressionTargets(
                 target_sets_per_week=15,
-                target_avg_intensity=0.85,
-                target_minutes_z2=80,
-                target_hiit_sessions=0,
+                target_avg_intensity=0.82,
+                target_minutes_z2=90,
+                target_hiit_sessions=1,
                 volume_progression=1.02
             )
-        elif effective_priority == Priority.ENDURANCE:
+        elif priority == Priority.ENDURANCE:
             progression = ProgressionTargets(
-                target_sets_per_week=6,
+                target_sets_per_week=8,
                 target_avg_intensity=0.72,
-                target_minutes_z2=180,
-                target_hiit_sessions=1,
+                target_minutes_z2=150,
+                target_hiit_sessions=2,
                 volume_progression=1.05
             )
-        else:  # BALANCED
+        else:
             progression = ProgressionTargets(
                 target_sets_per_week=12,
                 target_avg_intensity=0.82,
@@ -769,58 +619,58 @@ def create_microcycle_template(
                 target_hiit_sessions=1,
                 volume_progression=1.02
             )
-    
     elif block_type == BlockType.PEAK:
-        if effective_priority == Priority.STRENGTH:
-            progression = ProgressionTargets(
-                target_sets_per_week=10,
-                target_avg_intensity=0.90,
-                target_minutes_z2=60,
-                target_hiit_sessions=0,
-                volume_progression=0.95
-            )
-        elif effective_priority == Priority.ENDURANCE:
-            progression = ProgressionTargets(
-                target_sets_per_week=4,
-                target_avg_intensity=0.75,
-                target_minutes_z2=120,
-                target_hiit_sessions=2,
-                volume_progression=0.95
-            )
-        else:  # BALANCED
+        if priority == Priority.STRENGTH:
             progression = ProgressionTargets(
                 target_sets_per_week=9,
                 target_avg_intensity=0.88,
                 target_minutes_z2=60,
+                target_hiit_sessions=0,
+                volume_progression=0.95
+            )
+        elif priority == Priority.ENDURANCE:
+            progression = ProgressionTargets(
+                target_sets_per_week=6,
+                target_avg_intensity=0.75,
+                target_minutes_z2=90,
                 target_hiit_sessions=2,
                 volume_progression=0.95
             )
-    
-    else:  # DELOAD
-        if effective_priority == Priority.STRENGTH:
+        else:
             progression = ProgressionTargets(
-                target_sets_per_week=8,
-                target_avg_intensity=0.70,
+                target_sets_per_week=9,
+                target_avg_intensity=0.88,
                 target_minutes_z2=60,
-                target_hiit_sessions=0,
-                volume_progression=0.70
+                target_hiit_sessions=1,
+                volume_progression=0.95
             )
-        elif effective_priority == Priority.ENDURANCE:
-            progression = ProgressionTargets(
-                target_sets_per_week=3,
-                target_avg_intensity=0.65,
-                target_minutes_z2=120,
-                target_hiit_sessions=0,
-                volume_progression=0.70
-            )
-        else:  # BALANCED
-            progression = ProgressionTargets(
-                target_sets_per_week=6,
-                target_avg_intensity=0.70,
-                target_minutes_z2=90,
-                target_hiit_sessions=0,
-                volume_progression=0.70
-            )
+    else:  # DELOAD
+        deload_factor = 0.70 if priority == Priority.STRENGTH else (0.60 if priority == Priority.ENDURANCE else 0.70)
+        progression = ProgressionTargets(
+            target_sets_per_week=int(6 * deload_factor),
+            target_avg_intensity=0.70 if priority != Priority.ENDURANCE else 0.65,
+            target_minutes_z2=int(90 * deload_factor),
+            target_hiit_sessions=0,
+            volume_progression=deload_factor
+        )
+    
+    # Adjust guardrails based on priority
+    if priority == Priority.STRENGTH:
+        guardrails = FatigueGuardrails(
+            max_hiit_per_week=1,
+            max_heavy_legs_sessions_per_week=3,
+            max_weekly_ramp_percent=0.10,
+            min_readiness_for_heavy=0.65
+        )
+    elif priority == Priority.ENDURANCE:
+        guardrails = FatigueGuardrails(
+            max_hiit_per_week=3,
+            max_heavy_legs_sessions_per_week=2,
+            max_weekly_ramp_percent=0.15,
+            min_readiness_for_heavy=0.70
+        )
+    else:
+        guardrails = FatigueGuardrails()
     
     return MicrocyclePlan(
         start_date=start_date,
@@ -829,7 +679,7 @@ def create_microcycle_template(
         week_index=week_index,
         days=days,
         progression=progression,
-        guardrails=FatigueGuardrails()
+        guardrails=guardrails
     )
 
 
@@ -840,7 +690,6 @@ def start_program(
 ) -> Tuple[ProgramState, MicrocyclePlan]:
     """
     Start a new training program.
-    PRIORITY-AWARE: Sets weekly targets based on priority.
     
     Args:
         athlete_id: Athlete identifier
@@ -852,10 +701,7 @@ def start_program(
     """
     start_date = start_date or date.today()
     
-    # Get priority-based targets
-    targets = get_priority_weekly_targets(config.effective_priority)
-    
-    # Create initial state with priority-aware targets
+    # Create initial state
     state = ProgramState(
         athlete_id=athlete_id,
         config=config,
@@ -863,14 +709,7 @@ def start_program(
         block_week_index=0,
         microcycle_index=0,
         start_date=start_date,
-        current_week_start=start_date,
-        # Priority-aware weekly targets (Sprint 5)
-        weekly_strength_sessions_target=targets["strength_sessions"],
-        weekly_endurance_sessions_target=targets["endurance_sessions"],
-        weekly_hiit_cap=targets["hiit_cap"],
-        weekly_heavy_legs_cap=targets["heavy_legs_cap"],
-        key_strength_sessions=targets["key_strength_sessions"],
-        key_endurance_sessions=targets["key_endurance_sessions"],
+        current_week_start=start_date
     )
     
     # Generate first microcycle
@@ -1000,190 +839,128 @@ def should_deload(
 
 
 # ============================================================================
-# PRIORITY-AWARE REPLANNING (Sprint 5)
+# Sprint 5: Replanning Logic
 # ============================================================================
 
-def replan_missed_session(
+@dataclass
+class ReplanResult:
+    """Result of replanning operation."""
+    updated_microcycle: MicrocyclePlan
+    moved_sessions: List[Tuple[int, int]]  # (from_day, to_day) tuples
+    dropped_sessions: List[int]  # Day indices of dropped sessions
+    explanation: str
+
+
+def replan_missed_sessions(
     microcycle: MicrocyclePlan,
-    missed_date: date,
-    completed_dates: List[date],
-    priority: Priority
-) -> Optional[DayTemplate]:
+    missed_days: List[int],
+    current_day: int
+) -> ReplanResult:
     """
-    Replan a missed session.
-    PRIORITY-AWARE: Key sessions are moved, non-key sessions are discarded.
+    Replan missed sessions by moving key sessions or dropping non-key ones.
+    
+    Strategy:
+    - Key sessions: Move to next valid day within 3 days, maintain guardrails
+    - Non-key sessions: Discard
+    - Never stack heavy lower + HIIT
     
     Args:
         microcycle: Current microcycle plan
-        missed_date: Date of missed session
-        completed_dates: Dates of completed sessions (to avoid conflicts)
-        priority: Training priority
+        missed_days: List of missed day indices (0-6)
+        current_day: Current day index (can't reschedule before this)
     
     Returns:
-        New DayTemplate for rescheduled session, or None if discarded
+        ReplanResult with updated microcycle and changes log
     """
-    # Get the missed day template
-    days_diff = (missed_date - microcycle.start_date).days
-    if days_diff < 0 or days_diff >= 7:
-        return None
+    moved_sessions: List[Tuple[int, int]] = []
+    dropped_sessions: List[int] = []
+    explanations: List[str] = []
     
-    missed_day = microcycle.days[days_diff]
-    
-    # Non-key sessions: discard
-    if not missed_day.key_session:
-        return None
-    
-    # Key sessions: find next valid day within 3 days
-    for offset in range(1, 4):  # 1-3 days forward
-        new_date = missed_date + timedelta(days=offset)
-        new_idx = days_diff + offset
+    # Sort missed days to process in order
+    for missed_day in sorted(missed_days):
+        if missed_day < current_day:
+            continue  # Can't reschedule past days
         
-        if new_idx >= 7 or new_date in completed_dates:
+        missed_template = microcycle.days[missed_day]
+        
+        if missed_template.mode == "rest":
+            continue  # Skip rest days
+        
+        if not missed_template.key_session:
+            # Non-key session: discard
+            dropped_sessions.append(missed_day)
+            explanations.append(f"Day {missed_day}: Non-key {missed_template.mode} session dropped")
             continue
         
-        # Check guardrails
-        existing_day = microcycle.days[new_idx] if new_idx < 7 else None
-        
-        # If it's a rest day, use it
-        if existing_day and existing_day.mode == "rest":
-            # Create new template for this day
-            return DayTemplate(
-                day_index=new_idx,
-                mode=missed_day.mode,
-                priority=missed_day.priority,
-                time_budget_min=missed_day.time_budget_min,
-                primary_lifts=missed_day.primary_lifts,
-                endurance_zone=missed_day.endurance_zone,
-                notes=f"Rescheduled from {missed_date.isoformat()}",
-                key_session=True,  # Still key
-                session_domain=missed_day.session_domain,
-                avoid_hiit=missed_day.avoid_hiit,
-                avoid_heavy_legs=missed_day.avoid_heavy_legs,
-                must_include_lifts=missed_day.must_include_lifts,
-            )
-        
-        # If concurrent day and missed was strength, can combine
-        if existing_day and existing_day.mode == "concurrent" and missed_day.mode == "strength":
-            return DayTemplate(
-                day_index=new_idx,
-                mode="concurrent",
-                priority=missed_day.priority,
-                time_budget_min=max(missed_day.time_budget_min, existing_day.time_budget_min),
-                primary_lifts=list(set(missed_day.primary_lifts + existing_day.primary_lifts)),
-                endurance_zone=existing_day.endurance_zone,
-                notes=f"Combined with existing + rescheduled from {missed_date.isoformat()}",
-                key_session=True,
-                session_domain="concurrent",
-                avoid_hiit=missed_day.avoid_hiit or existing_day.avoid_hiit,
-                avoid_heavy_legs=missed_day.avoid_heavy_legs or existing_day.avoid_heavy_legs,
-                must_include_lifts=missed_day.must_include_lifts,
-            )
-    
-    # Could not find valid day within 3 days - keep as missed but note it
-    return None
-
-
-def compress_week(
-    microcycle: MicrocyclePlan,
-    missed_dates: List[date],
-    completed_dates: List[date],
-    priority: Priority
-) -> MicrocyclePlan:
-    """
-    Compress week after multiple missed sessions.
-    PRIORITY-AWARE: Never stack heavy lower + HIIT.
-    
-    Args:
-        microcycle: Original microcycle
-        missed_dates: List of missed session dates
-        completed_dates: List of completed session dates
-        priority: Training priority
-    
-    Returns:
-        Modified MicrocyclePlan
-    """
-    # Start with copy of days
-    new_days = [DayTemplate(
-        day_index=d.day_index,
-        mode=d.mode,
-        priority=d.priority,
-        time_budget_min=d.time_budget_min,
-        primary_lifts=d.primary_lifts[:],
-        endurance_zone=d.endurance_zone,
-        notes=d.notes,
-        key_session=d.key_session,
-        session_domain=d.session_domain,
-        avoid_hiit=d.avoid_hiit,
-        avoid_heavy_legs=d.avoid_heavy_legs,
-        must_include_lifts=d.must_include_lifts[:],
-    ) for d in microcycle.days]
-    
-    # Collect key sessions to preserve
-    key_sessions = []
-    for missed_date in missed_dates:
-        days_diff = (missed_date - microcycle.start_date).days
-        if 0 <= days_diff < 7:
-            day = microcycle.days[days_diff]
-            if day.key_session:
-                key_sessions.append((missed_date, day))
-    
-    # Try to fit key sessions into remaining days
-    for missed_date, missed_day in key_sessions:
-        # Find first available day
-        for new_day in new_days:
-            if new_day.mode == "rest" and new_day.day_index not in [
-                (d - microcycle.start_date).days for d in completed_dates
-            ]:
-                # Check guardrails: no heavy lower + HIIT
-                has_heavy_lower = _is_heavy_lower_day(missed_day.primary_lifts)
-                would_have_hiit = new_day.endurance_zone == "hiit" or missed_day.endurance_zone == "hiit"
-                
-                if has_heavy_lower and would_have_hiit:
-                    # Skip this day, would violate guardrail
-                    continue
-                
-                # Schedule here
-                new_day.mode = missed_day.mode
-                new_day.priority = missed_day.priority
-                new_day.time_budget_min = missed_day.time_budget_min
-                new_day.primary_lifts = missed_day.primary_lifts[:]
-                new_day.endurance_zone = missed_day.endurance_zone
-                new_day.notes = f"Compressed from {missed_date.isoformat()}"
-                new_day.key_session = True
-                new_day.session_domain = missed_day.session_domain
-                new_day.avoid_hiit = missed_day.avoid_hiit
-                new_day.avoid_heavy_legs = missed_day.avoid_heavy_legs
-                new_day.must_include_lifts = missed_day.must_include_lifts[:]
+        # Key session: try to find next valid day
+        target_day = None
+        for offset in range(1, 4):  # Within 3 days
+            candidate = missed_day + offset
+            if candidate >= 7:
                 break
+            if candidate < current_day:
+                continue
+            
+            candidate_day = microcycle.days[candidate]
+            
+            # Check guardrails based on session type
+            if missed_template.session_domain == "strength":
+                # Check if heavy legs session
+                if _has_heavy_legs(missed_template.must_include_lifts or missed_template.primary_lifts):
+                    # Can't move to day with HIIT
+                    if _is_hiit_session(candidate_day.endurance_zone):
+                        continue
+                    if candidate_day.avoid_hiit:
+                        continue
+            
+            elif missed_template.session_domain == "endurance":
+                # Check if HIIT session
+                if _is_hiit_session(missed_template.endurance_zone):
+                    # Can't move to day with heavy legs
+                    if _has_heavy_legs(candidate_day.must_include_lifts or candidate_day.primary_lifts):
+                        continue
+                    if candidate_day.avoid_heavy_legs:
+                        continue
+            
+            # Valid target found
+            target_day = candidate
+            break
+        
+        if target_day is not None:
+            # Move session to target day
+            microcycle.days[target_day] = DayTemplate(
+                day_index=target_day,
+                mode=missed_template.mode,
+                priority=missed_template.priority,
+                time_budget_min=missed_template.time_budget_min,
+                primary_lifts=missed_template.primary_lifts,
+                endurance_zone=missed_template.endurance_zone,
+                notes=f"Rescheduled from day {missed_day}: {missed_template.notes}",
+                key_session=True,  # Still a key session
+                session_domain=missed_template.session_domain,
+                must_include_lifts=missed_template.must_include_lifts
+            )
+            
+            # Clear original day
+            microcycle.days[missed_day] = DayTemplate(
+                day_index=missed_day,
+                mode="rest",
+                time_budget_min=0,
+                notes="Session rescheduled",
+                key_session=False,
+                session_domain="rest"
+            )
+            
+            moved_sessions.append((missed_day, target_day))
+            explanations.append(f"Day {missed_day}: Key {missed_template.mode} session moved to day {target_day}")
+        else:
+            # Could not find valid target - drop it with note
+            dropped_sessions.append(missed_day)
+            explanations.append(f"Day {missed_day}: Key {missed_template.mode} session dropped (no valid slot)")
     
-    return MicrocyclePlan(
-        start_date=microcycle.start_date,
-        end_date=microcycle.end_date,
-        block_type=microcycle.block_type,
-        week_index=microcycle.week_index,
-        days=new_days,
-        progression=microcycle.progression,
-        guardrails=microcycle.guardrails
+    return ReplanResult(
+        updated_microcycle=microcycle,
+        moved_sessions=moved_sessions,
+        dropped_sessions=dropped_sessions,
+        explanation="; ".join(explanations)
     )
-
-
-def get_weekly_summary(microcycle: MicrocyclePlan) -> Dict:
-    """
-    Get summary of weekly plan.
-    
-    Returns dict with counts and key session info.
-    """
-    strength_days = [d for d in microcycle.days if d.mode == "strength"]
-    endurance_days = [d for d in microcycle.days if d.mode == "endurance"]
-    concurrent_days = [d for d in microcycle.days if d.mode == "concurrent"]
-    key_sessions = [d for d in microcycle.days if d.key_session]
-    
-    return {
-        "total_sessions": len(strength_days) + len(endurance_days) + len(concurrent_days),
-        "strength_sessions": len(strength_days),
-        "endurance_sessions": len(endurance_days),
-        "concurrent_sessions": len(concurrent_days),
-        "key_sessions": len(key_sessions),
-        "hiit_sessions": len([d for d in microcycle.days if d.endurance_zone == "hiit"]),
-        "heavy_legs_sessions": len([d for d in microcycle.days if _is_heavy_lower_day(d.primary_lifts)]),
-    }
