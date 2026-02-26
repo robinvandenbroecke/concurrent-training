@@ -25,6 +25,24 @@ from .rep_engine import (
     RepState,
 )
 
+from .day_engine import (
+    DayEngineParams,
+    SetImpulse,
+    StrengthImpulses,
+    EnduranceImpulses,
+    DailyImpulses,
+    PerLiftState,
+    DayState,
+    ReadinessOutput,
+    compute_strength_impulses,
+    compute_endurance_impulses,
+    compute_interference,
+    update_day_state,
+    compute_readiness,
+    simulate_day_transition,
+    create_initial_state,
+)
+
 __all__ = [
     # Original model exports
     "ConcurrentTrainingModel",
@@ -36,7 +54,7 @@ __all__ = [
     "DayLevelState",
     "RepLevelState",
     "SystemParameters",
-    # New rep-engine exports
+    # Rep-engine exports
     "LiftVelocityProfile",
     "RepEngineParams",
     "RepInput",
@@ -48,4 +66,20 @@ __all__ = [
     "simulate_strength_session",
     "LimitingFactor",
     "RepState",
+    # Day-engine exports
+    "DayEngineParams",
+    "SetImpulse",
+    "StrengthImpulses",
+    "EnduranceImpulses",
+    "DailyImpulses",
+    "PerLiftState",
+    "DayState",
+    "ReadinessOutput",
+    "compute_strength_impulses",
+    "compute_endurance_impulses",
+    "compute_interference",
+    "update_day_state",
+    "compute_readiness",
+    "simulate_day_transition",
+    "create_initial_state",
 ]
