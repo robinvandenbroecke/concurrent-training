@@ -382,18 +382,36 @@ def compute_strength_metrics(
     )
 
 
+def _compute_median(values: List[float]) -> Optional[float]:
+    """Compute median of a list of values."""
+    if not values:
+        return None
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    if n % 2 == 0:
+        return (sorted_vals[n//2 - 1] + sorted_vals[n//2]) / 2
+    return sorted_vals[n//2]
+
+
 def analyze_lift_trend(
     lift: str,
     sessions: List[StrengthSessionMetrics],
-    today: date = None
+    today: date = None,
+    day_states: Optional[List[Dict]] = None
 ) -> LiftPerformanceTrend:
     """
     Analyze performance trend for a lift over multiple sessions.
+    
+    Uses 28-day window with specific classification thresholds:
+    - progress: delta >= +1.5%
+    - stagnation: -1% < delta < +1.5%
+    - regression: delta <= -1%
     
     Args:
         lift: Lift name
         sessions: List of session metrics (sorted by date)
         today: Reference date (default: today)
+        day_states: Optional day state data for overreaching detection
     
     Returns:
         LiftPerformanceTrend
@@ -404,7 +422,7 @@ def analyze_lift_trend(
         return LiftPerformanceTrend(lift=lift)
     
     # Filter quality sessions
-    quality_sessions = [s for s in sessions if s.quality_ok]
+    quality_sessions = [s for s in sessions if s.quality_ok and s.e1rm_est is not None]
     
     if not quality_sessions:
         return LiftPerformanceTrend(lift=lift)
@@ -415,16 +433,29 @@ def analyze_lift_trend(
     # Current values (most recent)
     current = quality_sessions[-1]
     
-    # Historical lookups
+    # Define windows
     d28 = today - timedelta(days=28)
-    d90 = today - timedelta(days=90)
-    d14 = today - timedelta(days=14)
+    d8 = today - timedelta(days=8)
     d7 = today - timedelta(days=7)
+    d90 = today - timedelta(days=90)
     
+    # Baseline: median of weeks 2-4 (days -28 to -8)
+    baseline_sessions = [s for s in quality_sessions if d28 <= s.session_date < d8]
+    baseline_values = [s.e1rm_est for s in baseline_sessions if s.e1rm_est]
+    baseline_median = _compute_median(baseline_values) if baseline_values else None
+    
+    # Recent: median of last 7 days (or last 7 non-null points)
+    recent_sessions = [s for s in quality_sessions if s.session_date >= d7]
+    if len(recent_sessions) < 2:
+        # Use last 7 non-null points
+        recent_sessions = quality_sessions[-7:] if len(quality_sessions) >= 7 else quality_sessions
+    
+    recent_values = [s.e1rm_est for s in recent_sessions if s.e1rm_est]
+    recent_median = _compute_median(recent_values) if recent_values else None
+    
+    # Historical lookups for PR detection
     sessions_28d = [s for s in quality_sessions if s.session_date >= d28]
     sessions_90d = [s for s in quality_sessions if s.session_date >= d90]
-    sessions_7d = [s for s in quality_sessions if s.session_date >= d7]
-    sessions_prev_7d = [s for s in quality_sessions if d14 <= s.session_date < d7]
     
     # Best values
     best_28d_e1rm = max((s.e1rm_est for s in sessions_28d if s.e1rm_est), default=None)
@@ -432,7 +463,6 @@ def analyze_lift_trend(
     best_28d_perf_y = max((s.perf_y for s in sessions_28d if s.perf_y), default=None)
     
     # PR detection (compare current to historical best EXCLUDING current)
-    # Get best from 90d excluding the most recent session
     best_90d_e1rm_excl_current = max(
         (s.e1rm_est for s in sessions_90d[:-1] if s.e1rm_est),
         default=None
@@ -446,49 +476,49 @@ def analyze_lift_trend(
     is_e1rm_pr = False
     if current.e1rm_est and best_90d_e1rm_excl_current:
         is_e1rm_pr = current.e1rm_est > best_90d_e1rm_excl_current * 1.01  # 1% improvement
-    elif current.e1rm_est and len(sessions_90d) == 1:
-        # First session - not a PR yet
-        is_e1rm_pr = False
     
     is_velocity_pr = False
     if current.perf_y and best_28d_perf_y_excl_current:
         is_velocity_pr = current.perf_y > best_28d_perf_y_excl_current * 1.02  # 2% improvement
     
-    # Trend analysis
-    e1rm_7d_avg = None
-    e1rm_prev_7d_avg = None
-    
-    if sessions_7d:
-        e1rm_values = [s.e1rm_est for s in sessions_7d if s.e1rm_est]
-        if e1rm_values:
-            e1rm_7d_avg = sum(e1rm_values) / len(e1rm_values)
-    
-    if sessions_prev_7d:
-        e1rm_values = [s.e1rm_est for s in sessions_prev_7d if s.e1rm_est]
-        if e1rm_values:
-            e1rm_prev_7d_avg = sum(e1rm_values) / len(e1rm_values)
-    
-    # Determine trend direction
+    # Trend classification with specific thresholds
     e1rm_trend = TrendDirection.STABLE
-    if e1rm_7d_avg and e1rm_prev_7d_avg:
-        pct_change = (e1rm_7d_avg - e1rm_prev_7d_avg) / e1rm_prev_7d_avg if e1rm_prev_7d_avg > 0 else 0
-        
-        if pct_change > 0.03:
-            e1rm_trend = TrendDirection.IMPROVING
-        elif pct_change > 0.01:
-            e1rm_trend = TrendDirection.STABLE
-        elif pct_change > -0.02:
-            e1rm_trend = TrendDirection.STAGNANT
-        else:
-            e1rm_trend = TrendDirection.REGRESSING
+    delta = None
     
-    # Velocity trend
+    if recent_median and baseline_median and baseline_median > 0:
+        delta = (recent_median - baseline_median) / baseline_median
+        
+        # Classification thresholds:
+        # progress: >= +1.5%
+        # stagnation: -1% < delta < +1.5%
+        # regression: <= -1%
+        if delta >= 0.015:
+            e1rm_trend = TrendDirection.IMPROVING
+        elif delta <= -0.01:
+            e1rm_trend = TrendDirection.REGRESSING
+        else:
+            e1rm_trend = TrendDirection.STAGNANT
+    
+    # Check for overreaching: regression + high fatigue
+    if e1rm_trend == TrendDirection.REGRESSING and day_states:
+        high_fatigue_days = sum(
+            1 for ds in day_states[-7:]  # Last 7 days
+            if ds.get("D_sys", 0) > 0.25 or ds.get("E_fat", 0) > 0.25
+        )
+        if high_fatigue_days >= 3:
+            e1rm_trend = TrendDirection.OVERREACHING
+    
+    # Velocity trend (simplified)
     perf_y_trend = TrendDirection.STABLE
     current_perf_y = current.perf_y
-    if current_perf_y and best_28d_perf_y and current_perf_y < best_28d_perf_y * 0.95:
-        perf_y_trend = TrendDirection.REGRESSING
-    elif current_perf_y and best_28d_perf_y and current_perf_y > best_28d_perf_y * 1.02:
-        perf_y_trend = TrendDirection.IMPROVING
+    if current_perf_y and best_28d_perf_y and best_28d_perf_y > 0:
+        perf_y_delta = (current_perf_y - best_28d_perf_y) / best_28d_perf_y
+        if perf_y_delta >= 0.015:
+            perf_y_trend = TrendDirection.IMPROVING
+        elif perf_y_delta <= -0.01:
+            perf_y_trend = TrendDirection.REGRESSING
+        else:
+            perf_y_trend = TrendDirection.STAGNANT
     
     return LiftPerformanceTrend(
         lift=lift,
@@ -501,8 +531,8 @@ def analyze_lift_trend(
         is_velocity_pr=is_velocity_pr,
         e1rm_trend=e1rm_trend,
         perf_y_trend=perf_y_trend,
-        e1rm_7d_avg=e1rm_7d_avg,
-        e1rm_prev_7d_avg=e1rm_prev_7d_avg,
+        e1rm_7d_avg=recent_median,
+        e1rm_prev_7d_avg=baseline_median,
     )
 
 
@@ -570,7 +600,15 @@ def analyze_endurance_trend(
     today: date = None
 ) -> EndurancePerformanceTrend:
     """
-    Analyze endurance performance trend.
+    Analyze endurance performance trend with TP_proxy calculation.
+    
+    TP_proxy = 0.95 * best_20min_power (cycling)
+    For running/swimming: use pace or TRIMP efficiency
+    
+    Classification thresholds:
+    - progress: delta >= +1.5%
+    - stagnation: -1% < delta < +1.5%
+    - regression: delta <= -1%
     
     Args:
         sport: Sport type
@@ -594,13 +632,41 @@ def analyze_endurance_trend(
     quality_sessions.sort(key=lambda s: s.session_date)
     
     current = quality_sessions[-1]
+    
+    # Define windows
     d28 = today - timedelta(days=28)
+    d8 = today - timedelta(days=8)
+    d7 = today - timedelta(days=7)
+    
     sessions_28d = [s for s in quality_sessions if s.session_date >= d28]
+    
+    # Calculate TP_proxy for each session
+    def calc_tp_proxy(s: EnduranceSessionMetrics) -> Optional[float]:
+        if s.best_20min_power:
+            return s.best_20min_power * 0.95  # TP_proxy = 0.95 * best_20min
+        elif s.normalized_power:
+            return s.normalized_power * 0.90  # Estimate from NP
+        elif s.avg_power:
+            return s.avg_power * 0.85  # Rough estimate from avg
+        return None
+    
+    # Baseline: median of weeks 2-4 (days -28 to -8)
+    baseline_sessions = [s for s in quality_sessions if d28 <= s.session_date < d8]
+    baseline_proxies = [calc_tp_proxy(s) for s in baseline_sessions if calc_tp_proxy(s)]
+    baseline_median = _compute_median(baseline_proxies) if baseline_proxies else None
+    
+    # Recent: median of last 7 days
+    recent_sessions = [s for s in quality_sessions if s.session_date >= d7]
+    if len(recent_sessions) < 2:
+        recent_sessions = quality_sessions[-7:] if len(quality_sessions) >= 7 else quality_sessions
+    
+    recent_proxies = [calc_tp_proxy(s) for s in recent_sessions if calc_tp_proxy(s)]
+    recent_median = _compute_median(recent_proxies) if recent_proxies else None
     
     # Best values
     best_28d_5min = max((s.best_5min_power for s in sessions_28d if s.best_5min_power), default=None)
     best_28d_20min = max((s.best_20min_power for s in sessions_28d if s.best_20min_power), default=None)
-    best_28d_pace = min((s.avg_pace for s in sessions_28d if s.avg_pace), default=None)  # Lower is better
+    best_28d_pace = min((s.avg_pace for s in sessions_28d if s.avg_pace), default=None)
     
     # PR detection (compare to historical best excluding current)
     best_28d_5min_excl_current = max(
@@ -627,25 +693,39 @@ def analyze_endurance_trend(
     if current.best_20min_power and best_28d_20min_excl_current:
         is_20min_pr = current.best_20min_power >= best_28d_20min_excl_current * 1.01
     if current.avg_pace and best_28d_pace_excl_current:
-        is_pace_pr = current.avg_pace <= best_28d_pace_excl_current * 0.99  # Lower pace is better
+        is_pace_pr = current.avg_pace <= best_28d_pace_excl_current * 0.99
     
-    # Trend analysis (simplified for V1)
+    # Trend classification with specific thresholds
     power_trend = TrendDirection.STABLE
-    pace_trend = TrendDirection.STABLE
     
-    if len(sessions_28d) >= 3:
-        recent = sessions_28d[-3:]
-        older = sessions_28d[:-3] if len(sessions_28d) > 3 else []
+    if recent_median and baseline_median and baseline_median > 0:
+        delta = (recent_median - baseline_median) / baseline_median
         
-        if older:
-            recent_avg_power = sum(s.avg_power for s in recent if s.avg_power) / len([s for s in recent if s.avg_power]) if any(s.avg_power for s in recent) else None
-            older_avg_power = sum(s.avg_power for s in older if s.avg_power) / len([s for s in older if s.avg_power]) if any(s.avg_power for s in older) else None
+        if delta >= 0.015:
+            power_trend = TrendDirection.IMPROVING
+        elif delta <= -0.01:
+            power_trend = TrendDirection.REGRESSING
+        else:
+            power_trend = TrendDirection.STAGNANT
+    
+    # Pace trend (for running/swimming) - lower is better
+    pace_trend = TrendDirection.STABLE
+    baseline_paces = [s.avg_pace for s in baseline_sessions if s.avg_pace]
+    recent_paces = [s.avg_pace for s in recent_sessions if s.avg_pace]
+    
+    if baseline_paces and recent_paces:
+        baseline_pace_median = _compute_median(baseline_paces)
+        recent_pace_median = _compute_median(recent_paces)
+        
+        if baseline_pace_median and recent_pace_median and baseline_pace_median > 0:
+            pace_delta = (baseline_pace_median - recent_pace_median) / baseline_pace_median  # Reversed
             
-            if recent_avg_power and older_avg_power:
-                if recent_avg_power > older_avg_power * 1.03:
-                    power_trend = TrendDirection.IMPROVING
-                elif recent_avg_power < older_avg_power * 0.97:
-                    power_trend = TrendDirection.REGRESSING
+            if pace_delta >= 0.015:  # Pace improved by >= 1.5%
+                pace_trend = TrendDirection.IMPROVING
+            elif pace_delta <= -0.01:  # Pace worsened
+                pace_trend = TrendDirection.REGRESSING
+            else:
+                pace_trend = TrendDirection.STAGNANT
     
     return EndurancePerformanceTrend(
         sport=sport,
@@ -802,11 +882,11 @@ def should_adjust_microcycle(
 ) -> bool:
     """
     Determine if microcycle should be adjusted based on performance.
-    
+
     Args:
         report: Performance report
         threshold_signal: Minimum signal level to trigger adjustment
-    
+
     Returns:
         True if adjustment recommended
     """
@@ -817,8 +897,197 @@ def should_adjust_microcycle(
         PerformanceSignal.DELOAD_SUGGESTED,
         PerformanceSignal.OVERREACHING,
     ]
-    
+
     current_level = signal_order.index(report.overall_signal)
     threshold_level = signal_order.index(threshold_signal)
-    
+
     return current_level >= threshold_level
+
+
+# ============================================================================
+# Program Feedback Integration (Sprint 6 Enhanced)
+# ============================================================================
+
+@dataclass
+class MicrocycleAdjustment:
+    """Adjustment to apply to next microcycle based on performance."""
+    force_deload: bool = False
+    reduce_key_session_intensity: bool = False
+    add_stimulus_lifts: List[str] = field(default_factory=list)
+    replace_z2_with_tempo: bool = False
+    add_hiit_intervals: int = 0
+    hold_volume_constant: bool = False
+    prioritize_lift: Optional[str] = None
+    explanation: str = ""
+
+
+def compute_microcycle_adjustment(
+    report: PerformanceReport,
+    priority: str = "balanced",
+    microcycles_since_stimulus_change: int = 0
+) -> MicrocycleAdjustment:
+    """
+    Compute adjustments for next microcycle based on performance report.
+
+    Rules:
+    A) If overreaching_suspected:
+       - force deload microcycle next
+       - reduce key sessions intensity by 1 step
+
+    B) If strength priority and lift l stagnating for >=2 microcycles:
+       - increase stimulus: add +1 backoff set on that lift's key day
+       - OR +2.5% top-set target (choose deterministically)
+
+    C) If endurance priority and TP_proxy stagnating:
+       - replace one Z2 with tempo
+       - OR add 1 interval set within HIIT cap
+
+    D) If progress:
+       - keep planned progression (no extra)
+
+    E) If regression but not overreaching:
+       - hold volume constant next week (no planned increase)
+
+    F) If specific lift regressing while others progress:
+       - allocate more "quality" to that lift
+
+    Args:
+        report: Performance report
+        priority: Program priority ("strength", "endurance", "balanced")
+        microcycles_since_stimulus_change: Counter for deterministic choices
+
+    Returns:
+        MicrocycleAdjustment
+    """
+    adjustment = MicrocycleAdjustment()
+
+    # A) Overreaching: force deload and reduce intensity
+    if report.overall_signal == PerformanceSignal.OVERREACHING:
+        adjustment.force_deload = True
+        adjustment.reduce_key_session_intensity = True
+        adjustment.explanation = "Overreaching detected: forcing deload and reducing key session intensity"
+        return adjustment
+
+    # Check for stagnating lifts
+    stagnating_lifts = [
+        lift for lift, trend in report.lift_trends.items()
+        if trend.e1rm_trend == TrendDirection.STAGNANT
+    ]
+
+    regressing_lifts = [
+        lift for lift, trend in report.lift_trends.items()
+        if trend.e1rm_trend == TrendDirection.REGRESSING
+    ]
+
+    improving_lifts = [
+        lift for lift, trend in report.lift_trends.items()
+        if trend.e1rm_trend == TrendDirection.IMPROVING
+    ]
+
+    # B) Strength priority with stagnation
+    if priority == "strength" and stagnating_lifts and microcycles_since_stimulus_change >= 2:
+        # Choose deterministically based on counter
+        for lift in stagnating_lifts[:1]:  # Take first stagnating lift
+            if microcycles_since_stimulus_change % 2 == 0:
+                adjustment.add_stimulus_lifts.append(lift)
+                adjustment.explanation = f"Strength stagnation: adding +1 backoff set for {lift}"
+            else:
+                adjustment.add_stimulus_lifts.append(lift)
+                adjustment.explanation = f"Strength stagnation: increasing top-set target +2.5% for {lift}"
+
+    # C) Endurance priority with stagnation
+    if priority == "endurance":
+        stagnating_endurance = any(
+            trend.power_trend == TrendDirection.STAGNANT or trend.power_trend == TrendDirection.REGRESSING
+            for trend in report.endurance_trends.values()
+        )
+        if stagnating_endurance and microcycles_since_stimulus_change >= 2:
+            if microcycles_since_stimulus_change % 2 == 0:
+                adjustment.replace_z2_with_tempo = True
+                adjustment.explanation = "Endurance stagnation: replacing Z2 with tempo"
+            else:
+                adjustment.add_hiit_intervals = 1
+                adjustment.explanation = "Endurance stagnation: adding 1 HIIT interval set"
+
+    # D) Progress: no changes needed
+    if report.overall_signal == PerformanceSignal.INCREASE_LOAD:
+        adjustment.explanation = "Progress detected: maintaining planned progression"
+        return adjustment
+
+    # E) Regression but not overreaching: hold volume
+    if report.overall_signal == PerformanceSignal.DELOAD_SUGGESTED:
+        adjustment.hold_volume_constant = True
+        adjustment.explanation = "Regression detected: holding volume constant"
+        return adjustment
+
+    # F) Specific lift regressing while others progress
+    for lift in regressing_lifts:
+        if lift not in improving_lifts and len(improving_lifts) >= 1:
+            adjustment.prioritize_lift = lift
+            adjustment.explanation = f"{lift} regressing while others progress: prioritizing quality"
+            break
+
+    if not adjustment.explanation:
+        adjustment.explanation = report.signal_reason
+
+    return adjustment
+
+
+def should_force_deload(
+    report: PerformanceReport,
+    consecutive_regressing_microcycles: int = 0
+) -> Tuple[bool, str]:
+    """
+    Determine if deload should be forced based on performance.
+
+    Args:
+        report: Performance report
+        consecutive_regressing_microcycles: Number of consecutive regressing microcycles
+
+    Returns:
+        (should_deload, reason)
+    """
+    # Immediate deload for overreaching
+    if report.overall_signal == PerformanceSignal.OVERREACHING:
+        return True, f"Overreaching: {report.signal_reason}"
+
+    # Deload if suggested
+    if report.suggest_deload:
+        return True, report.signal_reason
+
+    # Force deload after 2 consecutive regressing microcycles
+    if consecutive_regressing_microcycles >= 2:
+        return True, f"Two consecutive regressing microcycles ({consecutive_regressing_microcycles})"
+
+    return False, ""
+
+
+def get_lift_priority_ranking(
+    report: PerformanceReport
+) -> List[Tuple[str, float]]:
+    """
+    Rank lifts by performance priority (regressing first, then stagnating, then improving).
+
+    Args:
+        report: Performance report
+
+    Returns:
+        List of (lift, priority_score) tuples, sorted by priority
+    """
+    rankings = []
+
+    for lift, trend in report.lift_trends.items():
+        if trend.e1rm_trend == TrendDirection.REGRESSING:
+            score = 3.0  # Highest priority
+        elif trend.e1rm_trend == TrendDirection.STAGNANT:
+            score = 2.0  # Medium priority
+        elif trend.e1rm_trend == TrendDirection.IMPROVING:
+            score = 1.0  # Lower priority
+        else:
+            score = 0.0
+
+        rankings.append((lift, score))
+
+    # Sort by score descending
+    rankings.sort(key=lambda x: x[1], reverse=True)
+    return rankings

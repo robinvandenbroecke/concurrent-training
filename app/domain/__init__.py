@@ -99,6 +99,7 @@ from .performance_engine import (
     LiftPerformanceTrend,
     EndurancePerformanceTrend,
     PerformanceReport,
+    MicrocycleAdjustment,
     compute_session_e1rm,
     compute_session_perf_y,
     compute_strength_metrics,
@@ -108,6 +109,9 @@ from .performance_engine import (
     generate_performance_report,
     apply_performance_adjustments,
     should_adjust_microcycle,
+    compute_microcycle_adjustment,
+    should_force_deload,
+    get_lift_priority_ranking,
 )
 
 __all__ = [
@@ -201,6 +205,7 @@ __all__ = [
     "LiftPerformanceTrend",
     "EndurancePerformanceTrend",
     "PerformanceReport",
+    "MicrocycleAdjustment",
     "compute_session_e1rm",
     "compute_session_perf_y",
     "compute_strength_metrics",
@@ -210,4 +215,7 @@ __all__ = [
     "generate_performance_report",
     "apply_performance_adjustments",
     "should_adjust_microcycle",
+    "compute_microcycle_adjustment",
+    "should_force_deload",
+    "get_lift_priority_ranking",
 ]
