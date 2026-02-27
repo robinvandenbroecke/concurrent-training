@@ -1,0 +1,644 @@
+"""
+EngineOrchestrator - Single Source of Truth for Concurrent Training
+
+Sprint A: CONSOLIDATION
+- Replaces legacy ConcurrentTrainingModel pipeline with modular engines
+- Coordinates: rep_engine -> day_engine -> performance_engine
+- All production ingestion flows through this orchestrator
+"""
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional, Tuple, Any
+import os
+
+from sqlalchemy.orm import Session
+
+from app import models as db_models
+from app.types import LiftType, EnduranceSport
+
+# Domain engines
+from app.domain.rep_engine import (
+    LiftVelocityProfile,
+    RepEngineParams,
+    SetInput,
+    SessionInput,
+    simulate_strength_session,
+)
+from app.domain.day_engine import (
+    LiftType as DayEngineLiftType,
+    EnduranceMode,
+    DayEngineParams,
+    SetImpulse,
+    StrengthImpulses,
+    EnduranceImpulses,
+    DailyImpulses,
+    PerLiftState,
+    DayState,
+    update_day_state,
+    compute_readiness,
+    ReadinessOutput as Readiness,
+)
+from app.domain.performance_engine import (
+    StrengthSessionMetrics,
+    EnduranceSessionMetrics,
+    analyze_lift_trend,
+    compute_session_e1rm,
+)
+
+
+# Feature flag for legacy model
+USE_LEGACY_MODEL = os.getenv("USE_LEGACY_MODEL", "false").lower() == "true"
+
+
+class EngineOrchestrator:
+    """
+    Orchestrates all domain engines for session ingestion and state updates.
+    
+    This is the SINGLE SOURCE OF TRUTH for:
+    - Strength session ingestion (uses rep_engine)
+    - Endurance session ingestion
+    - Day state updates (uses day_engine)
+    - Performance snapshots (uses performance_engine)
+    """
+    
+    def __init__(self, db: Session):
+        self.db = db
+        self.rep_params = RepEngineParams()
+        self.day_params = DayEngineParams()
+    
+    def ingest_strength_session(
+        self,
+        athlete_id: int,
+        lift: LiftType,
+        session_date: date,
+        sets_data: List[Dict[str, Any]],
+        vbt_available: bool = True,
+        optional_rpe: Optional[float] = None,
+    ) -> Tuple[db_models.StrengthSession, DayState, Dict]:
+        """
+        Ingest a strength session using rep_engine and update day state.
+        
+        Args:
+            athlete_id: Athlete ID
+            lift: Lift type
+            session_date: Date of session
+            sets_data: List of set data with velocities
+                     Format: [{"load_kg": float, "reps": int, "velocities": [float], "rest_sec": float}]
+            vbt_available: Whether VBT data is available
+            optional_rpe: Optional session RPE for central/local split
+        
+        Returns:
+            (strength_session_db, updated_day_state, performance_snapshot)
+        """
+        # Get athlete's lift profile
+        profile_db = self.db.query(db_models.LiftProfile).filter(
+            db_models.LiftProfile.athlete_id == athlete_id,
+            db_models.LiftProfile.lift == lift
+        ).first()
+        
+        if not profile_db:
+            raise ValueError(f"No profile found for {lift}")
+        
+        # Convert to rep_engine profile
+        profile = LiftVelocityProfile(
+            lift=lift.value,
+            a=profile_db.a,
+            b=profile_db.b
+        )
+        
+        # Get current day state
+        day_state = self._get_or_create_day_state(athlete_id, session_date)
+        
+        # Convert sets_data to rep_engine SetInput
+        set_inputs = []
+        total_tonnage = 0
+        total_reps = 0
+        
+        for i, set_data in enumerate(sets_data):
+            load_kg = set_data.get("load_kg", 0)
+            reps = set_data.get("reps", 0)
+            velocities = set_data.get("velocities", [])
+            rest_sec = set_data.get("rest_sec")
+            
+            total_tonnage += load_kg * reps
+            total_reps += reps
+            
+            set_inputs.append(SetInput(
+                lift=lift.value,
+                load_kg=load_kg,
+                velocities=velocities,
+                rest_before_sec=rest_sec if i > 0 else None
+            ))
+        
+        # Build rep_engine session input
+        # Map current day state to rep_engine initial conditions
+        init_A_local = {
+            lift.value: max(0.1, 1.0 - day_state.per_lift.get(lift.value, PerLiftState()).D_l / 2)
+        }
+        init_A_sys = max(0.1, 1.0 - day_state.D_sys / 2)
+        init_M = 0.0  # Start fresh for session
+        
+        session_input = SessionInput(
+            sets=set_inputs,
+            profiles={lift.value: profile},
+            init_A_local=init_A_local,
+            init_A_sys=init_A_sys,
+            init_M=init_M,
+            R_mito=day_state.R_mito,
+            params=self.rep_params
+        )
+        
+        # Run rep_engine simulation
+        rep_output = simulate_strength_session(session_input)
+        
+        # Store strength session in DB
+        strength_session = db_models.StrengthSession(
+            athlete_id=athlete_id,
+            lift=lift,
+            start_time=datetime.combine(session_date, datetime.min.time()),
+            tonnage=total_tonnage,
+            avg_intensity=total_tonnage / max(total_reps, 1) if total_reps > 0 else 0,
+            raw_data={
+                "sets": sets_data,
+                "final_A_local": rep_output.final_A_local,
+                "final_A_sys": rep_output.final_A_sys,
+                "final_A_M": rep_output.final_A_M,
+            },
+            rep_level_log=[
+                {
+                    "set_idx": s_idx,
+                    "rep_idx": r_idx,
+                    "A_l": rep.A_l,
+                    "A_sys": rep.A_sys,
+                    "A_M": rep.A_M,
+                    "v_pred_next": rep.v_pred_next,
+                }
+                for s_idx, set_out in enumerate(rep_output.sets)
+                for r_idx, rep in enumerate(set_out.reps)
+            ]
+        )
+        self.db.add(strength_session)
+        self.db.flush()  # Get ID without committing
+        
+        # Compute strength impulses for day_engine
+        strength_impulses = self._compute_strength_impulses(
+            lift.value, sets_data, rep_output
+        )
+        
+        # Update day state
+        daily_impulses = DailyImpulses(
+            strength=strength_impulses,
+            endurance=EnduranceImpulses(
+                u_E_Z2=0.0, u_E_HIIT=0.0, u_E_total=0.0,
+                mode=EnduranceMode.CYCLING, has_HIIT=False, has_Z2=False
+            ),
+            date=session_date
+        )
+        
+        updated_day_state = update_day_state(day_state, daily_impulses, self.day_params)
+        
+        # Persist updated day state
+        self._persist_day_state(athlete_id, session_date, updated_day_state)
+        
+        # Compute performance snapshot
+        performance_snapshot = self._compute_strength_performance_snapshot(
+            athlete_id, lift, session_date, sets_data, rep_output, vbt_available
+        )
+        
+        self.db.commit()
+        
+        return strength_session, updated_day_state, performance_snapshot
+    
+    def ingest_endurance_session(
+        self,
+        athlete_id: int,
+        session_date: date,
+        sport: EnduranceSport,
+        duration_minutes: float,
+        intensity_type: str,  # "z2", "hiit", "mixed"
+        power_data: Optional[List[Dict]] = None,
+    ) -> Tuple[db_models.EnduranceSession, DayState, Dict]:
+        """
+        Ingest an endurance session and update day state.
+        
+        Args:
+            athlete_id: Athlete ID
+            session_date: Date of session
+            sport: Endurance sport type
+            duration_minutes: Session duration
+            intensity_type: "z2", "hiit", or "mixed"
+            power_data: Optional power meter data
+        
+        Returns:
+            (endurance_session_db, updated_day_state, performance_snapshot)
+        """
+        # Get current day state
+        day_state = self._get_or_create_day_state(athlete_id, session_date)
+        
+        # Compute endurance impulses
+        u_E_Z2, u_E_HIIT = self._compute_endurance_impulses(
+            duration_minutes, intensity_type, power_data
+        )
+        
+        # Map sport to endurance mode
+        mode_map = {
+            EnduranceSport.RUNNING: EnduranceMode.RUNNING,
+            EnduranceSport.CYCLING: EnduranceMode.CYCLING,
+            EnduranceSport.SWIMMING: EnduranceMode.SWIMMING,
+        }
+        mode = mode_map.get(sport, EnduranceMode.CYCLING)
+        
+        endurance_impulses = EnduranceImpulses(
+            u_E_Z2=u_E_Z2,
+            u_E_HIIT=u_E_HIIT,
+            u_E_total=u_E_Z2 + u_E_HIIT,
+            mode=mode,
+            has_HIIT=intensity_type in ["hiit", "mixed"],
+            has_Z2=intensity_type in ["z2", "mixed"]
+        )
+        
+        # Update day state
+        daily_impulses = DailyImpulses(
+            strength=StrengthImpulses(
+                per_lift={}, u_sys=0.0, u_legs=0.0, u_met=0.0,
+                u_legs_high_intensity=0.0, sets=[]
+            ),
+            endurance=endurance_impulses,
+            date=session_date
+        )
+        
+        updated_day_state = update_day_state(day_state, daily_impulses, self.day_params)
+        
+        # Persist endurance session
+        endurance_session = db_models.EnduranceSession(
+            athlete_id=athlete_id,
+            sport=sport,
+            start_time=datetime.combine(session_date, datetime.min.time()),
+            duration_minutes=duration_minutes,
+            intensity_type=intensity_type,
+            u_E_Z2=u_E_Z2,
+            u_E_HIIT=u_E_HIIT,
+            raw_data={
+                "power_data": power_data,
+                "impulses": {"u_E_Z2": u_E_Z2, "u_E_HIIT": u_E_HIIT}
+            }
+        )
+        self.db.add(endurance_session)
+        
+        # Persist updated day state
+        self._persist_day_state(athlete_id, session_date, updated_day_state)
+        
+        # Compute performance snapshot
+        performance_snapshot = self._compute_endurance_performance_snapshot(
+            athlete_id, sport, session_date, duration_minutes, intensity_type, power_data
+        )
+        
+        self.db.commit()
+        
+        return endurance_session, updated_day_state, performance_snapshot
+    
+    def get_day_state_snapshot(
+        self,
+        athlete_id: int,
+        query_date: date
+    ) -> Optional[DayState]:
+        """
+        Get day state snapshot for athlete on specific date.
+        Used by coach, program, and performance engines.
+        """
+        return self._get_or_create_day_state(athlete_id, query_date, create=False)
+    
+    def get_recent_sessions(
+        self,
+        athlete_id: int,
+        date_from: date,
+        date_to: date
+    ) -> Dict[str, List]:
+        """
+        Get recent sessions for performance analysis.
+        
+        Returns:
+            {"strength": [...], "endurance": [...]}
+        """
+        strength_sessions = self.db.query(db_models.StrengthSession).filter(
+            db_models.StrengthSession.athlete_id == athlete_id,
+            db_models.StrengthSession.start_time >= datetime.combine(date_from, datetime.min.time()),
+            db_models.StrengthSession.start_time <= datetime.combine(date_to, datetime.max.time())
+        ).all()
+        
+        endurance_sessions = self.db.query(db_models.EnduranceSession).filter(
+            db_models.EnduranceSession.athlete_id == athlete_id,
+            db_models.EnduranceSession.start_time >= datetime.combine(date_from, datetime.min.time()),
+            db_models.EnduranceSession.start_time <= datetime.combine(date_to, datetime.max.time())
+        ).all()
+        
+        return {
+            "strength": strength_sessions,
+            "endurance": endurance_sessions
+        }
+    
+    def compute_readiness(
+        self,
+        athlete_id: int,
+        query_date: date
+    ) -> Readiness:
+        """Compute readiness for athlete on specific date."""
+        day_state = self._get_or_create_day_state(athlete_id, query_date)
+        return compute_readiness(day_state, self.day_params)
+    
+    # -------------------------------------------------------------------------
+    # Internal helpers
+    # -------------------------------------------------------------------------
+    
+    def _get_or_create_day_state(
+        self,
+        athlete_id: int,
+        query_date: date,
+        create: bool = True
+    ) -> DayState:
+        """Get or create day state for athlete on date."""
+        date_str = query_date.isoformat()
+        
+        # Try to load from DB
+        day_state_db = self.db.query(db_models.DayState).filter(
+            db_models.DayState.athlete_id == athlete_id,
+            db_models.DayState.date == date_str
+        ).first()
+        
+        lift_states_db = self.db.query(db_models.LiftDayState).filter(
+            db_models.LiftDayState.athlete_id == athlete_id,
+            db_models.LiftDayState.date == date_str
+        ).all()
+        
+        if day_state_db and lift_states_db:
+            # Convert DB models to domain DayState
+            per_lift = {}
+            for ls in lift_states_db:
+                per_lift[ls.lift.value] = PerLiftState(
+                    D_l=ls.D_l,
+                    F_l=ls.F_l,
+                    C_l=ls.C_l
+                )
+            
+            return DayState(
+                date=query_date,
+                per_lift=per_lift,
+                D_sys=day_state_db.D_sys,
+                R_mito=day_state_db.R_mito,
+                E_fat=day_state_db.E_fat,
+                T_legs=getattr(day_state_db, 'T_legs', 0.0)
+            )
+        
+        if not create:
+            return None
+        
+        # Create default day state
+        per_lift = {}
+        for lt in LiftType:
+            per_lift[lt.value] = PerLiftState(D_l=0.0, F_l=1.0, C_l=100.0)
+        
+        return DayState(
+            date=query_date,
+            per_lift=per_lift,
+            D_sys=0.0,
+            R_mito=0.0,
+            E_fat=0.0,
+            T_legs=0.0
+        )
+    
+    def _persist_day_state(
+        self,
+        athlete_id: int,
+        query_date: date,
+        day_state: DayState
+    ) -> None:
+        """Persist day state to DB."""
+        date_str = query_date.isoformat()
+        
+        # Update or create system day state
+        day_state_db = self.db.query(db_models.DayState).filter(
+            db_models.DayState.athlete_id == athlete_id,
+            db_models.DayState.date == date_str
+        ).first()
+        
+        if day_state_db:
+            day_state_db.D_sys = day_state.D_sys
+            day_state_db.R_mito = day_state.R_mito
+            day_state_db.E_fat = day_state.E_fat
+        else:
+            day_state_db = db_models.DayState(
+                athlete_id=athlete_id,
+                date=date_str,
+                D_sys=day_state.D_sys,
+                R_mito=day_state.R_mito,
+                E_fat=day_state.E_fat
+            )
+            self.db.add(day_state_db)
+        
+        # Update per-lift states
+        for lift_name, lift_state in day_state.per_lift.items():
+            lift_enum = LiftType(lift_name)
+            
+            lift_day_state = self.db.query(db_models.LiftDayState).filter(
+                db_models.LiftDayState.athlete_id == athlete_id,
+                db_models.LiftDayState.lift == lift_enum,
+                db_models.LiftDayState.date == date_str
+            ).first()
+            
+            if lift_day_state:
+                lift_day_state.D_l = lift_state.D_l
+                lift_day_state.F_l = lift_state.F_l
+                lift_day_state.C_l = lift_state.C_l
+            else:
+                lift_day_state = db_models.LiftDayState(
+                    athlete_id=athlete_id,
+                    lift=lift_enum,
+                    date=date_str,
+                    D_l=lift_state.D_l,
+                    F_l=lift_state.F_l,
+                    C_l=lift_state.C_l
+                )
+                self.db.add(lift_day_state)
+    
+    def _compute_strength_impulses(
+        self,
+        lift: str,
+        sets_data: List[Dict],
+        rep_output: Any
+    ) -> StrengthImpulses:
+        """Compute strength impulses from rep_engine output."""
+        per_lift = {lift: 0.0}
+        u_sys = 0.0
+        u_legs = 0.0
+        u_met = 0.0
+        u_legs_high_intensity = 0.0
+        set_impulses = []
+        
+        # Check if this is a legs lift
+        is_legs = lift in ['squat', 'deadlift', 'clean']
+        
+        for set_data in sets_data:
+            load_kg = set_data.get("load_kg", 0)
+            reps = set_data.get("reps", 0)
+            
+            # Simple impulse calculation
+            intensity = min(1.0, load_kg / 200)  # Rough intensity estimate
+            impulse = (load_kg * reps) * (intensity ** 1.2)
+            
+            per_lift[lift] += impulse
+            u_sys += impulse * (1.3 if is_legs else 0.7)
+            
+            if is_legs:
+                u_legs += impulse
+                if intensity > 0.85:
+                    u_legs_high_intensity += impulse * 0.5
+            
+            set_impulses.append(SetImpulse(
+                lift=lift,
+                tonnage=load_kg * reps,
+                intensity=intensity,
+                velocity_factor=0.9,  # Placeholder
+                vl=0.15,    # Placeholder
+                reps=reps,
+                avg_intensity_pct=intensity * 100
+            ))
+        
+        return StrengthImpulses(
+            per_lift=per_lift,
+            u_sys=u_sys,
+            u_legs=u_legs,
+            u_met=u_met,
+            u_legs_high_intensity=u_legs_high_intensity,
+            sets=set_impulses
+        )
+    
+    def _compute_endurance_impulses(
+        self,
+        duration_minutes: float,
+        intensity_type: str,
+        power_data: Optional[List[Dict]]
+    ) -> Tuple[float, float]:
+        """Compute endurance impulses (u_E_Z2, u_E_HIIT)."""
+        # Match legacy behavior for backward compatibility
+        if intensity_type == "z2":
+            return duration_minutes, 0.0
+        elif intensity_type == "hiit":
+            return 0.0, duration_minutes
+        elif intensity_type == "mixed":
+            return duration_minutes * 0.3, duration_minutes * 0.7
+        else:
+            return duration_minutes * 0.5, 0.0
+    
+    def _compute_strength_performance_snapshot(
+        self,
+        athlete_id: int,
+        lift: LiftType,
+        session_date: date,
+        sets_data: List[Dict],
+        rep_output: Any,
+        vbt_available: bool
+    ) -> Dict:
+        """Compute performance snapshot for strength session."""
+        # Build sets_data for e1RM calculation
+        e1rm_sets = []
+        for set_data in sets_data:
+            load_kg = set_data.get("load_kg", 0)
+            reps = set_data.get("reps", 0)
+            velocities = set_data.get("velocities", [])
+            
+            # Estimate velocity loss if we have velocities
+            vl = 0.0
+            if len(velocities) >= 2:
+                vl = (velocities[0] - velocities[-1]) / max(velocities[0], 0.001)
+            
+            e1rm_sets.append({
+                "load": load_kg,
+                "reps": reps,
+                "velocity_loss": vl
+            })
+        
+        e1rm_est, top_load, top_reps, top_vl, method = compute_session_e1rm(
+            e1rm_sets, vbt_available=vbt_available
+        )
+        
+        snapshot = {
+            "athlete_id": athlete_id,
+            "date": session_date.isoformat(),
+            "lift": lift.value,
+            "e1rm_est": e1rm_est,
+            "top_load": top_load,
+            "top_reps": top_reps,
+            "method": method,
+            "final_A_local": rep_output.final_A_local,
+            "final_A_sys": rep_output.final_A_sys,
+            "final_A_M": rep_output.final_A_M,
+        }
+        
+        # Store in performance_snapshots table if it exists
+        self._store_performance_snapshot(athlete_id, session_date, "strength", lift.value, snapshot)
+        
+        return snapshot
+    
+    def _compute_endurance_performance_snapshot(
+        self,
+        athlete_id: int,
+        sport: EnduranceSport,
+        session_date: date,
+        duration_minutes: float,
+        intensity_type: str,
+        power_data: Optional[List[Dict]]
+    ) -> Dict:
+        """Compute performance snapshot for endurance session."""
+        snapshot = {
+            "athlete_id": athlete_id,
+            "date": session_date.isoformat(),
+            "sport": sport.value,
+            "duration_minutes": duration_minutes,
+            "intensity_type": intensity_type,
+        }
+        
+        if power_data:
+            # Compute normalized power, TSS, etc.
+            avg_power = sum(p.get("power", 0) for p in power_data) / len(power_data)
+            snapshot["avg_power"] = avg_power
+        
+        self._store_performance_snapshot(athlete_id, session_date, "endurance", sport.value, snapshot)
+        
+        return snapshot
+    
+    def _store_performance_snapshot(
+        self,
+        athlete_id: int,
+        session_date: date,
+        session_type: str,
+        subtype: str,
+        data: Dict
+    ) -> None:
+        """Store performance snapshot if table exists."""
+        # Check if PerformanceSnapshot model exists with expected fields
+        if hasattr(db_models, 'PerformanceSnapshot'):
+            # Check if snapshot already exists for this date
+            existing = self.db.query(db_models.PerformanceSnapshot).filter(
+                db_models.PerformanceSnapshot.athlete_id == athlete_id,
+                db_models.PerformanceSnapshot.snapshot_date == session_date.isoformat()
+            ).first()
+            
+            if existing:
+                # Update existing snapshot
+                existing.metrics_json = {
+                    "session_type": session_type,
+                    "subtype": subtype,
+                    "data": data
+                }
+            else:
+                snapshot = db_models.PerformanceSnapshot(
+                    athlete_id=athlete_id,
+                    snapshot_date=session_date.isoformat(),
+                    days_analyzed=1,
+                    metrics_json={
+                        "session_type": session_type,
+                        "subtype": subtype,
+                        "data": data
+                    },
+                    overall_signal="maintain"
+                )
+                self.db.add(snapshot)

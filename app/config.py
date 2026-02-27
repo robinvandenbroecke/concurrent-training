@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     admin_api_key: str = "dev-api-key-change-in-production"
     
+    # Sprint A: Feature flag for legacy model
+    use_legacy_model: bool = False  # USE_LEGACY_MODEL env var
+    
     class Config:
         env_file = ".env"
 

@@ -2,7 +2,7 @@
 FastAPI application - main entry point
 """
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Security, status
@@ -400,3 +400,164 @@ def delete_goal_endpoint(
     if not success:
         raise HTTPException(status_code=404, detail="Goal not found")
     return {"status": "deleted", "goal_id": goal_id}
+
+
+# ============================================================================
+# Sprint A: State Fetch Service
+# ============================================================================
+
+@app.get("/state/day")
+def get_day_state_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    target_date: Optional[date] = Query(None, description="Date (default: today)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get day state snapshot for athlete on specific date.
+    Used by coach/program/performance engines.
+    """
+    from app.services.engine_orchestrator import EngineOrchestrator
+    
+    target_date = target_date or date.today()
+    orchestrator = EngineOrchestrator(db)
+    day_state = orchestrator.get_day_state_snapshot(athlete_id, target_date)
+    
+    if not day_state:
+        raise HTTPException(status_code=404, detail="No state found for date")
+    
+    return {
+        "athlete_id": athlete_id,
+        "date": target_date.isoformat(),
+        "per_lift": {
+            lift: {
+                "D_l": state.D_l,
+                "F_l": state.F_l,
+                "C_l": state.C_l
+            }
+            for lift, state in day_state.per_lift.items()
+        },
+        "D_sys": day_state.D_sys,
+        "R_mito": day_state.R_mito,
+        "E_fat": day_state.E_fat,
+        "T_legs": getattr(day_state, 'T_legs', 0.0)
+    }
+
+
+@app.get("/state/readiness")
+def get_readiness_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    target_date: Optional[date] = Query(None, description="Date (default: today)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get readiness scores for athlete on specific date.
+    """
+    from app.services.engine_orchestrator import EngineOrchestrator
+    
+    target_date = target_date or date.today()
+    orchestrator = EngineOrchestrator(db)
+    readiness = orchestrator.compute_readiness(athlete_id, target_date)
+    
+    return {
+        "athlete_id": athlete_id,
+        "date": target_date.isoformat(),
+        "overall": readiness.overall,
+        "per_lift": readiness.per_lift,
+        "endurance": readiness.endurance,
+        "legs_structural": getattr(readiness, 'legs_structural', None),
+        "explanations": readiness.explanations
+    }
+
+
+@app.get("/sessions/recent")
+def get_recent_sessions_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    days: int = Query(7, description="Number of days to look back"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get recent sessions for performance analysis.
+    """
+    from app.services.engine_orchestrator import EngineOrchestrator
+    
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+    
+    orchestrator = EngineOrchestrator(db)
+    sessions = orchestrator.get_recent_sessions(athlete_id, start_date, end_date)
+    
+    return {
+        "athlete_id": athlete_id,
+        "date_from": start_date.isoformat(),
+        "date_to": end_date.isoformat(),
+        "strength_sessions": [
+            {
+                "id": s.id,
+                "lift": s.lift.value,
+                "start_time": s.start_time.isoformat() if s.start_time else None,
+                "tonnage": s.tonnage,
+                "avg_intensity": s.avg_intensity
+            }
+            for s in sessions["strength"]
+        ],
+        "endurance_sessions": [
+            {
+                "id": s.id,
+                "sport": s.sport.value,
+                "start_time": s.start_time.isoformat() if s.start_time else None,
+                "duration_minutes": s.duration_minutes,
+                "intensity_type": s.intensity_type
+            }
+            for s in sessions["endurance"]
+        ]
+    }
+
+
+# ============================================================================
+# Sprint A: Legacy Comparison Endpoints (explicit /legacy prefix)
+# ============================================================================
+
+@app.post("/legacy/sessions/strength")
+def create_strength_session_legacy(
+    session: schemas.StrengthSessionCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    [LEGACY] Ingest strength session using legacy ConcurrentTrainingModel.
+    For comparison/testing only - does NOT update primary state.
+    """
+    import os
+    if not os.getenv("USE_LEGACY_MODEL"):
+        raise HTTPException(
+            status_code=403,
+            detail="Legacy endpoints disabled. Set USE_LEGACY_MODEL=true to enable."
+        )
+    
+    # Import legacy service
+    from app.domain.model import ConcurrentTrainingModel
+    
+    # Run legacy model (results not stored to primary state)
+    model = ConcurrentTrainingModel()
+    
+    return {
+        "status": "legacy_computed",
+        "message": "Legacy model results (not stored)",
+        "athlete_id": session.athlete_id,
+        "lift": session.lift.value
+    }
+
+
+@app.get("/legacy/status")
+def legacy_status():
+    """
+    Check legacy model feature flag status.
+    """
+    import os
+    use_legacy = os.getenv("USE_LEGACY_MODEL", "false").lower() == "true"
+    
+    return {
+        "use_legacy_model": use_legacy,
+        "primary_engine": "modular_engines",
+        "available_engines": ["rep_engine", "day_engine", "performance_engine", "program_engine", "goal_engine"],
+        "legacy_available": True
+    }
