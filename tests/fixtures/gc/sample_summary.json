@@ -1,0 +1,49 @@
+[
+  {
+    "id": "gc_001",
+    "sport": "Bike",
+    "date": "2024-02-01T08:00:00",
+    "duration": 3600,
+    "Distance": 30000,
+    "Avg Power": 200,
+    "NP": 210,
+    "TSS": 80,
+    "IF": 0.85
+  },
+  {
+    "id": "gc_002",
+    "sport": "Run",
+    "date": "2024-02-02T07:30:00",
+    "duration": 1800,
+    "Distance": 5000,
+    "Avg Power": 280,
+    "Avg HR": 155,
+    "TSS": 60
+  },
+  {
+    "id": "gc_003",
+    "sport": "Swim",
+    "date": "2024-02-03T19:00:00",
+    "duration": 2400,
+    "Distance": 2000
+  },
+  {
+    "id": "gc_004",
+    "sport": "Bike",
+    "date": "2024-02-04T09:00:00",
+    "duration": 5400,
+    "Distance": 45000,
+    "Avg Power": 250,
+    "NP": 260,
+    "TSS": 150,
+    "IF": 0.95
+  },
+  {
+    "id": "gc_005",
+    "sport": "Bike",
+    "date": "2024-02-05T07:00:00",
+    "duration": 2700,
+    "Distance": 18000,
+    "Avg Power": 180
+  }
+]

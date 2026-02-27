@@ -221,7 +221,7 @@ def replay(
     date_from: str = typer.Option(..., "--from", "-f", help="Start date (YYYY-MM-DD)"),
     date_to: str = typer.Option(..., "--to", "-t", help="End date (YYYY-MM-DD)"),
     out: str = typer.Option("./artifacts/run1", "--out", "-o", help="Output directory"),
-    dry_run: bool = typer.Option(True, "--dry-run/--live", help="Dry run (no DB writes)")
+    dry_run: bool = typer.Option(True, "--dry-run", help="Dry run (no DB writes)")
 ):
     """Replay historical sessions and compute validation metrics."""
     from app.eval.replay import ReplayRunner

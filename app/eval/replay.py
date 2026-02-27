@@ -383,18 +383,65 @@ class ReplayRunner:
         run_dir = self.artifacts_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         
-        # Rep errors CSV
+        # Rep errors CSV - deterministic ordering
         if self.rep_errors:
+            # Sort by date, lift, set, rep for determinism
+            sorted_rep_errors = sorted(
+                self.rep_errors,
+                key=lambda x: (x.get("date", ""), x.get("lift", ""), x.get("set", 0), x.get("rep", 0))
+            )
             with open(run_dir / "rep_errors.csv", "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=self.rep_errors[0].keys())
+                writer = csv.DictWriter(f, fieldnames=sorted_rep_errors[0].keys())
                 writer.writeheader()
-                writer.writerows(self.rep_errors)
+                writer.writerows(sorted_rep_errors)
         
-        # Day errors CSV
+        # Day errors CSV - deterministic ordering
         if self.day_errors:
+            sorted_day_errors = sorted(
+                self.day_errors,
+                key=lambda x: (x.get("date", ""), x.get("lift", ""))
+            )
             with open(run_dir / "day_errors.csv", "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=self.day_errors[0].keys())
+                writer = csv.DictWriter(f, fieldnames=sorted_day_errors[0].keys())
                 writer.writeheader()
-                writer.writerows(self.day_errors)
+                writer.writerows(sorted_day_errors)
+        
+        # Write summary JSON with deterministic formatting
+        summary = self._compute_summary_dict()
+        with open(run_dir / "summary.json", "w") as f:
+            json.dump(summary, f, sort_keys=True, separators=(',', ':'))
         
         print(f"Artifacts written to {run_dir}")
+    
+    def _compute_summary_dict(self) -> Dict:
+        """Compute deterministic summary dictionary."""
+        summary = {
+            "n_rep_errors": len(self.rep_errors),
+            "n_day_errors": len(self.day_errors),
+            "rep_metrics": {},
+            "day_metrics": {},
+        }
+        
+        if self.rep_errors:
+            predictions = [e["v_pred"] for e in self.rep_errors]
+            observed = [e["v_obs"] for e in self.rep_errors]
+            metrics = compute_rep_level_metrics(predictions, observed)
+            summary["rep_metrics"] = {
+                "rmse": round(metrics.rmse, 6),
+                "mae": round(metrics.mae, 6),
+                "n_samples": metrics.n_samples,
+            }
+        
+        if self.day_errors:
+            pred_model = [e["predicted_model"] for e in self.day_errors]
+            pred_a = [e["predicted_baseline_a"] for e in self.day_errors]
+            pred_b = [e["predicted_baseline_b"] for e in self.day_errors]
+            obs = [e["observed"] for e in self.day_errors]
+            
+            summary["day_metrics"] = {
+                "mae_model": round(compute_day_level_strength_metrics(pred_model, obs).mae, 6),
+                "mae_baseline_a": round(compute_day_level_strength_metrics(pred_a, obs).mae, 6),
+                "mae_baseline_b": round(compute_day_level_strength_metrics(pred_b, obs).mae, 6),
+            }
+        
+        return summary
