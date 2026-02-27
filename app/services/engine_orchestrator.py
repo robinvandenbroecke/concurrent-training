@@ -271,12 +271,12 @@ class EngineOrchestrator:
         # Run rep_engine simulation
         rep_output = simulate_strength_session(session_input)
         
-        # Store strength session in DB (with content_hash for idempotency)
+        # v9.1: CONCURRENCY-SAFE idempotency - try insert, catch IntegrityError
         strength_session = db_models.StrengthSession(
             athlete_id=athlete_id,
             lift=lift,
             start_time=datetime.combine(session_date, datetime.min.time()),
-            content_hash=content_hash,  # HOTFIX: Idempotency
+            content_hash=content_hash,
             tonnage=total_tonnage,
             avg_intensity=total_tonnage / max(total_reps, 1) if total_reps > 0 else 0,
             raw_data={
@@ -299,7 +299,20 @@ class EngineOrchestrator:
             ]
         )
         self.db.add(strength_session)
-        self.db.flush()  # Get ID without committing
+        
+        try:
+            self.db.flush()  # Get ID without committing
+        except IntegrityError:
+            # v9.1: Concurrent duplicate - rollback and return existing
+            self.db.rollback()
+            existing_session = self._check_existing_strength_session(athlete_id, content_hash)
+            if existing_session:
+                existing_day_state = self._get_or_create_day_state(athlete_id, session_date, create=False)
+                if existing_day_state is None:
+                    existing_day_state = self._get_or_create_day_state(athlete_id, session_date)
+                return existing_session, existing_day_state, {"idempotent": True, "concurrent": True, "existing_session_id": existing_session.id}
+            # Should not reach here, but re-raise if we do
+            raise
         
         # Compute strength impulses for day_engine
         strength_impulses = self._compute_strength_impulses(
@@ -405,12 +418,12 @@ class EngineOrchestrator:
         
         updated_day_state = update_day_state(day_state, daily_impulses, self.day_params)
         
-        # Persist endurance session (with content_hash for idempotency)
+        # v9.1: CONCURRENCY-SAFE idempotency - try insert, catch IntegrityError
         endurance_session = db_models.EnduranceSession(
             athlete_id=athlete_id,
             sport=sport,
             start_time=datetime.combine(session_date, datetime.min.time()),
-            content_hash=content_hash,  # HOTFIX: Idempotency
+            content_hash=content_hash,
             duration_minutes=duration_minutes,
             intensity_type=intensity_type,
             u_E_Z2=u_E_Z2,
@@ -421,7 +434,20 @@ class EngineOrchestrator:
             }
         )
         self.db.add(endurance_session)
-        
+
+        try:
+            self.db.flush()
+        except IntegrityError:
+            # v9.1: Concurrent duplicate - rollback and return existing
+            self.db.rollback()
+            existing_session = self._check_existing_endurance_session(athlete_id, content_hash)
+            if existing_session:
+                existing_day_state = self._get_or_create_day_state(athlete_id, session_date, create=False)
+                if existing_day_state is None:
+                    existing_day_state = self._get_or_create_day_state(athlete_id, session_date)
+                return existing_session, existing_day_state, {"idempotent": True, "concurrent": True, "existing_session_id": existing_session.id}
+            raise
+
         # Persist updated day state
         self._persist_day_state(athlete_id, session_date, updated_day_state)
         

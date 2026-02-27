@@ -33,8 +33,8 @@ class StrengthSession(Base):
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True))
 
-    # HOTFIX: Idempotency - content hash for duplicate detection
-    content_hash = Column(String(64), nullable=True)
+    # HOTFIX: Idempotency - content hash for duplicate detection (NOT NULL enforced in v9.1)
+    content_hash = Column(String(64), nullable=False)
 
     # Computed fields
     tonnage = Column(Float, default=0.0)
@@ -63,8 +63,8 @@ class EnduranceSession(Base):
     duration_minutes = Column(Float, nullable=False)
     intensity_type = Column(String(20))  # z2, hiit, mixed
 
-    # HOTFIX: Idempotency - content hash for duplicate detection
-    content_hash = Column(String(64), nullable=True)
+    # HOTFIX: Idempotency - content hash for duplicate detection (NOT NULL enforced in v9.1)
+    content_hash = Column(String(64), nullable=False)
 
     # Computed fields
     u_E_Z2 = Column(Float, default=0.0)  # Z2 component
