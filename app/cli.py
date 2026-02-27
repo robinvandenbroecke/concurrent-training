@@ -1,7 +1,9 @@
 """CLI for demo and administration"""
 import sys
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, date
 from typing import Optional
+from pathlib import Path
 
 import typer
 from sqlalchemy.orm import Session
@@ -200,13 +202,137 @@ def readiness(athlete_id: int):
 def update_day(athlete_id: int):
     """Manually trigger day state update"""
     db = next(get_db())
-    
+
     state = DayUpdateService(db).update_day_state(athlete_id)
-    
+
     typer.echo(f"Updated day state for athlete {athlete_id}")
     typer.echo(f"  D_sys: {state.D_sys:.3f}")
     typer.echo(f"  R_mito: {state.R_mito:.3f}")
     typer.echo(f"  E_fat: {state.E_fat:.3f}")
+
+
+# ============================================================================
+# Sprint V1: Validation & Replay Commands
+# ============================================================================
+
+@app.command()
+def replay(
+    athlete_id: int = typer.Option(..., "--athlete_id", "-a", help="Athlete ID"),
+    date_from: str = typer.Option(..., "--from", "-f", help="Start date (YYYY-MM-DD)"),
+    date_to: str = typer.Option(..., "--to", "-t", help="End date (YYYY-MM-DD)"),
+    out: str = typer.Option("./artifacts/run1", "--out", "-o", help="Output directory"),
+    dry_run: bool = typer.Option(True, "--dry-run/--live", help="Dry run (no DB writes)")
+):
+    """Replay historical sessions and compute validation metrics."""
+    from app.eval.replay import ReplayRunner
+    import json
+
+    db = next(get_db())
+
+    typer.echo(f"=== Replay Runner ===")
+    typer.echo(f"Athlete: {athlete_id}")
+    typer.echo(f"Date range: {date_from} to {date_to}")
+    typer.echo(f"Mode: {'DRY RUN' if dry_run else 'LIVE'}")
+    typer.echo()
+
+    # Parse dates
+    try:
+        from_date = date.fromisoformat(date_from)
+        to_date = date.fromisoformat(date_to)
+    except ValueError:
+        typer.echo("Error: Dates must be in YYYY-MM-DD format", err=True)
+        raise typer.Exit(1)
+
+    # Run replay
+    runner = ReplayRunner(db, artifacts_dir=out)
+    report = runner.replay(athlete_id, from_date, to_date, dry_run=dry_run)
+
+    # Write artifacts
+    run_id = f"replay_{athlete_id}_{date_from}_{date_to}"
+    runner.write_artifacts(run_id)
+
+    # Print summary
+    typer.echo("\n=== Validation Report ===")
+    typer.echo(f"Date range: {report.date_range[0]} to {report.date_range[1]}")
+    typer.echo()
+    typer.echo("Rep-level (VBT):")
+    if report.rep_level_rmse:
+        typer.echo(f"  RMSE: {report.rep_level_rmse:.4f}")
+        typer.echo(f"  MAE:  {report.rep_level_mae:.4f}")
+    else:
+        typer.echo("  No VBT data available")
+    typer.echo()
+    typer.echo("Day-level (Strength):")
+    typer.echo(f"  MAE Model:      {report.day_level_mae_model or 'N/A'}")
+    typer.echo(f"  MAE Baseline A: {report.day_level_mae_baseline_a or 'N/A'}")
+    typer.echo(f"  MAE Baseline B: {report.day_level_mae_baseline_b or 'N/A'}")
+    typer.echo()
+    typer.echo(f"Artifacts written to: {out}/{run_id}")
+
+
+@app.command()
+def validate(
+    athlete_id: int = typer.Option(..., "--athlete_id", "-a", help="Athlete ID"),
+    days: int = typer.Option(90, "--days", "-d", help="Number of days to validate"),
+    out: str = typer.Option("./artifacts/validate", "--out", "-o", help="Output directory")
+):
+    """Validate model predictions for recent history."""
+    db = next(get_db())
+
+    to_date = date.today()
+    from_date = to_date - timedelta(days=days)
+
+    # Delegate to replay
+    replay(athlete_id, from_date.isoformat(), to_date.isoformat(), out, dry_run=True)
+
+
+@app.command()
+def import_strava(
+    zip_path: str = typer.Option(..., "--zip", "-z", help="Path to Strava export zip"),
+    athlete_id: int = typer.Option(..., "--athlete_id", "-a", help="Athlete ID"),
+):
+    """Import Strava bulk export zip file."""
+    from app.adapters.strava_export import import_strava_export
+
+    if not os.path.exists(zip_path):
+        typer.echo(f"Error: File not found: {zip_path}", err=True)
+        raise typer.Exit(1)
+
+    db = next(get_db())
+
+    typer.echo(f"Importing Strava export from: {zip_path}")
+
+    try:
+        count = import_strava_export(zip_path, athlete_id, db)
+        typer.echo(f"✓ Imported {count} endurance sessions")
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
+def import_gc(
+    data_path: str = typer.Option(..., "--path", "-p", help="Path to GoldenCheetah data directory"),
+    athlete_id: int = typer.Option(..., "--athlete_id", "-a", help="Athlete ID"),
+    format: str = typer.Option("json", "--format", "-f", help="File format (json or csv)"),
+):
+    """Import GoldenCheetah OpenData."""
+    from app.adapters.goldencheetah import import_gc_data
+
+    if not os.path.exists(data_path):
+        typer.echo(f"Error: Path not found: {data_path}", err=True)
+        raise typer.Exit(1)
+
+    db = next(get_db())
+
+    typer.echo(f"Importing GoldenCheetah data from: {data_path}")
+
+    try:
+        count = import_gc_data(data_path, athlete_id, db, file_format=format)
+        typer.echo(f"✓ Imported {count} endurance sessions")
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
