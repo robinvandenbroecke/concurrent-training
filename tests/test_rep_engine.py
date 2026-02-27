@@ -281,11 +281,11 @@ class TestRMitoEffect:
     """
     
     def test_high_r_mito_improves_recovery(self):
-        """Higher recovery capacity leads to better between-set recovery (lower M)."""
+        """Higher recovery capacity leads to better between-set recovery (higher A_M)."""
         profile = LiftVelocityProfile(lift="squat", a=0.55, b=0.0032)
-        
+
         velocities = [0.45, 0.42, 0.39, 0.36]
-        
+
         # Scenario A: R_mito = 0 (poor recovery capacity)
         session_low = SessionInput(
             sets=[
@@ -298,7 +298,7 @@ class TestRMitoEffect:
             init_M=0.0,
             R_mito=0.0
         )
-        
+
         # Scenario B: R_mito = 1.0 (good recovery capacity)
         session_high = SessionInput(
             sets=[
@@ -311,16 +311,16 @@ class TestRMitoEffect:
             init_M=0.0,
             R_mito=1.0
         )
-        
+
         result_low = simulate_strength_session(session_low)
         result_high = simulate_strength_session(session_high)
-        
-        # Metabolic state should be lower (more cleared) with higher R_mito
+
+        # Metabolic availability should be higher (more recovered) with higher R_mito
         # This is the primary mechanism - R_mito accelerates metabolic clearance
-        M_low = result_low.sets[1].reps[0].M
-        M_high = result_high.sets[1].reps[0].M
-        
-        assert M_high < M_low, f"R_mito should accelerate metabolic clearance: M_low={M_low}, M_high={M_high}"
+        A_M_low = result_low.sets[1].reps[0].A_M
+        A_M_high = result_high.sets[1].reps[0].A_M
+
+        assert A_M_high > A_M_low, f"R_mito should accelerate metabolic clearance: A_M_low={A_M_low}, A_M_high={A_M_high}"
 
 
 class TestLiftDifferences:
@@ -439,12 +439,12 @@ class TestDeterminism:
                 assert r1.y == pytest.approx(r2.y, abs=1e-10)
                 assert r1.A_l == pytest.approx(r2.A_l, abs=1e-10)
                 assert r1.A_sys == pytest.approx(r2.A_sys, abs=1e-10)
-                assert r1.M == pytest.approx(r2.M, abs=1e-10)
+                assert r1.A_M == pytest.approx(r2.A_M, abs=1e-10)  # H1: Use A_M instead of M
                 assert r1.v_pred_next == pytest.approx(r2.v_pred_next, abs=1e-10)
                 assert r1.limiting == r2.limiting
-        
+
         assert result1.final_A_sys == pytest.approx(result2.final_A_sys, abs=1e-10)
-        assert result1.final_M == pytest.approx(result2.final_M, abs=1e-10)
+        assert result1.final_A_M == pytest.approx(result2.final_A_M, abs=1e-10)  # H1: Use final_A_M
 
 
 class TestLimitingFactor:
@@ -477,15 +477,21 @@ class TestLimitingFactor:
         assert limiting == LimitingFactor.CENTRAL
     
     def test_metabolic_limiting(self):
-        """When metabolic damping is strongest, metabolic is limiting."""
-        params = RepEngineParams(kM=0.6)
+        """When metabolic availability is lowest, metabolic is limiting."""
+        # H1: Use high M_init to get low A_M (A_M = exp(-kM*M_init))
+        # With kM=0.6 and M_init=3.0, A_M = exp(-1.8) ≈ 0.17
+        params = RepEngineParams()
         state = RepState(
             A_local_init={"squat": 0.9},
             A_sys_init=0.9,
-            M_init=3.0,  # Very high metabolic load -> exp(-0.6*3) = 0.17
+            M_init=3.0,  # Legacy conversion gives A_M ≈ 0.17
             params=params
         )
-        
+
+        # Verify A_M is indeed lowest
+        assert state.A_M < state.A_local("squat")
+        assert state.A_M < state.A_sys
+
         limiting = state.get_limiting_factor("squat")
         assert limiting == LimitingFactor.METABOLIC
 

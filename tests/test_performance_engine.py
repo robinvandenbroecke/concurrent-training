@@ -384,47 +384,62 @@ class TestPerformanceReport:
     def test_detects_progress(self):
         """Detects progress signal for increasing load."""
         base_date = date(2024, 1, 1)
+
+        # Create more data points for trend detection
+        squat_sessions = []
+        bench_sessions = []
+
+        for i in range(8):  # 8 sessions over 4 weeks
+            # Gradual improvement pattern
+            e1rm_squat = 140 + (i * 2)  # 140 -> 154
+            e1rm_bench = 90 + (i * 1.5)  # 90 -> 100
+            perf_y = 1.0 + (i * 0.005)  # Gradual velocity improvement
+
+            squat_sessions.append(StrengthSessionMetrics(
+                lift="squat",
+                session_date=base_date + timedelta(days=i * 4),
+                e1rm_est=e1rm_squat,
+                perf_y=perf_y,
+                quality_ok=True
+            ))
+
+            bench_sessions.append(StrengthSessionMetrics(
+                lift="bench",
+                session_date=base_date + timedelta(days=i * 4),
+                e1rm_est=e1rm_bench,
+                perf_y=perf_y,
+                quality_ok=True
+            ))
+
+        # Final sessions with PRs
+        squat_sessions.append(StrengthSessionMetrics(
+            lift="squat",
+            session_date=base_date + timedelta(days=35),
+            e1rm_est=158,  # PR (>10% from start)
+            perf_y=1.05,   # Velocity PR
+            quality_ok=True
+        ))
+
+        bench_sessions.append(StrengthSessionMetrics(
+            lift="bench",
+            session_date=base_date + timedelta(days=35),
+            e1rm_est=102,  # Also improving
+            quality_ok=True
+        ))
+
         strength_sessions = {
-            "squat": [
-                StrengthSessionMetrics(
-                    lift="squat",
-                    session_date=base_date,
-                    e1rm_est=140,
-                    perf_y=1.0,
-                    quality_ok=True
-                ),
-                StrengthSessionMetrics(
-                    lift="squat",
-                    session_date=base_date + timedelta(days=14),
-                    e1rm_est=155,  # PR (>10% improvement)
-                    perf_y=1.05,  # Velocity PR
-                    quality_ok=True
-                ),
-            ],
-            "bench": [
-                StrengthSessionMetrics(
-                    lift="bench",
-                    session_date=base_date,
-                    e1rm_est=90,
-                    quality_ok=True
-                ),
-                StrengthSessionMetrics(
-                    lift="bench",
-                    session_date=base_date + timedelta(days=14),
-                    e1rm_est=100,  # Also improving
-                    quality_ok=True
-                ),
-            ]
+            "squat": squat_sessions,
+            "bench": bench_sessions
         }
-        
+
         report = generate_performance_report(
             "athlete_1",
             strength_sessions,
             {},
-            days=28,
-            today=base_date + timedelta(days=14)
+            days=42,
+            today=base_date + timedelta(days=35)
         )
-        
+
         # With 2 lifts improving and at least 1 PR, should signal increase
         assert report.overall_signal == PerformanceSignal.INCREASE_LOAD
         assert report.volume_adjustment_pct > 0

@@ -403,17 +403,22 @@ class TestCapacityEvolution:
     """Test capacity (C_l) changes over time."""
     
     def test_training_increases_capacity(self):
-        """Repeated training increases capacity."""
+        """Repeated training increases capacity (with proper recovery)."""
         state = create_initial_state(date(2024, 1, 1), ["squat"])
         initial_C = state.per_lift["squat"].C_l
-        
-        # Simulate 10 training days
-        sets = [SetImpulse("squat", 800.0, 0.75, 1.0, 0.10, 5)]
-        
-        for _ in range(10):
-            state, _, _ = simulate_day_transition(state, sets, [], DayEngineParams())
-        
-        # Capacity should increase from training
+
+        # Simulate training blocks with rest days for recovery
+        # 4 weeks: 3 training days, 1 rest day per week
+        sets = [SetImpulse("squat", 600.0, 0.70, 1.0, 0.08, 5)]  # Moderate load
+
+        for week in range(4):
+            # 3 training days
+            for _ in range(3):
+                state, _, _ = simulate_day_transition(state, sets, [], DayEngineParams())
+            # 1 rest day
+            state, _, _ = simulate_day_transition(state, [], [], DayEngineParams())
+
+        # Capacity should increase from training (with recovery)
         assert state.per_lift["squat"].C_l > initial_C
     
     def test_detraining_decreases_capacity(self):
