@@ -26,45 +26,59 @@ class Athlete(Base):
 
 class StrengthSession(Base):
     __tablename__ = "strength_sessions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     lift = Column(SQLEnum(LiftType, name="lift_type"), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True))
-    
+
+    # HOTFIX: Idempotency - content hash for duplicate detection
+    content_hash = Column(String(64), nullable=True)
+
     # Computed fields
     tonnage = Column(Float, default=0.0)
     avg_intensity = Column(Float, default=0.0)
-    
+
     # Raw data
     raw_data = Column(JSON)
     rep_level_log = Column(JSON)  # List of rep states for debugging
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
+    __table_args__ = (
+        UniqueConstraint('athlete_id', 'content_hash', name='uq_strength_session_hash'),
+    )
+
     athlete = relationship("Athlete", back_populates="strength_sessions")
 
 
 class EnduranceSession(Base):
     __tablename__ = "endurance_sessions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     sport = Column(SQLEnum(EnduranceSport, name="endurance_sport"), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     duration_minutes = Column(Float, nullable=False)
     intensity_type = Column(String(20))  # z2, hiit, mixed
-    
+
+    # HOTFIX: Idempotency - content hash for duplicate detection
+    content_hash = Column(String(64), nullable=True)
+
     # Computed fields
     u_E_Z2 = Column(Float, default=0.0)  # Z2 component
     u_E_HIIT = Column(Float, default=0.0)  # HIIT component
-    
+
     # Raw data
     raw_data = Column(JSON)
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
+    __table_args__ = (
+        UniqueConstraint('athlete_id', 'content_hash', name='uq_endurance_session_hash'),
+    )
+
     athlete = relationship("Athlete", back_populates="endurance_sessions")
 
 
@@ -100,6 +114,7 @@ class DayState(Base):
     D_sys = Column(Float, default=0.0)  # System fatigue
     R_mito = Column(Float, default=0.0)  # Recovery capacity
     E_fat = Column(Float, default=0.0)  # Endurance fatigue
+    T_legs = Column(Float, default=0.0, nullable=False)  # Structural/connective tissue fatigue
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -9,8 +9,11 @@ Sprint A: CONSOLIDATION
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 import os
+import json
+import hashlib
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app import models as db_models
 from app.types import LiftType, EnduranceSport
@@ -64,6 +67,109 @@ class EngineOrchestrator:
         self.db = db
         self.rep_params = RepEngineParams()
         self.day_params = DayEngineParams()
+
+    # -------------------------------------------------------------------------
+    # HOTFIX: Idempotency - Content hash computation
+    # -------------------------------------------------------------------------
+
+    def _compute_strength_content_hash(
+        self,
+        athlete_id: int,
+        session_date: date,
+        lift: str,
+        sets_data: List[Dict[str, Any]],
+        optional_rpe: Optional[float] = None
+    ) -> str:
+        """
+        Compute deterministic content hash for strength session.
+        Used for idempotency - prevents double-counting sessions.
+        """
+        # Build canonical representation
+        canonical_sets = []
+        for set_data in sorted(sets_data, key=lambda x: (x.get("load_kg", 0), x.get("reps", 0))):
+            velocities = set_data.get("velocities", [])
+            # Round velocities to 3 decimals for stability
+            rounded_velocities = [round(v, 3) for v in velocities]
+
+            canonical_sets.append({
+                "lift": lift,
+                "load_kg": round(set_data.get("load_kg", 0), 2),
+                "reps": set_data.get("reps", 0),
+                "velocities": rounded_velocities,
+                "rest_sec": round(set_data.get("rest_sec", 0), 1) if set_data.get("rest_sec") else None,
+            })
+
+        canonical = {
+            "athlete_id": athlete_id,
+            "date": session_date.isoformat(),
+            "sets": canonical_sets,
+            "rpe": round(optional_rpe, 1) if optional_rpe else None,
+        }
+
+        # Deterministic JSON (sorted keys, no whitespace)
+        json_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(json_bytes).hexdigest()
+
+    def _compute_endurance_content_hash(
+        self,
+        athlete_id: int,
+        session_date: date,
+        sport: str,
+        duration_minutes: float,
+        intensity_type: str,
+        power_data: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Compute deterministic content hash for endurance session.
+        Used for idempotency - prevents double-counting sessions.
+        """
+        # Build canonical representation
+        canonical_power = None
+        if power_data:
+            # Round power values to 1 decimal for stability
+            canonical_power = [
+                {"power": round(p.get("power", 0), 1), "timestamp": p.get("timestamp")}
+                for p in sorted(power_data, key=lambda x: x.get("timestamp", 0))
+            ]
+
+        canonical = {
+            "athlete_id": athlete_id,
+            "date": session_date.isoformat(),
+            "sport": sport,
+            "duration_minutes": round(duration_minutes, 1),
+            "intensity_type": intensity_type,
+            "power_data": canonical_power,
+        }
+
+        # Deterministic JSON (sorted keys, no whitespace)
+        json_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(json_bytes).hexdigest()
+
+    def _check_existing_strength_session(
+        self,
+        athlete_id: int,
+        content_hash: str
+    ) -> Optional[db_models.StrengthSession]:
+        """Check if strength session with this hash already exists."""
+        if not content_hash:
+            return None
+        return self.db.query(db_models.StrengthSession).filter(
+            db_models.StrengthSession.athlete_id == athlete_id,
+            db_models.StrengthSession.content_hash == content_hash
+        ).first()
+
+    def _check_existing_endurance_session(
+        self,
+        athlete_id: int,
+        content_hash: str
+    ) -> Optional[db_models.EnduranceSession]:
+        """Check if endurance session with this hash already exists."""
+        if not content_hash:
+            return None
+        return self.db.query(db_models.EnduranceSession).filter(
+            db_models.EnduranceSession.athlete_id == athlete_id,
+            db_models.EnduranceSession.content_hash == content_hash
+        ).first()
     
     def ingest_strength_session(
         self,
@@ -97,14 +203,29 @@ class EngineOrchestrator:
         
         if not profile_db:
             raise ValueError(f"No profile found for {lift}")
-        
+
+        # HOTFIX: Check idempotency - compute content hash before processing
+        content_hash = self._compute_strength_content_hash(
+            athlete_id, session_date, lift.value, sets_data, optional_rpe
+        )
+
+        # Check if session already exists
+        existing_session = self._check_existing_strength_session(athlete_id, content_hash)
+        if existing_session:
+            # Return existing session without double-applying impulses
+            existing_day_state = self._get_or_create_day_state(athlete_id, session_date, create=False)
+            if existing_day_state is None:
+                existing_day_state = self._get_or_create_day_state(athlete_id, session_date)
+            # Return empty performance snapshot for idempotent case
+            return existing_session, existing_day_state, {"idempotent": True, "existing_session_id": existing_session.id}
+
         # Convert to rep_engine profile
         profile = LiftVelocityProfile(
             lift=lift.value,
             a=profile_db.a,
             b=profile_db.b
         )
-        
+
         # Get current day state
         day_state = self._get_or_create_day_state(athlete_id, session_date)
         
@@ -150,11 +271,12 @@ class EngineOrchestrator:
         # Run rep_engine simulation
         rep_output = simulate_strength_session(session_input)
         
-        # Store strength session in DB
+        # Store strength session in DB (with content_hash for idempotency)
         strength_session = db_models.StrengthSession(
             athlete_id=athlete_id,
             lift=lift,
             start_time=datetime.combine(session_date, datetime.min.time()),
+            content_hash=content_hash,  # HOTFIX: Idempotency
             tonnage=total_tonnage,
             avg_intensity=total_tonnage / max(total_reps, 1) if total_reps > 0 else 0,
             raw_data={
@@ -231,9 +353,24 @@ class EngineOrchestrator:
         Returns:
             (endurance_session_db, updated_day_state, performance_snapshot)
         """
+        # HOTFIX: Check idempotency - compute content hash before processing
+        content_hash = self._compute_endurance_content_hash(
+            athlete_id, session_date, sport.value, duration_minutes, intensity_type, power_data
+        )
+
+        # Check if session already exists
+        existing_session = self._check_existing_endurance_session(athlete_id, content_hash)
+        if existing_session:
+            # Return existing session without double-applying impulses
+            existing_day_state = self._get_or_create_day_state(athlete_id, session_date, create=False)
+            if existing_day_state is None:
+                existing_day_state = self._get_or_create_day_state(athlete_id, session_date)
+            # Return empty performance snapshot for idempotent case
+            return existing_session, existing_day_state, {"idempotent": True, "existing_session_id": existing_session.id}
+
         # Get current day state
         day_state = self._get_or_create_day_state(athlete_id, session_date)
-        
+
         # Compute endurance impulses
         u_E_Z2, u_E_HIIT = self._compute_endurance_impulses(
             duration_minutes, intensity_type, power_data
@@ -268,11 +405,12 @@ class EngineOrchestrator:
         
         updated_day_state = update_day_state(day_state, daily_impulses, self.day_params)
         
-        # Persist endurance session
+        # Persist endurance session (with content_hash for idempotency)
         endurance_session = db_models.EnduranceSession(
             athlete_id=athlete_id,
             sport=sport,
             start_time=datetime.combine(session_date, datetime.min.time()),
+            content_hash=content_hash,  # HOTFIX: Idempotency
             duration_minutes=duration_minutes,
             intensity_type=intensity_type,
             u_E_Z2=u_E_Z2,
@@ -420,17 +558,20 @@ class EngineOrchestrator:
             db_models.DayState.date == date_str
         ).first()
         
+        # HOTFIX: Persist T_legs along with other day state fields
         if day_state_db:
             day_state_db.D_sys = day_state.D_sys
             day_state_db.R_mito = day_state.R_mito
             day_state_db.E_fat = day_state.E_fat
+            day_state_db.T_legs = getattr(day_state, 'T_legs', 0.0)
         else:
             day_state_db = db_models.DayState(
                 athlete_id=athlete_id,
                 date=date_str,
                 D_sys=day_state.D_sys,
                 R_mito=day_state.R_mito,
-                E_fat=day_state.E_fat
+                E_fat=day_state.E_fat,
+                T_legs=getattr(day_state, 'T_legs', 0.0)
             )
             self.db.add(day_state_db)
         
