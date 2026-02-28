@@ -37,10 +37,16 @@ LIFT_CODE_MAP = {
     "bench": LiftType.BENCH,
     "press": LiftType.PRESS,
     "ohp": LiftType.PRESS,
+    "shoulder press": LiftType.PRESS,
+    "strict shoulder press": LiftType.PRESS,
+    "push press": LiftType.PRESS,
     "dl": LiftType.DEADLIFT,
     "deadlift": LiftType.DEADLIFT,
+    "romanian deadlift": LiftType.DEADLIFT,
     "pc": LiftType.POWER_CLEAN,
     "clean": LiftType.POWER_CLEAN,
+    "power clean": LiftType.POWER_CLEAN,
+    "other": None,  # Skip unsupported lifts
 }
 
 
@@ -126,6 +132,10 @@ def parse_strength_csv(path: str) -> List[ParsedSession]:
     """
     Parse strength CSV file into grouped sessions.
     
+    Supports two formats:
+    - Legacy: session_date,session_id,lift_code,sets,reps,weight_kg,rest_seconds,rpe,velocity_m_per_s
+    - Robin's format: session_date,session_id,session_label,lift,lift_code,set_index,load_kg,reps,rest_sec,rpe,velocities
+    
     Args:
         path: Path to CSV file
         
@@ -152,7 +162,16 @@ def parse_strength_csv(path: str) -> List[ParsedSession]:
         # Normalize fieldnames (strip whitespace, lowercase)
         fieldnames = [fn.strip().lower() for fn in reader.fieldnames]
         
-        required_fields = ['session_date', 'session_id', 'lift_code', 'sets', 'reps', 'weight_kg']
+        # Check which format we're dealing with
+        has_robin_format = 'set_index' in fieldnames or 'rest_sec' in fieldnames
+        has_legacy_format = 'sets' in fieldnames or 'rest_seconds' in fieldnames
+        
+        # Required fields depend on format
+        if has_robin_format:
+            required_fields = ['session_date', 'session_id', 'lift_code', 'set_index', 'reps', 'load_kg']
+        else:
+            required_fields = ['session_date', 'session_id', 'lift_code', 'sets', 'reps', 'weight_kg']
+        
         missing = [f for f in required_fields if f not in fieldnames]
         if missing:
             raise ValueError(f"Missing required fields: {missing}")
@@ -164,6 +183,11 @@ def parse_strength_csv(path: str) -> List[ParsedSession]:
             session_id = row.get('session_id', '').strip()
             if not session_id:
                 continue  # Skip rows without session_id
+            
+            # Skip unsupported lifts (lift_code = "other")
+            lift_code = row.get('lift_code', '').strip().lower()
+            if lift_code == 'other':
+                continue
             
             if session_id not in rows_by_session:
                 rows_by_session[session_id] = []
@@ -191,17 +215,36 @@ def parse_strength_csv(path: str) -> List[ParsedSession]:
         sets: List[ParsedSet] = []
         for row_idx, row in rows:
             try:
-                set_num = int(row.get('sets', 0))
+                # Support both formats for set number
+                if 'set_index' in row:
+                    set_num = int(row.get('set_index', 0))
+                else:
+                    set_num = int(row.get('sets', 0))
+                
                 reps = int(row.get('reps', 0))
-                weight_kg = float(row.get('weight_kg', 0))
-                rest_seconds = parse_optional_float(row.get('rest_seconds', ''))
+                
+                # Support both weight_kg and load_kg
+                weight_str = row.get('load_kg', row.get('weight_kg', '0'))
+                weight_kg = float(weight_str) if weight_str.strip() else 0.0
+                
+                # Skip rows with invalid weight (e.g., empty load_kg)
+                if weight_kg <= 0:
+                    continue
+                
+                # Support both rest_sec and rest_seconds
+                rest_str = row.get('rest_sec', row.get('rest_seconds', ''))
+                rest_seconds = parse_optional_float(rest_str)
+                
                 rpe = parse_optional_float(row.get('rpe', ''))
                 
-                # Parse velocity if present
+                # Parse velocities if present (Robin format has 'velocities' column)
                 velocities = []
-                vel = parse_velocity(row.get('velocity_m_per_s', ''))
-                if vel:
-                    velocities.append(vel)
+                vel_str = row.get('velocities', row.get('velocity_m_per_s', ''))
+                if vel_str and vel_str.strip():
+                    # Try to parse as list or single value
+                    vel = parse_velocity(vel_str)
+                    if vel:
+                        velocities.append(vel)
                 
                 sets.append(ParsedSet(
                     set_num=set_num,
@@ -213,6 +256,10 @@ def parse_strength_csv(path: str) -> List[ParsedSession]:
                 ))
             except (ValueError, TypeError) as e:
                 raise ValueError(f"Row {row_idx}: Parse error - {e}")
+        
+        # Skip sessions with no valid sets
+        if not sets:
+            continue
         
         # Sort sets by set_num
         sets.sort(key=lambda s: s.set_num)
