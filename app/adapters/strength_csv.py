@@ -294,6 +294,7 @@ def convert_to_sets_data(parsed_sets: List[ParsedSet]) -> List[Dict[str, Any]]:
             "reps": s.reps,
             "velocities": s.velocities if s.velocities else [],
             "rest_sec": s.rest_seconds if i > 0 else None,  # No rest before first set
+            "rpe": s.rpe,
         }
         sets_data.append(set_data)
     return sets_data

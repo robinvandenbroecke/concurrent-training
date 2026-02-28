@@ -1,0 +1,198 @@
+{
+  "total_sessions_with_rpe": 14,
+  "rpe_coverage_pct": 77.77777777777779,
+  "correlations": {
+    "rpe_vs_d_sys": -0.28081696602869527,
+    "rpe_vs_d_l": -0.25323408021265975,
+    "rpe_vs_t_legs": -0.2848079673695277
+  },
+  "per_lift_correlations": {
+    "bench": -0.522263085739402,
+    "power_clean": null,
+    "press": null,
+    "deadlift": 0.7294396502221389
+  },
+  "rpe_distribution": {
+    "Light (RPE 5-6)": {
+      "count": 6,
+      "avg_d_sys": 0.45113421825714467,
+      "avg_d_l": 0.8664909484264675
+    },
+    "Moderate (RPE 7)": {
+      "count": 6,
+      "avg_d_sys": 0.4195164145984259,
+      "avg_d_l": 0.8547813381431507
+    },
+    "Hard (RPE 8)": {
+      "count": 2,
+      "avg_d_sys": 0.19072612604854172,
+      "avg_d_l": 0.5302615133191547
+    },
+    "Max (RPE 9-10)": {
+      "count": 0,
+      "avg_d_sys": null,
+      "avg_d_l": null
+    }
+  },
+  "validation_checks": [
+    "\u274c FAIL: RPE does not correlate with D_sys as expected",
+    "\u26a0\ufe0f  WEAK: Per-lift RPE correlation weak or inconsistent",
+    "\u274c FAIL: Hard sessions do not show higher fatigue"
+  ],
+  "raw_data": [
+    {
+      "date": "2026-01-03",
+      "lift": "bench",
+      "session_id": 3,
+      "rpe": 8.0,
+      "d_sys": 0.09838560704340801,
+      "d_l": 0.27353410862224203,
+      "t_legs": 0.0,
+      "tonnage": 1987.5,
+      "avg_intensity": 44.166666666666664
+    },
+    {
+      "date": "2026-01-04",
+      "lift": "power_clean",
+      "session_id": 4,
+      "rpe": 6.0,
+      "d_sys": 0.2163619961940845,
+      "d_l": 0.6181771319830985,
+      "t_legs": 0.0,
+      "tonnage": 2900.0,
+      "avg_intensity": 58.0
+    },
+    {
+      "date": "2026-01-05",
+      "lift": "bench",
+      "session_id": 5,
+      "rpe": 7.0,
+      "d_sys": 0.1835581846725638,
+      "d_l": 0.5103330246524178,
+      "t_legs": 0.0,
+      "tonnage": 2970.0,
+      "avg_intensity": 51.206896551724135
+    },
+    {
+      "date": "2026-01-06",
+      "lift": "press",
+      "session_id": 6,
+      "rpe": 6.0,
+      "d_sys": 0.097853498424464,
+      "d_l": 0.2720547270221585,
+      "t_legs": 0.0,
+      "tonnage": 1597.5,
+      "avg_intensity": 51.53225806451613
+    },
+    {
+      "date": "2026-01-07",
+      "lift": "deadlift",
+      "session_id": 7,
+      "rpe": 6.0,
+      "d_sys": 0.5730599699712113,
+      "d_l": 0.9341215618734253,
+      "t_legs": 0.40133562892160213,
+      "tonnage": 3130.0,
+      "avg_intensity": 78.25
+    },
+    {
+      "date": "2026-01-08",
+      "lift": "bench",
+      "session_id": 8,
+      "rpe": 7.0,
+      "d_sys": 0.20928062563615607,
+      "d_l": 0.5818471939704986,
+      "t_legs": 0.0,
+      "tonnage": 3120.0,
+      "avg_intensity": 55.714285714285715
+    },
+    {
+      "date": "2026-01-09",
+      "lift": "bench",
+      "session_id": 9,
+      "rpe": 8.0,
+      "d_sys": 0.2830666450536754,
+      "d_l": 0.7869889180160674,
+      "t_legs": 0.0,
+      "tonnage": 3895.0,
+      "avg_intensity": 59.92307692307692
+    },
+    {
+      "date": "2026-01-11",
+      "lift": "bench",
+      "session_id": 11,
+      "rpe": 7.0,
+      "d_sys": 0.3377197609924629,
+      "d_l": 0.9389368685445278,
+      "t_legs": 0.0,
+      "tonnage": 4325.0,
+      "avg_intensity": 61.785714285714285
+    },
+    {
+      "date": "2026-01-12",
+      "lift": "deadlift",
+      "session_id": 12,
+      "rpe": 6.0,
+      "d_sys": 0.7591232602073825,
+      "d_l": 1.2374157027841095,
+      "t_legs": 0.5316428070864073,
+      "tonnage": 4262.5,
+      "avg_intensity": 63.61940298507463
+    },
+    {
+      "date": "2026-01-13",
+      "lift": "deadlift",
+      "session_id": 13,
+      "rpe": 6.0,
+      "d_sys": 0.7051088918960091,
+      "d_l": 1.1493690955622482,
+      "t_legs": 0.4938144965901476,
+      "tonnage": 3530.0,
+      "avg_intensity": 76.73913043478261
+    },
+    {
+      "date": "2026-01-14",
+      "lift": "bench",
+      "session_id": 14,
+      "rpe": 6.0,
+      "d_sys": 0.3552976928497164,
+      "d_l": 0.9878074713337648,
+      "t_legs": 0.0,
+      "tonnage": 4075.0,
+      "avg_intensity": 67.91666666666667
+    },
+    {
+      "date": "2026-01-15",
+      "lift": "deadlift",
+      "session_id": 15,
+      "rpe": 7.0,
+      "d_sys": 0.8285385927537015,
+      "d_l": 1.3505667903734029,
+      "t_legs": 0.5802569968817239,
+      "tonnage": 4520.0,
+      "avg_intensity": 65.5072463768116
+    },
+    {
+      "date": "2026-01-16",
+      "lift": "bench",
+      "session_id": 16,
+      "rpe": 7.0,
+      "d_sys": 0.16119890280259908,
+      "d_l": 0.448169193788053,
+      "t_legs": 0.0,
+      "tonnage": 2162.5,
+      "avg_intensity": 61.785714285714285
+    },
+    {
+      "date": "2026-01-18",
+      "lift": "deadlift",
+      "session_id": 18,
+      "rpe": 7.0,
+      "d_sys": 0.7968024207330722,
+      "d_l": 1.2988349575300042,
+      "t_legs": 0.5580309520960391,
+      "tonnage": 3500.0,
+      "avg_intensity": 87.5
+    }
+  ]
+}
