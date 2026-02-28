@@ -1,0 +1,2 @@
+session_id,date,lift,set_idx,rep_idx,predicted_velocity,actual_velocity,error,abs_error,A_local,A_sys,A_M,note
+N/A,N/A,N/A,N/A,N/A,N/A,NO_DATA,NO_DATA,NO_DATA,N/A,N/A,N/A,No rep-level log available

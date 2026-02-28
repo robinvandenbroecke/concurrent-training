@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "title": "Add velocity-based validation for VBT-enabled sessions",
+    "rationale": "Currently 0% velocity coverage prevents rep-level RMSE/MAE calculation",
+    "implementation": "Extend strength_csv adapter to extract velocities from CSV; add ground truth comparison",
+    "expected_impact": "Enable rep-level error metrics when VBT data available",
+    "files": [
+      "app/adapters/strength_csv.py",
+      "app/eval/validation.py"
+    ],
+    "effort": "Low (2-3 hours)"
+  },
+  {
+    "id": 2,
+    "title": "Implement per-lift trend classification with confidence intervals",
+    "rationale": "Current trend detection (progress/maintain/regression) is deterministic without uncertainty quantification",
+    "implementation": "Add EWMA confidence bands; classify only when trend is statistically significant (p<0.05)",
+    "expected_impact": "Reduce false positive trend classifications; improve program recommendations",
+    "files": [
+      "app/domain/performance_engine.py"
+    ],
+    "effort": "Medium (4-6 hours)"
+  },
+  {
+    "id": 3,
+    "title": "Add structural fatigue (T_legs) validation against subjective scores",
+    "rationale": "T_legs is tracked but never validated; no ground truth comparison exists",
+    "implementation": "Add optional RPE/post-session survey data to sessions; correlate with T_legs predictions",
+    "expected_impact": "Calibrate T_legs accumulation/decay rates; improve readiness accuracy",
+    "files": [
+      "app/models.py",
+      "app/domain/day_engine.py",
+      "app/eval/validation.py"
+    ],
+    "effort": "High (1-2 days)"
+  }
+]

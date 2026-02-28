@@ -1,0 +1,65 @@
+{
+  "athlete_id": 1,
+  "date_range": [
+    "2026-01-01",
+    "2026-01-18"
+  ],
+  "total_sessions": 18,
+  "lift_data": {
+    "press": {
+      "sessions": 2,
+      "sets": 13,
+      "reps": 91,
+      "with_vel": 0,
+      "total_sets": 13,
+      "missing_load": 0,
+      "missing_rest": 2
+    },
+    "deadlift": {
+      "sessions": 7,
+      "sets": 82,
+      "reps": 353,
+      "with_vel": 0,
+      "total_sets": 82,
+      "missing_load": 0,
+      "missing_rest": 7
+    },
+    "bench": {
+      "sessions": 7,
+      "sets": 87,
+      "reps": 389,
+      "with_vel": 0,
+      "total_sets": 87,
+      "missing_load": 0,
+      "missing_rest": 7
+    },
+    "power_clean": {
+      "sessions": 1,
+      "sets": 12,
+      "reps": 50,
+      "with_vel": 0,
+      "total_sets": 12,
+      "missing_load": 0,
+      "missing_rest": 1
+    },
+    "squat": {
+      "sessions": 1,
+      "sets": 4,
+      "reps": 16,
+      "with_vel": 0,
+      "total_sets": 4,
+      "missing_load": 0,
+      "missing_rest": 1
+    }
+  },
+  "reps_distribution": {
+    "10": 11,
+    "5": 58,
+    "6": 15,
+    "3": 54,
+    "4": 44,
+    "11": 1,
+    "8": 5,
+    "2": 10
+  }
+}

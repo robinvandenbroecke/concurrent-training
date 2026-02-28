@@ -1,0 +1,64 @@
+{
+  "athlete_id": 1,
+  "date_range": [
+    "2026-01-01",
+    "2026-01-18"
+  ],
+  "total_sessions": 18,
+  "day_states_tracked": 19,
+  "lift_metrics": {
+    "press": {
+      "sessions": 2,
+      "tonnage": 3997.5,
+      "avg_intensity": [
+        40.0,
+        51.53225806451613
+      ]
+    },
+    "deadlift": {
+      "sessions": 7,
+      "tonnage": 24737.5,
+      "avg_intensity": [
+        65.78947368421052,
+        78.25,
+        62.16981132075472,
+        63.61940298507463,
+        76.73913043478261,
+        65.5072463768116,
+        87.5
+      ]
+    },
+    "bench": {
+      "sessions": 7,
+      "tonnage": 22535.0,
+      "avg_intensity": [
+        44.166666666666664,
+        51.206896551724135,
+        55.714285714285715,
+        59.92307692307692,
+        61.785714285714285,
+        67.91666666666667,
+        61.785714285714285
+      ]
+    },
+    "power_clean": {
+      "sessions": 1,
+      "tonnage": 2900.0,
+      "avg_intensity": [
+        58.0
+      ]
+    },
+    "squat": {
+      "sessions": 1,
+      "tonnage": 1480.0,
+      "avg_intensity": [
+        92.5
+      ]
+    }
+  },
+  "notes": [
+    "No VBT data available (velocity coverage 0%)",
+    "Rep-level predictions based on model internal state",
+    "Day-level states tracked via EngineOrchestrator"
+  ]
+}

@@ -1,0 +1,311 @@
+{
+  "trend_matrix": {
+    "squat": {
+      "trend": "insufficient_data",
+      "loads": [
+        92.5
+      ]
+    },
+    "bench": {
+      "trend": "progress",
+      "first_load": 47.5,
+      "last_load": 57.5,
+      "sessions": 7,
+      "progress_pct": 21.052631578947366
+    },
+    "deadlift": {
+      "trend": "progress",
+      "first_load": 80.0,
+      "last_load": 122.5,
+      "sessions": 7,
+      "progress_pct": 53.125
+    },
+    "press": {
+      "trend": "progress",
+      "first_load": 30.0,
+      "last_load": 42.5,
+      "sessions": 2,
+      "progress_pct": 41.66666666666667
+    },
+    "power_clean": {
+      "trend": "insufficient_data",
+      "loads": [
+        40.0
+      ]
+    }
+  },
+  "banister_baseline": [
+    {
+      "date": "2026-01-01",
+      "load": 2400.0,
+      "fitness": 1.0,
+      "fatigue": 0.0,
+      "form": 1.0,
+      "pred_perf": 1.0
+    },
+    {
+      "date": "2026-01-02",
+      "load": 2500.0,
+      "fitness": 48.967216100482005,
+      "fatigue": 96.0,
+      "form": -47.032783899517995,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-03",
+      "load": 1987.5,
+      "fitness": 97.3618798081679,
+      "fatigue": 183.22027837601743,
+      "form": -85.85839856784953,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-04",
+      "load": 2900.0,
+      "fitness": 133.91997772365391,
+      "fatigue": 238.3296101102456,
+      "form": -104.40963238659168,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-05",
+      "load": 2970.0,
+      "fitness": 187.52955863050963,
+      "fatigue": 322.60267186064937,
+      "form": -135.07311323013974,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-06",
+      "load": 1597.5,
+      "fitness": 240.7816084237132,
+      "fatigue": 398.45712663635675,
+      "form": -157.67551821264354,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-07",
+      "load": 3130.0,
+      "fitness": 264.8378483673692,
+      "fatigue": 409.31367707901705,
+      "form": -144.47582871164786,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-08",
+      "load": 3120.0,
+      "fitness": 318.75543095793165,
+      "fatigue": 480.0249807252823,
+      "form": -161.26954976735067,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-09",
+      "load": 3895.0,
+      "fitness": 370.7053849385919,
+      "fatigue": 540.9230471187541,
+      "form": -170.21766218016216,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-10",
+      "load": 3295.0,
+      "fitness": 436.4522168479858,
+      "fatigue": 624.714235012774,
+      "form": -188.26201816478817,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-11",
+      "load": 4325.0,
+      "fitness": 488.0436112264357,
+      "fatigue": 673.3509639919148,
+      "form": -185.3073527654791,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-12",
+      "load": 4262.5,
+      "fitness": 558.5436385155892,
+      "fatigue": 756.7130694600712,
+      "form": -198.16943094448197,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-13",
+      "load": 3530.0,
+      "fitness": 625.4823999940793,
+      "fatigue": 826.4778363670598,
+      "form": -200.99543637298052,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-14",
+      "load": 4075.0,
+      "fitness": 675.5766478423997,
+      "fatigue": 857.6553709799512,
+      "form": -182.0787231375515,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-15",
+      "load": 4520.0,
+      "fitness": 734.9286109028311,
+      "fatigue": 906.4824867045629,
+      "form": -171.5538758017318,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-16",
+      "load": 2162.5,
+      "fitness": 801.2347851700937,
+      "fatigue": 966.6096342347735,
+      "form": -165.37484906467978,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-17",
+      "load": 1480.0,
+      "fitness": 818.2171844827558,
+      "fatigue": 924.4325296037316,
+      "form": -106.21534512097583,
+      "pred_perf": 0.75
+    },
+    {
+      "date": "2026-01-18",
+      "load": 3500.0,
+      "fitness": 820.9928345227771,
+      "fatigue": 860.5701297236304,
+      "form": -39.577295200853314,
+      "pred_perf": 0.75
+    }
+  ],
+  "model_comparison": [
+    {
+      "date": "2026-01-01",
+      "our_D_sys": 0.0658999843468251,
+      "banister_fatigue": 0.0,
+      "our_R_mito": 0.0,
+      "banister_fitness": 1.0
+    },
+    {
+      "date": "2026-01-02",
+      "our_D_sys": 0.22858945410262604,
+      "banister_fatigue": 96.0,
+      "our_R_mito": 0.0,
+      "banister_fitness": 48.967216100482005
+    },
+    {
+      "date": "2026-01-03",
+      "our_D_sys": 0.057316523408198365,
+      "banister_fatigue": 183.22027837601743,
+      "our_R_mito": 0.0,
+      "banister_fitness": 97.3618798081679
+    },
+    {
+      "date": "2026-01-04",
+      "our_D_sys": 0.12604605279338635,
+      "banister_fatigue": 238.3296101102456,
+      "our_R_mito": 0.0,
+      "banister_fitness": 133.91997772365391
+    },
+    {
+      "date": "2026-01-05",
+      "our_D_sys": 0.10693552954254316,
+      "banister_fatigue": 322.60267186064937,
+      "our_R_mito": 0.0,
+      "banister_fitness": 187.52955863050963
+    },
+    {
+      "date": "2026-01-06",
+      "our_D_sys": 0.05700653278019978,
+      "banister_fatigue": 398.45712663635675,
+      "our_R_mito": 0.0,
+      "banister_fitness": 240.7816084237132
+    },
+    {
+      "date": "2026-01-07",
+      "our_D_sys": 0.33384766502141644,
+      "banister_fatigue": 409.31367707901705,
+      "our_R_mito": 0.0,
+      "banister_fitness": 264.8378483673692
+    },
+    {
+      "date": "2026-01-08",
+      "our_D_sys": 0.12192065728541783,
+      "banister_fatigue": 480.0249807252823,
+      "our_R_mito": 0.0,
+      "banister_fitness": 318.75543095793165
+    },
+    {
+      "date": "2026-01-09",
+      "our_D_sys": 0.16490619385151442,
+      "banister_fatigue": 540.9230471187541,
+      "our_R_mito": 0.0,
+      "banister_fitness": 370.7053849385919
+    },
+    {
+      "date": "2026-01-10",
+      "our_D_sys": 0.31942521169187443,
+      "banister_fatigue": 624.714235012774,
+      "our_R_mito": 0.0,
+      "banister_fitness": 436.4522168479858
+    },
+    {
+      "date": "2026-01-11",
+      "our_D_sys": 0.19674547088778271,
+      "banister_fatigue": 673.3509639919148,
+      "our_R_mito": 0.0,
+      "banister_fitness": 488.0436112264357
+    },
+    {
+      "date": "2026-01-12",
+      "our_D_sys": 0.44224259442936026,
+      "banister_fatigue": 756.7130694600712,
+      "our_R_mito": 0.0,
+      "banister_fitness": 558.5436385155892
+    },
+    {
+      "date": "2026-01-13",
+      "our_D_sys": 0.41077543273027195,
+      "banister_fatigue": 826.4778363670598,
+      "our_R_mito": 0.0,
+      "banister_fitness": 625.4823999940793
+    },
+    {
+      "date": "2026-01-14",
+      "our_D_sys": 0.20698585027904334,
+      "banister_fatigue": 857.6553709799512,
+      "our_R_mito": 0.0,
+      "banister_fitness": 675.5766478423997
+    },
+    {
+      "date": "2026-01-15",
+      "our_D_sys": 0.4826818990425195,
+      "banister_fatigue": 906.4824867045629,
+      "our_R_mito": 0.0,
+      "banister_fitness": 734.9286109028311
+    },
+    {
+      "date": "2026-01-16",
+      "our_D_sys": 0.09390967808720874,
+      "banister_fatigue": 966.6096342347735,
+      "our_R_mito": 0.0,
+      "banister_fitness": 801.2347851700937
+    },
+    {
+      "date": "2026-01-17",
+      "our_D_sys": 0.1906685925924779,
+      "banister_fatigue": 924.4325296037316,
+      "our_R_mito": 0.0,
+      "banister_fitness": 818.2171844827558
+    },
+    {
+      "date": "2026-01-18",
+      "our_D_sys": 0.464193350756138,
+      "banister_fatigue": 860.5701297236304,
+      "our_R_mito": 0.0,
+      "banister_fitness": 820.9928345227771
+    }
+  ]
+}
