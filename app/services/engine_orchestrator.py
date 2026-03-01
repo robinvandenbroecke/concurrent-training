@@ -471,6 +471,61 @@ class EngineOrchestrator:
         """
         return self._get_or_create_day_state(athlete_id, query_date, create=False)
     
+    def get_day_state_with_carryover(
+        self,
+        athlete_id: int,
+        query_date: date
+    ) -> Optional[DayState]:
+        """
+        Get day state with guaranteed carryover from prior days.
+        
+        Unlike get_day_state_snapshot, this method ALWAYS computes the state
+        by decaying forward from the most recent prior day state, ensuring
+        continuity even if the target date has sessions stored with incomplete
+        carryover data.
+        
+        Used by replay and validation to show correct day-to-day state evolution.
+        """
+        date_str = query_date.isoformat()
+        
+        # Find most recent prior day state
+        prior_state_db = self.db.query(db_models.DayState).filter(
+            db_models.DayState.athlete_id == athlete_id,
+            db_models.DayState.date < date_str
+        ).order_by(db_models.DayState.date.desc()).first()
+        
+        if prior_state_db:
+            # Load the prior state
+            prior_date = date.fromisoformat(prior_state_db.date)
+            prior_lift_states = self.db.query(db_models.LiftDayState).filter(
+                db_models.LiftDayState.athlete_id == athlete_id,
+                db_models.LiftDayState.date == prior_state_db.date
+            ).all()
+            
+            per_lift = {}
+            for ls in prior_lift_states:
+                per_lift[ls.lift.value] = PerLiftState(
+                    D_l=ls.D_l,
+                    F_l=ls.F_l,
+                    C_l=ls.C_l
+                )
+            
+            prior_day_state = DayState(
+                date=prior_date,
+                per_lift=per_lift,
+                D_sys=prior_state_db.D_sys,
+                R_mito=prior_state_db.R_mito,
+                E_fat=prior_state_db.E_fat,
+                T_legs=getattr(prior_state_db, 'T_legs', 0.0)
+            )
+            
+            # Decay to target date
+            from app.domain.day_engine import decay_day_state_to_date
+            return decay_day_state_to_date(prior_day_state, query_date, self.day_params)
+        
+        # No prior state - check if target date has a state
+        return self._get_or_create_day_state(athlete_id, query_date, create=False)
+    
     def get_recent_sessions(
         self,
         athlete_id: int,
@@ -555,7 +610,46 @@ class EngineOrchestrator:
         if not create:
             return None
         
-        # Create default day state
+        # v9.2: Look for most recent prior day state and decay it forward
+        prior_state_db = self.db.query(db_models.DayState).filter(
+            db_models.DayState.athlete_id == athlete_id,
+            db_models.DayState.date < date_str
+        ).order_by(db_models.DayState.date.desc()).first()
+        
+        if prior_state_db:
+            # Load the prior state
+            prior_date = date.fromisoformat(prior_state_db.date)
+            prior_lift_states = self.db.query(db_models.LiftDayState).filter(
+                db_models.LiftDayState.athlete_id == athlete_id,
+                db_models.LiftDayState.date == prior_state_db.date
+            ).all()
+            
+            per_lift = {}
+            for ls in prior_lift_states:
+                per_lift[ls.lift.value] = PerLiftState(
+                    D_l=ls.D_l,
+                    F_l=ls.F_l,
+                    C_l=ls.C_l
+                )
+            
+            prior_day_state = DayState(
+                date=prior_date,
+                per_lift=per_lift,
+                D_sys=prior_state_db.D_sys,
+                R_mito=prior_state_db.R_mito,
+                E_fat=prior_state_db.E_fat,
+                T_legs=getattr(prior_state_db, 'T_legs', 0.0)
+            )
+            
+            # Decay to target date
+            from app.domain.day_engine import decay_day_state_to_date
+            decayed_state = decay_day_state_to_date(prior_day_state, query_date, self.day_params)
+            return decayed_state
+        
+        if not create:
+            return None
+        
+        # No prior state - create fresh default
         per_lift = {}
         for lt in LiftType:
             per_lift[lt.value] = PerLiftState(D_l=0.0, F_l=1.0, C_l=100.0)

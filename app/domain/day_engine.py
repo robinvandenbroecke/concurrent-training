@@ -543,9 +543,9 @@ def update_day_state(
     # H1: Update T_legs structural fatigue
     new_T_legs = update_T_legs(current.T_legs, impulses.strength, params)
     
-    # Create new state
+    # Create new state (same date - caller manages date transitions)
     new_state = DayState(
-        date=current.date + timedelta(days=1),
+        date=current.date,
         per_lift={},
         D_sys=0.0,  # Will compute below
         R_mito=new_R_mito,
@@ -594,6 +594,79 @@ def update_day_state(
     E_fat_new += params.k_EHIIT * impulses.endurance.u_E_HIIT
     E_fat_new += params.k_SE * impulses.strength.u_legs
     new_state.E_fat = max(0.0, E_fat_new)
+    
+    return new_state
+
+
+def decay_day_state_to_date(
+    current: DayState,
+    target_date: date,
+    params: DayEngineParams
+) -> DayState:
+    """
+    Decay day state forward to target date with no new impulses.
+    
+    This handles day-to-day carryover when there are no sessions.
+    Each day decays exponentially according to the model time constants.
+    
+    Args:
+        current: Starting day state
+        target_date: Date to decay to (must be >= current.date)
+        params: Engine parameters
+    
+    Returns:
+        New DayState with decayed values and target_date
+    """
+    if target_date < current.date:
+        raise ValueError(f"target_date {target_date} must be >= current.date {current.date}")
+    
+    days_diff = (target_date - current.date).days
+    if days_diff == 0:
+        # Return a copy with same date
+        return DayState(
+            date=target_date,
+            per_lift={
+                lift: PerLiftState(D_l=s.D_l, F_l=s.F_l, C_l=s.C_l)
+                for lift, s in current.per_lift.items()
+            },
+            D_sys=current.D_sys,
+            R_mito=current.R_mito,
+            E_fat=current.E_fat,
+            T_legs=current.T_legs
+        )
+    
+    # Create new state for target date
+    new_state = DayState(
+        date=target_date,
+        per_lift={},
+        D_sys=0.0,
+        R_mito=0.0,
+        E_fat=0.0,
+        T_legs=0.0
+    )
+    
+    # Decay per-lift states
+    for lift, lift_state in current.per_lift.items():
+        # Fatigue decay over days_diff
+        D_new = lift_state.D_l * math.exp(-days_diff / params.get_tau_Dl(lift))
+        # Fitness decay
+        F_new = lift_state.F_l * math.exp(-days_diff / params.tau_Fl)
+        # Capacity stays (it's a baseline, doesn't decay quickly)
+        C_new = lift_state.C_l
+        
+        new_state.per_lift[lift] = PerLiftState(D_l=D_new, F_l=F_new, C_l=C_new)
+    
+    # System fatigue decay
+    new_state.D_sys = current.D_sys * math.exp(-days_diff / params.tau_sys)
+    
+    # R_mito decay
+    new_state.R_mito = current.R_mito * math.exp(-days_diff / params.tau_mito)
+    
+    # E_fat decay
+    new_state.E_fat = current.E_fat * math.exp(-days_diff / params.tau_Efat)
+    
+    # T_legs decay (slow)
+    new_state.T_legs = current.T_legs * math.exp(-days_diff / params.tau_T_legs)
     
     return new_state
 
