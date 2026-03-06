@@ -16,7 +16,7 @@ from app.database import SessionLocal
 from app import models
 from app.eval.replay import ReplayRunner
 from app.services.engine_orchestrator import EngineOrchestrator
-from app.domain.day_engine import PerLiftState
+from app.domain.day_engine import PerLiftState, DayState
 
 def main():
     db = SessionLocal()
@@ -30,8 +30,13 @@ def main():
         models.StrengthSession.athlete_id == athlete_id
     ).order_by(models.StrengthSession.start_time).all()
     
-    from_date = sessions[0].start_time.date()
-    to_date = sessions[-1].start_time.date()
+    # Get endurance sessions too
+    endurance_sessions = db.query(models.EnduranceSession).filter(
+        models.EnduranceSession.athlete_id == athlete_id
+    ).order_by(models.EnduranceSession.start_time).all()
+    
+    from_date = min(sessions[0].start_time.date(), endurance_sessions[0].start_time.date()) if endurance_sessions else sessions[0].start_time.date()
+    to_date = max(sessions[-1].start_time.date(), endurance_sessions[-1].start_time.date()) if endurance_sessions else sessions[-1].start_time.date()
     
     print('='*60)
     print('3. REPLAY & VALIDATION ANALYSIS')
@@ -61,125 +66,59 @@ def main():
     
     print(f"Rep-level entries collected: {len(rep_predictions)}")
     
-    # v9.2: Simulate day-by-day with proper carryover
+    # v9.2: Get day states from DB with carryover for missing days
     from datetime import timedelta
     from app.services.engine_orchestrator import EngineOrchestrator
-    from app.domain.day_engine import decay_day_state_to_date, DayEngineParams, DailyImpulses, EnduranceImpulses, StrengthImpulses, SetImpulse
-    from app.domain.rep_engine import simulate_strength_session, LiftVelocityProfile, SessionInput, SetInput, RepEngineParams
     
     orchestrator = EngineOrchestrator(db)
-    day_params = DayEngineParams()
-    rep_params = RepEngineParams()
     
-    # Group sessions by date
-    sessions_by_date = {}
-    for s in sessions:
-        d = s.start_time.date()
-        if d not in sessions_by_date:
-            sessions_by_date[d] = []
-        sessions_by_date[d].append(s)
-    
-    # Simulate day-by-day
+    # Query day states from DB for each calendar day
     day_data = []
     current_date = from_date
     previous_state = None
     
     while current_date <= to_date:
-        # Step 1: Decay from previous day (if any)
-        if previous_state:
-            # Decay previous state to current date
-            day_state = decay_day_state_to_date(previous_state, current_date, day_params)
+        date_str = current_date.isoformat()
+        
+        # First check if day state exists in DB
+        day_state_db = db.query(models.DayState).filter(
+            models.DayState.athlete_id == athlete_id,
+            models.DayState.date == date_str
+        ).first()
+        
+        if day_state_db:
+            # Use DB state directly
+            lift_states_db = db.query(models.LiftDayState).filter(
+                models.LiftDayState.athlete_id == athlete_id,
+                models.LiftDayState.date == date_str
+            ).all()
+            
+            per_lift = {}
+            for ls in lift_states_db:
+                per_lift[ls.lift.value] = PerLiftState(
+                    D_l=ls.D_l,
+                    F_l=ls.F_l,
+                    C_l=ls.C_l
+                )
+            
+            day_state = DayState(
+                date=current_date,
+                per_lift=per_lift,
+                D_sys=day_state_db.D_sys,
+                R_mito=day_state_db.R_mito,
+                E_fat=day_state_db.E_fat,
+                T_legs=getattr(day_state_db, 'T_legs', 0.0)
+            )
+            previous_state = day_state
+        elif previous_state:
+            # Decay from previous state
+            from app.domain.day_engine import decay_day_state_to_date, DayEngineParams
+            day_state = decay_day_state_to_date(previous_state, current_date, DayEngineParams())
         else:
-            # First day - get initial state
-            day_state = orchestrator._get_or_create_day_state(athlete_id, current_date, create=False)
-            if not day_state:
-                # Create fresh state
-                day_state = orchestrator._get_or_create_day_state(athlete_id, current_date, create=True)
+            # No prior state - skip
+            current_date += timedelta(days=1)
+            continue
         
-        # Step 2: Apply any sessions on this date
-        if current_date in sessions_by_date:
-            for session in sessions_by_date[current_date]:
-                # Get lift profile
-                profile_db = db.query(models.LiftProfile).filter(
-                    models.LiftProfile.athlete_id == athlete_id,
-                    models.LiftProfile.lift == session.lift
-                ).first()
-                
-                if profile_db:
-                    profile = LiftVelocityProfile(
-                        lift=session.lift.value,
-                        a=profile_db.a,
-                        b=profile_db.b
-                    )
-                    
-                    # Get session data
-                    raw_data = session.raw_data or {}
-                    sets_data = raw_data.get('sets', [])
-                    
-                    # Convert to rep_engine inputs
-                    set_inputs = []
-                    for set_data in sets_data:
-                        velocities = set_data.get('velocities', [])
-                        if not velocities:
-                            velocities = [1.0] * set_data.get('reps', 1)
-                        
-                        set_inputs.append(SetInput(
-                            lift=session.lift.value,
-                            load_kg=set_data.get('load_kg', 0),
-                            velocities=velocities,
-                            rest_before_sec=set_data.get('rest_sec', 0)
-                        ))
-                    
-                    # Run rep_engine simulation
-                    init_A_local = {session.lift.value: max(0.1, 1.0 - day_state.per_lift.get(session.lift.value, PerLiftState()).D_l / 2)}
-                    init_A_sys = max(0.1, 1.0 - day_state.D_sys / 2)
-                    
-                    session_input = SessionInput(
-                        sets=set_inputs,
-                        profiles={session.lift.value: profile},
-                        init_A_local=init_A_local,
-                        init_A_sys=init_A_sys,
-                        init_M=0.0,
-                        R_mito=day_state.R_mito,
-                        params=rep_params
-                    )
-                    
-                    rep_output = simulate_strength_session(session_input)
-                    
-                    # Compute strength impulses
-                    total_tonnage = sum(s.load_kg * len(s.velocities) for s in set_inputs)
-                    total_reps = sum(len(s.velocities) for s in set_inputs)
-                    avg_intensity = total_tonnage / max(total_reps, 1) if total_reps > 0 else 0
-                    
-                    # Simplified impulse calculation
-                    u_lift = total_tonnage * 0.001  # Simplified
-                    u_sys = total_tonnage * 0.0005  # Simplified
-                    u_legs = u_lift if session.lift.value in ['squat', 'deadlift', 'clean'] else 0
-                    u_legs_high_intensity = u_legs if avg_intensity > 70 else 0
-                    
-                    strength_impulses = StrengthImpulses(
-                        per_lift={session.lift.value: u_lift},
-                        u_sys=u_sys,
-                        u_legs=u_legs,
-                        u_met=0.0,
-                        u_legs_high_intensity=u_legs_high_intensity,
-                        sets=[]
-                    )
-                    
-                    # Update day state with session
-                    daily_impulses = DailyImpulses(
-                        strength=strength_impulses,
-                        endurance=EnduranceImpulses(
-                            u_E_Z2=0.0, u_E_HIIT=0.0, u_E_total=0.0,
-                            mode='cycling', has_HIIT=False, has_Z2=False
-                        ),
-                        date=current_date
-                    )
-                    
-                    from app.domain.day_engine import update_day_state
-                    day_state = update_day_state(day_state, daily_impulses, day_params)
-        
-        # Store the day state
         day_entry = {
             'date': current_date.isoformat(),
             'D_sys': day_state.D_sys,
@@ -195,12 +134,9 @@ def main():
             day_entry[f"C_l_{lift}"] = lift_state.C_l
         
         day_data.append(day_entry)
-        
-        # Update for next iteration
-        previous_state = day_state
         current_date += timedelta(days=1)
     
-    print(f"Day states collected: {len(day_data)} (simulated day-by-day with carryover)")
+    print(f"Day states collected: {len(day_data)} (from DB with carryover)")
     
     # Save day states
     with open(artifacts_dir / 'day_states.json', 'w') as f:
@@ -227,17 +163,41 @@ def main():
         avg_int = sum(m['avg_intensity']) / len(m['avg_intensity']) if m['avg_intensity'] else 0
         print(f"{lift:<15} {m['sessions']:>10} {m['tonnage']:>12.1f} {avg_int:>10.2f}")
     
+    # Endurance summary
+    if endurance_sessions:
+        print()
+        print(f"{'Sport':<15} {'Sessions':>10} {'Duration':>12} {'Z2/HIIT':>10}")
+        print('-'*60)
+        
+        sport_metrics = defaultdict(lambda: {'sessions': 0, 'duration': 0, 'z2': 0, 'hiit': 0})
+        for e in endurance_sessions:
+            sport = e.sport.value
+            sport_metrics[sport]['sessions'] += 1
+            sport_metrics[sport]['duration'] += e.duration_minutes
+            if e.u_E_HIIT > 0:
+                sport_metrics[sport]['hiit'] += 1
+            else:
+                sport_metrics[sport]['z2'] += 1
+        
+        for sport in sorted(sport_metrics.keys()):
+            m = sport_metrics[sport]
+            z2_hiit = f"{m['z2']}Z2/{m['hiit']}HIIT"
+            print(f"{sport:<15} {m['sessions']:>10} {m['duration']:>11.0f}m {z2_hiit:>10}")
+    
     # Save trend eval
     trend_eval = {
         'athlete_id': athlete_id,
         'date_range': [str(from_date), str(to_date)],
         'total_sessions': len(sessions),
+        'total_endurance_sessions': len(endurance_sessions),
         'day_states_tracked': len(day_data),
         'lift_metrics': dict(lift_metrics),
+        'sport_metrics': dict(sport_metrics) if endurance_sessions else {},
         'notes': [
             'No VBT data available (velocity coverage 0%)',
             'Rep-level predictions based on model internal state',
-            'Day-level states tracked via EngineOrchestrator'
+            'Day-level states tracked via EngineOrchestrator',
+            'Includes both strength and endurance training data'
         ]
     }
     

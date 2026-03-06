@@ -834,12 +834,14 @@ def process_quality_set_endpoint(
     reps: int = Query(..., description="Reps performed"),
     rpe: Optional[float] = Query(None, description="RPE 6-10 (optional)"),
     velocity_loss: Optional[float] = Query(None, description="Velocity loss % (optional)"),
+    observed_velocity: Optional[float] = Query(None, description="Observed velocity m/s (optional, for cleans)"),
     db: Session = Depends(get_db)
 ):
     """
     Process a strength set for capacity estimation.
     
     Evaluates set quality and detects breakthroughs.
+    Uses lift-specific criteria (different for power_clean vs others).
     """
     from app.services.capacity_profile_service import CapacityProfileService
     
@@ -851,7 +853,8 @@ def process_quality_set_endpoint(
         load_kg=load_kg,
         reps=reps,
         rpe=rpe,
-        velocity_loss=velocity_loss
+        velocity_loss=velocity_loss,
+        observed_velocity=observed_velocity
     )
     
     return {
@@ -859,6 +862,123 @@ def process_quality_set_endpoint(
         "lift": lift.value,
         **result
     }
+
+
+# ============================================================================
+# Sprint E3 Refined: New API Endpoints (preferred paths)
+# ============================================================================
+
+from pydantic import BaseModel
+
+class CapacityInitRequest(BaseModel):
+    athlete_id: int
+    lift: LiftType
+    input_type: str  # "1rm", "best_set", "unknown"
+    input_load_kg: Optional[float] = None
+    input_reps: Optional[int] = None
+    input_rpe: Optional[float] = None
+
+
+@app.post("/strength/capacity/init")
+def init_capacity_endpoint_v2(
+    request: CapacityInitRequest,
+    overwrite: bool = Query(False, description="Overwrite existing profile"),
+    db: Session = Depends(get_db)
+):
+    """
+    Initialize lift capacity profile from user input (onboarding) - preferred endpoint.
+    
+    Input types:
+    - 1rm: Direct 1RM input (highest confidence)
+    - best_set: Recent best set with load/reps/RPE
+    - unknown: Use conservative defaults (low confidence)
+    
+    Returns anchor_capacity (stable reference) and model_capacity (operational estimate).
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    
+    try:
+        profile = service.initialize_from_input(
+            athlete_id=request.athlete_id,
+            lift=request.lift,
+            input_type=request.input_type,
+            input_load_kg=request.input_load_kg,
+            input_reps=request.input_reps,
+            input_rpe=request.input_rpe,
+            overwrite=overwrite
+        )
+        
+        return {
+            "status": "initialized",
+            "athlete_id": request.athlete_id,
+            "lift": request.lift.value,
+            "input_type": profile.input_type,
+            "anchor_capacity": profile.anchor_capacity,
+            "model_capacity": profile.model_capacity,
+            "confidence": profile.confidence,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/strength/capacity/{athlete_id}")
+def get_all_capacities_endpoint_v2(
+    athlete_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all capacity profiles for an athlete - preferred endpoint.
+    
+    Returns both anchor_capacity (stable) and model_capacity (operational) for each lift.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    profiles = service.get_all_profiles(athlete_id)
+    
+    return {
+        "athlete_id": athlete_id,
+        "profiles": [
+            {
+                "lift": p.lift.value,
+                "anchor_capacity": p.anchor_capacity,
+                "model_capacity": p.model_capacity,
+                "confidence": p.confidence,
+                "input_type": p.input_type,
+                "provisional_breakthrough_count": p.provisional_breakthrough_count,
+                "last_confirmed_breakthrough_at": p.last_confirmed_breakthrough_at.isoformat() if p.last_confirmed_breakthrough_at else None
+            }
+            for p in profiles
+        ]
+    }
+
+
+@app.post("/strength/capacity/recompute")
+def recompute_capacity_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    lift: LiftType = Query(..., description="Lift type"),
+    days_back: int = Query(90, description="Days to scan (default: 90)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Recompute capacity by scanning recent sessions.
+    
+    Batch processes historical data to detect breakthroughs that may have been missed.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    
+    result = service.recompute_capacity_from_history(
+        athlete_id=athlete_id,
+        lift=lift,
+        days_back=days_back
+    )
+    
+    return result
 
 
 @app.post("/capacity/confirm-breakthrough")

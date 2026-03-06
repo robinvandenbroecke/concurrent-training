@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     # Sprint A: Feature flag for legacy model
     use_legacy_model: bool = False  # USE_LEGACY_MODEL env var
     
+    # Strava OAuth settings
+    strava_client_id: str = ""
+    strava_client_secret: str = ""
+    strava_redirect_uri: str = "http://localhost:8000/integrations/strava/callback"
+    strava_scopes: str = "read,activity:read_all"
+    app_base_url: str = "http://localhost:8000"
+    
     class Config:
         env_file = ".env"
 

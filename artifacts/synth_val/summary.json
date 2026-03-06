@@ -1,0 +1,23 @@
+{
+  "athlete_id": 99,
+  "date_range": {
+    "start": "2025-12-01",
+    "end": "2026-03-01",
+    "days": 90
+  },
+  "sessions": {
+    "strength": 26,
+    "endurance": 33
+  },
+  "data_quality": {
+    "total_sets": 107,
+    "sets_with_velocities": 107,
+    "velocity_coverage_pct": 100.0,
+    "sets_with_rest": 81,
+    "sets_with_rpe": 107
+  },
+  "lift_distribution": {
+    "squat": 17,
+    "deadlift": 9
+  }
+}

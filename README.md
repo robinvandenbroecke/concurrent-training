@@ -331,6 +331,129 @@ server {
 }
 ```
 
+## Strava Integration
+
+Sync activities from Strava automatically into endurance sessions.
+
+### Setup
+
+#### 1. Create Strava Developer App
+
+1. Go to https://www.strava.com/settings/api
+2. Create a new application:
+   - **Application Name**: Your App Name
+   - **Category**: Training
+   - **Website**: Your domain
+   - **Authorization Callback Domain**: `yourdomain.com` (or `localhost` for dev)
+3. Note down:
+   - **Client ID**
+   - **Client Secret**
+
+#### 2. Configure Environment Variables
+
+```bash
+# Add to .env file or export
+STRAVA_CLIENT_ID=your_client_id
+STRAVA_CLIENT_SECRET=your_client_secret
+STRAVA_REDIRECT_URI=http://localhost:8000/integrations/strava/callback
+STRAVA_SCOPES=read,activity:read_all
+APP_BASE_URL=http://localhost:8000
+```
+
+For production:
+```bash
+STRAVA_REDIRECT_URI=https://api.yourdomain.com/integrations/strava/callback
+APP_BASE_URL=https://api.yourdomain.com
+```
+
+#### 3. Run Migration
+
+```bash
+alembic upgrade head
+```
+
+This creates the `strava_connections` table for storing OAuth tokens.
+
+### Usage
+
+#### Connect Strava Account
+
+1. Visit the status page:
+   ```
+   http://localhost:8000/integrations/strava?athlete_id=1
+   ```
+
+2. Click **"Connect with Strava"**
+
+3. Authorize the application on Strava
+
+4. You'll be redirected back to the status page showing:
+   - Connection status
+   - Strava athlete name
+   - Token expiry
+   - Last sync timestamp
+
+#### Sync Activities
+
+**Via Web UI:**
+- Click **"Sync Last 30 Days"** button on the status page
+
+**Via API:**
+```bash
+# Sync last 30 days
+curl -X POST "http://localhost:8000/integrations/strava/sync?athlete_id=1&days_back=30"
+
+# Response:
+# {
+#   "status": "success",
+#   "athlete_id": 1,
+#   "imported": 15,
+#   "skipped": 3,
+#   "errors": [],
+#   "total_fetched": 18,
+#   "synced_at": "2024-01-15T12:00:00"
+# }
+```
+
+#### Disconnect
+
+**Via Web UI:**
+- Click **"Disconnect"** button on the status page
+
+**Via API:**
+```bash
+curl -X POST "http://localhost:8000/integrations/strava/disconnect?athlete_id=1"
+```
+
+### Activity Mapping
+
+Strava activities are mapped to `EnduranceSession` records:
+
+| Strava Type | EnduranceSport | Intensity Detection |
+|-------------|----------------|---------------------|
+| Ride, VirtualRide, EBikeRide | CYCLING | HIIT if name contains 'interval/workout' or avg_watts > 200 |
+| Run, VirtualRun | RUNNING | HIIT if name contains 'interval/sprint' |
+| Swim | SWIMMING | Defaults to z2 |
+
+**Idempotency**: Duplicate activities are prevented using content hashes based on Strava activity ID.
+
+**Token Refresh**: Access tokens are automatically refreshed when they expire (within 1 hour of expiry).
+
+### Local Development Example
+
+```bash
+# 1. Set env vars
+export STRAVA_CLIENT_ID=12345
+export STRAVA_CLIENT_SECRET=your_secret
+export STRAVA_REDIRECT_URI=http://localhost:8000/integrations/strava/callback
+
+# 2. Run the app
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 3. Open browser
+curl http://localhost:8000/integrations/strava?athlete_id=1
+```
+
 ## License
 
 MIT

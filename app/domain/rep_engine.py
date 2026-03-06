@@ -28,22 +28,104 @@ class LimitingFactor(str, Enum):
 @dataclass(frozen=True)
 class LiftVelocityProfile:
     """
-    Load-velocity profile for a lift: v_ref(w) = a - b*w, clamped to v_min.
+    Load-velocity profile for a lift: v_ref(w) = a - b*w, clamped to [v_min, v_max].
     
     Args:
         lift: Lift identifier (e.g., 'squat', 'bench')
         a: Velocity intercept (m/s at load=0)
-        b: Slope (m/s per kg)
+        b: Slope (m/s per kg) - must be > 0 so v_ref decreases with load
         v_min: Minimum velocity floor (default 0.05 m/s)
+        v_max: Maximum velocity cap (default 2.0 m/s)
     """
     lift: str
     a: float
     b: float
     v_min: float = 0.05
+    v_max: float = 2.0
+    
+    def __post_init__(self):
+        """Validate profile parameters."""
+        # Ensure b is positive so v_ref decreases with load
+        if self.b <= 0:
+            raise ValueError(
+                f"LiftVelocityProfile.b must be > 0 (got {self.b}). "
+                f"Profile for {self.lift} would have v_ref increasing with load."
+            )
+        if self.a <= 0:
+            raise ValueError(
+                f"LiftVelocityProfile.a must be > 0 (got {self.a})."
+            )
+        if self.v_min <= 0:
+            raise ValueError(
+                f"LiftVelocityProfile.v_min must be > 0 (got {self.v_min})."
+            )
+        if self.v_max <= self.v_min:
+            raise ValueError(
+                f"LiftVelocityProfile.v_max ({self.v_max}) must be > v_min ({self.v_min})."
+            )
     
     def v_ref(self, load_kg: float) -> float:
         """Reference velocity at given load when fresh."""
-        return max(self.v_min, self.a - self.b * load_kg)
+        v = self.a - self.b * load_kg
+        return max(self.v_min, min(self.v_max, v))
+    
+    def is_valid_for_load(self, load_kg: float) -> bool:
+        """Check if profile produces valid v_ref for given load."""
+        v = self.a - self.b * load_kg
+        return self.v_min <= v <= self.v_max
+    
+    @classmethod
+    def calibrated_profile(cls, lift: str, load_velocity_pairs: list = None) -> "LiftVelocityProfile":
+        """
+        Create a calibrated profile with realistic defaults per lift.
+        
+        Args:
+            lift: Lift identifier
+            load_velocity_pairs: Optional list of (load_kg, velocity) tuples for fitting
+        
+        Returns:
+            LiftVelocityProfile with validated parameters
+        """
+        # Realistic defaults per lift (a, b) where v_ref = a - b*load
+        defaults = {
+            "squat": (0.55, 0.0032),      # ~0.55 m/s at 0kg, decreases 0.0032 m/s per kg
+            "bench": (0.60, 0.0028),      # ~0.60 m/s at 0kg
+            "deadlift": (0.50, 0.0030),   # ~0.50 m/s at 0kg
+            "press": (0.58, 0.0025),      # ~0.58 m/s at 0kg
+            "power_clean": (0.75, 0.0040), # ~0.75 m/s at 0kg
+        }
+        
+        lift_lower = lift.lower()
+        a_default, b_default = defaults.get(lift_lower, (0.55, 0.0030))
+        
+        if load_velocity_pairs and len(load_velocity_pairs) >= 2:
+            # Simple linear regression: v = a - b*w
+            # Solve for a, b using least squares with constraint b > 0
+            import statistics
+            loads = [p[0] for p in load_velocity_pairs]
+            velocities = [p[1] for p in load_velocity_pairs]
+            
+            try:
+                # Linear regression: v = a + b*w (note: b will be negative)
+                mean_w = statistics.mean(loads)
+                mean_v = statistics.mean(velocities)
+                
+                # Calculate slope
+                numerator = sum((w - mean_w) * (v - mean_v) for w, v in zip(loads, velocities))
+                denominator = sum((w - mean_w) ** 2 for w in loads)
+                
+                if denominator > 0:
+                    slope = numerator / denominator  # This is dv/dw (negative)
+                    b_fitted = -slope  # Convert to positive b
+                    a_fitted = mean_v - slope * mean_w
+                    
+                    # Ensure b > 0, fall back to default if not
+                    if b_fitted > 0 and a_fitted > 0:
+                        return cls(lift=lift, a=a_fitted, b=b_fitted)
+            except Exception:
+                pass  # Fall back to defaults
+        
+        return cls(lift=lift, a=a_default, b=b_default)
 
 
 @dataclass(frozen=True)

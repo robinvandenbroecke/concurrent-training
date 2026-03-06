@@ -241,10 +241,24 @@ def parse_strength_csv(path: str) -> List[ParsedSession]:
                 velocities = []
                 vel_str = row.get('velocities', row.get('velocity_m_per_s', ''))
                 if vel_str and vel_str.strip():
-                    # Try to parse as list or single value
-                    vel = parse_velocity(vel_str)
-                    if vel:
-                        velocities.append(vel)
+                    # Try to parse as JSON list first
+                    try:
+                        # Handle JSON array like "[0.65, 0.62, 0.58, 0.55, 0.52]"
+                        import json
+                        vel_list = json.loads(vel_str)
+                        if isinstance(vel_list, list):
+                            for v in vel_list:
+                                if isinstance(v, (int, float)) and 0.05 <= v <= 2.0:
+                                    velocities.append(float(v))
+                        elif isinstance(vel_list, (int, float)):
+                            v = float(vel_list)
+                            if 0.05 <= v <= 2.0:
+                                velocities.append(v)
+                    except (json.JSONDecodeError, ValueError, TypeError):
+                        # Fall back to single value parsing
+                        vel = parse_velocity(vel_str)
+                        if vel:
+                            velocities.append(vel)
                 
                 sets.append(ParsedSet(
                     set_num=set_num,

@@ -1,19 +1,22 @@
 """
-Sprint E3: Strength Capacity Anchor + Breakthrough System
+Sprint E3 Refined: Strength Capacity Anchor + Breakthrough System v2
 
-Service for managing lift-specific capacity profiles with:
-- anchor_capacity: Stable reference (updated only by confirmed breakthroughs)
-- model_capacity: Operational estimate (used in planning/intensity)
+Refined implementation with:
+- Lift-specific quality criteria (different for power_clean)
+- Confidence-dependent breakthrough thresholds
+- Partial anchor updates (alpha blending)
+- Model capacity tracking with signal smoothing
+- 21-day window for provisional breakthroughs
+- No aggressive downward anchor updates
 
 Inspired by Xert-style profile updates for endurance.
 """
 from dataclasses import dataclass
 from typing import Optional, Dict, List, Tuple
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from enum import Enum
 
 from app.types import LiftType
-from app.domain.performance_engine import compute_session_e1rm
 
 
 class CapacityInputType(str, Enum):
@@ -28,6 +31,13 @@ class CapacityConfidence(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+
+
+class SignalType(str, Enum):
+    """Type of performance signal."""
+    E1RM = "e1rm"
+    VELOCITY = "velocity"
+    CLEAN_LOAD = "clean_load"
 
 
 # Conservative defaults for unknown input (kg)
@@ -52,12 +62,30 @@ class CapacityInitializationResult:
 
 
 @dataclass
+class PerformanceSignal:
+    """Extracted performance signal from a set or session."""
+    signal_value: float
+    signal_type: SignalType
+    quality_passed: bool
+    quality_score: float  # 0-1
+    reason: str = ""
+
+
+@dataclass
 class QualitySetResult:
     """Result of quality set evaluation."""
     is_quality: bool
-    estimated_e1rm: Optional[float] = None
-    quality_score: float = 0.0  # 0-1, higher is better
+    signal: Optional[PerformanceSignal] = None
+    quality_score: float = 0.0  # 0-1
     reason: str = ""
+    
+    # Backwards compatibility property
+    @property
+    def estimated_e1rm(self) -> Optional[float]:
+        """Backwards compatibility alias for signal.signal_value."""
+        if self.signal is not None:
+            return self.signal.signal_value
+        return None
 
 
 @dataclass
@@ -67,8 +95,27 @@ class BreakthroughDetectionResult:
     is_confirmed_breakthrough: bool
     new_anchor_capacity: Optional[float] = None
     new_model_capacity: Optional[float] = None
-    signal_delta_pct: float = 0.0  # % difference from current anchor
+    signal_delta_pct: float = 0.0
     reason: str = ""
+
+
+# Configuration constants
+PROVISIONAL_WINDOW_DAYS = 21  # Window for counting provisional breakthroughs
+STRONG_SIGNAL_THRESHOLD_PCT = 4.0  # % above anchor for immediate confirmation
+ANCHOR_UPDATE_ALPHA = 0.5  # Partial update factor (0.5 = halfway to signal)
+MODEL_CAPACITY_BLEND = 0.3  # Weight for recent signal in model capacity
+CONFIRMED_PROVISIONAL_COUNT = 2  # Provisional signals needed for confirmation
+
+
+# Confidence-dependent breakthrough thresholds
+def get_breakthrough_threshold(confidence: CapacityConfidence) -> float:
+    """Get breakthrough threshold % based on confidence level."""
+    thresholds = {
+        CapacityConfidence.HIGH: 2.5,
+        CapacityConfidence.MEDIUM: 2.0,
+        CapacityConfidence.LOW: 1.5,
+    }
+    return thresholds.get(confidence, 2.0)
 
 
 def compute_e1rm_from_set(load_kg: float, reps: int, rpe: Optional[float] = None) -> float:
@@ -77,27 +124,15 @@ def compute_e1rm_from_set(load_kg: float, reps: int, rpe: Optional[float] = None
     
     Formula without RPE: load * (1 + min(reps, 10) / 30)
     With RPE: adjusts based on RPE (lower RPE = higher estimated 1RM)
-    
-    Args:
-        load_kg: Load in kilograms
-        reps: Number of reps performed
-        rpe: Optional RPE rating (6-10)
-    
-    Returns:
-        Estimated 1RM in kg
     """
-    reps = min(reps, 10)  # Cap at 10 reps for formula
+    reps = min(reps, 10)
     
     if rpe is None:
-        # Simple formula: load * (1 + reps/30)
         return load_kg * (1 + reps / 30)
     else:
-        # Adjust based on RPE: lower RPE means more reps in reserve
-        # RPE 10 = max effort, RPE 6 = 4 reps in reserve
-        # Adjust load to estimated 1RM load using reps in reserve
         reps_in_reserve = 10 - rpe
         adjusted_reps = reps + reps_in_reserve
-        adjusted_reps = min(adjusted_reps, 12)  # Cap adjustment
+        adjusted_reps = min(adjusted_reps, 12)
         return load_kg * (1 + adjusted_reps / 30)
 
 
@@ -105,27 +140,322 @@ def determine_confidence_from_set(
     reps: int,
     rpe: Optional[float] = None
 ) -> CapacityConfidence:
-    """
-    Determine confidence level based on set parameters.
-    
-    Rules:
-    - reps <= 5 AND RPE >= 8: HIGH
-    - reps <= 8: MEDIUM  
-    - otherwise: LOW
-    
-    Args:
-        reps: Number of reps performed
-        rpe: Optional RPE rating (6-10)
-    
-    Returns:
-        Confidence level
-    """
+    """Determine confidence level based on set parameters."""
     if reps <= 5 and rpe is not None and rpe >= 8:
         return CapacityConfidence.HIGH
     elif reps <= 8:
         return CapacityConfidence.MEDIUM
     else:
         return CapacityConfidence.LOW
+
+
+def is_quality_strength_set(
+    lift: LiftType,
+    load_kg: float,
+    reps: int,
+    rpe: Optional[float] = None,
+    velocity_loss: Optional[float] = None,
+    observed_velocity: Optional[float] = None,
+    anchor_capacity: float = 0.0,
+) -> QualitySetResult:
+    """
+    Determine if a set is "quality" for capacity estimation.
+    
+    Lift-specific criteria:
+    - Squat/Bench/Deadlift/Press: reps <= 6, load >= 0.75*anchor, RPE 7.0-9.5, VL <= 0.25
+    - Power Clean: reps <= 3, load >= 0.70*anchor, velocity quality preferred
+    """
+    if anchor_capacity <= 0:
+        return QualitySetResult(is_quality=False, reason="Invalid anchor capacity")
+    
+    relative_load = load_kg / anchor_capacity
+    
+    # Lift-specific criteria
+    if lift in (LiftType.POWER_CLEAN, LiftType.CLEAN):
+        # Olympic lift criteria
+        if reps > 3:
+            return QualitySetResult(is_quality=False, reason=f"Too many reps for clean ({reps} > 3)")
+        if relative_load < 0.70:
+            return QualitySetResult(is_quality=False, reason=f"Load too light ({relative_load:.1%} < 70%)")
+        
+        # For cleans, velocity data is preferred
+        quality_score = min(1.0, relative_load)
+        if observed_velocity is not None:
+            # Good velocity indicates quality
+            quality_score *= min(1.0, observed_velocity / 1.0)  # Normalize to 1.0 m/s
+            signal_type = SignalType.VELOCITY
+            signal_value = observed_velocity
+        else:
+            signal_type = SignalType.CLEAN_LOAD
+            signal_value = load_kg
+        
+        signal = PerformanceSignal(
+            signal_value=signal_value,
+            signal_type=signal_type,
+            quality_passed=True,
+            quality_score=quality_score,
+            reason="Quality clean set"
+        )
+        return QualitySetResult(is_quality=True, signal=signal, quality_score=quality_score)
+    
+    else:
+        # Standard lift criteria (squat, bench, deadlift, press, other)
+        if reps > 6:
+            return QualitySetResult(is_quality=False, reason=f"Too many reps ({reps} > 6)")
+        if relative_load < 0.75:
+            return QualitySetResult(is_quality=False, reason=f"Load too light ({relative_load:.1%} < 75%)")
+        if rpe is not None and (rpe < 7.0 or rpe > 9.5):
+            return QualitySetResult(is_quality=False, reason=f"RPE out of range ({rpe}, need 7.0-9.5)")
+        if velocity_loss is not None and velocity_loss > 0.25:
+            return QualitySetResult(is_quality=False, reason=f"Velocity loss too high ({velocity_loss:.1%} > 25%)")
+        
+        # Compute quality score
+        quality_score = min(1.0, relative_load)
+        if velocity_loss is not None:
+            quality_score *= (1 - velocity_loss / 0.25)  # Penalize higher VL
+        if rpe is not None:
+            # Ideal RPE is 8-9, penalize deviations
+            rpe_factor = 1.0 - abs(rpe - 8.5) / 2.0
+            quality_score *= max(0.5, rpe_factor)
+        
+        # Compute e1RM signal
+        e1rm = compute_e1rm_from_set(load_kg, reps, rpe)
+        
+        signal = PerformanceSignal(
+            signal_value=e1rm,
+            signal_type=SignalType.E1RM,
+            quality_passed=True,
+            quality_score=quality_score,
+            reason="Quality strength set"
+        )
+        return QualitySetResult(is_quality=True, signal=signal, quality_score=quality_score)
+
+
+def extract_strength_performance_signal(
+    lift: LiftType,
+    load_kg: float,
+    reps: int,
+    rpe: Optional[float] = None,
+    velocity_loss: Optional[float] = None,
+    observed_velocity: Optional[float] = None,
+    reference_velocity: Optional[float] = None,
+    anchor_capacity: float = 0.0,
+) -> PerformanceSignal:
+    """
+    Extract performance signal from a set.
+    
+    For non-clean lifts: computes e1RM
+    For cleans: uses load or velocity quality
+    """
+    quality_result = is_quality_strength_set(
+        lift=lift,
+        load_kg=load_kg,
+        reps=reps,
+        rpe=rpe,
+        velocity_loss=velocity_loss,
+        observed_velocity=observed_velocity,
+        anchor_capacity=anchor_capacity
+    )
+    
+    if not quality_result.is_quality:
+        return PerformanceSignal(
+            signal_value=0.0,
+            signal_type=SignalType.E1RM,
+            quality_passed=False,
+            quality_score=0.0,
+            reason=quality_result.reason
+        )
+    
+    return quality_result.signal
+
+
+def detect_provisional_breakthrough(
+    anchor_capacity: float,
+    signal: PerformanceSignal,
+    confidence: CapacityConfidence,
+) -> bool:
+    """
+    Detect if signal qualifies as provisional breakthrough.
+    
+    Threshold depends on confidence:
+    - high: +2.5%
+    - medium: +2.0%
+    - low: +1.5%
+    """
+    if not signal.quality_passed or anchor_capacity <= 0:
+        return False
+    
+    threshold_pct = get_breakthrough_threshold(confidence)
+    delta_pct = (signal.signal_value - anchor_capacity) / anchor_capacity * 100
+    
+    return delta_pct >= threshold_pct
+
+
+def detect_confirmed_breakthrough(
+    provisional_count: int,
+    last_provisional_at: Optional[datetime],
+    signal: PerformanceSignal,
+    anchor_capacity: float,
+) -> bool:
+    """
+    Detect if breakthrough should be confirmed.
+    
+    Confirmed if:
+    A) Two provisional within 21 days
+    B) One strong signal >= 4% above anchor
+    """
+    if not signal.quality_passed or anchor_capacity <= 0:
+        return False
+    
+    delta_pct = (signal.signal_value - anchor_capacity) / anchor_capacity * 100
+    
+    # Strong signal immediate confirmation
+    if delta_pct >= STRONG_SIGNAL_THRESHOLD_PCT:
+        return True
+    
+    # Two provisional within window
+    if provisional_count >= 1 and last_provisional_at is not None:
+        days_since = (datetime.utcnow() - last_provisional_at).days
+        if days_since <= PROVISIONAL_WINDOW_DAYS:
+            return True
+    
+    return False
+
+
+def apply_confirmed_breakthrough(
+    current_anchor: float,
+    signal_value: float,
+    alpha: float = ANCHOR_UPDATE_ALPHA,
+) -> float:
+    """
+    Apply confirmed breakthrough with partial anchor update.
+    
+    new_anchor = old_anchor + alpha * (signal - old_anchor)
+    
+    Default alpha = 0.5 (move halfway toward signal)
+    """
+    if current_anchor <= 0:
+        return signal_value
+    
+    new_anchor = current_anchor + alpha * (signal_value - current_anchor)
+    return new_anchor
+
+
+def update_model_capacity(
+    anchor_capacity: float,
+    smoothed_recent_signal: Optional[float],
+    blend_weight: float = MODEL_CAPACITY_BLEND,
+) -> float:
+    """
+    Update model capacity as blend of anchor and recent signal.
+    
+    model_capacity = (1 - blend) * anchor + blend * smoothed_signal
+    
+    If no recent signal, model_capacity = anchor_capacity
+    """
+    if smoothed_recent_signal is None:
+        return anchor_capacity
+    
+    model = (1 - blend_weight) * anchor_capacity + blend_weight * smoothed_recent_signal
+    return model
+
+
+def detect_breakthrough_v2(
+    anchor_capacity: float,
+    model_capacity: float,
+    signal: PerformanceSignal,
+    confidence: CapacityConfidence,
+    provisional_count: int = 0,
+    last_provisional_at: Optional[datetime] = None,
+) -> BreakthroughDetectionResult:
+    """
+    Refined breakthrough detection with confidence-dependent thresholds.
+    
+    Returns updated capacities and breakthrough status.
+    """
+    if anchor_capacity <= 0 or not signal.quality_passed:
+        return BreakthroughDetectionResult(
+            is_provisional_breakthrough=False,
+            is_confirmed_breakthrough=False,
+            new_model_capacity=model_capacity,
+            reason="Invalid signal or anchor"
+        )
+    
+    delta_pct = (signal.signal_value - anchor_capacity) / anchor_capacity * 100
+    
+    # Check for confirmed breakthrough first
+    is_confirmed = detect_confirmed_breakthrough(
+        provisional_count=provisional_count,
+        last_provisional_at=last_provisional_at,
+        signal=signal,
+        anchor_capacity=anchor_capacity
+    )
+    
+    if is_confirmed:
+        # Partial anchor update
+        new_anchor = apply_confirmed_breakthrough(anchor_capacity, signal.signal_value)
+        # Model blends new anchor with signal
+        new_model = update_model_capacity(new_anchor, signal.signal_value)
+        
+        return BreakthroughDetectionResult(
+            is_provisional_breakthrough=True,
+            is_confirmed_breakthrough=True,
+            new_anchor_capacity=new_anchor,
+            new_model_capacity=new_model,
+            signal_delta_pct=delta_pct,
+            reason=f"Confirmed breakthrough ({delta_pct:+.1f}%): anchor {anchor_capacity:.1f} -> {new_anchor:.1f}"
+        )
+    
+    # Check for provisional breakthrough
+    is_provisional = detect_provisional_breakthrough(
+        anchor_capacity=anchor_capacity,
+        signal=signal,
+        confidence=confidence
+    )
+    
+    if is_provisional:
+        # Model drifts toward signal
+        new_model = update_model_capacity(anchor_capacity, signal.signal_value)
+        
+        return BreakthroughDetectionResult(
+            is_provisional_breakthrough=True,
+            is_confirmed_breakthrough=False,
+            new_model_capacity=new_model,
+            signal_delta_pct=delta_pct,
+            reason=f"Provisional breakthrough ({provisional_count + 1}/{CONFIRMED_PROVISIONAL_COUNT}): {delta_pct:+.1f}%"
+        )
+    
+    # No breakthrough: model still drifts slightly toward signal if positive
+    if delta_pct > 0:
+        new_model = update_model_capacity(anchor_capacity, signal.signal_value, blend_weight=0.15)
+    else:
+        # No aggressive downward updates - keep model close to anchor
+        new_model = model_capacity
+    
+    return BreakthroughDetectionResult(
+        is_provisional_breakthrough=False,
+        is_confirmed_breakthrough=False,
+        new_model_capacity=new_model,
+        signal_delta_pct=delta_pct,
+        reason=f"No breakthrough ({delta_pct:+.1f}%)"
+    )
+
+
+def should_reduce_anchor(
+    poor_signal_count: int,
+    first_poor_signal_at: Optional[datetime],
+    recent_high_fatigue: bool = False,
+) -> bool:
+    """
+    Determine if anchor should be reduced.
+    
+    Conservative rule: only reduce after 3+ poor signals across >=21 days
+    and no high fatigue context.
+    
+    For now (V1): returns False (skip downward anchor updates)
+    """
+    # V1: Skip all downward anchor updates
+    return False
 
 
 def initialize_lift_capacity(
@@ -135,22 +465,7 @@ def initialize_lift_capacity(
     input_reps: Optional[int] = None,
     input_rpe: Optional[float] = None
 ) -> CapacityInitializationResult:
-    """
-    Initialize capacity profile from user input.
-    
-    Args:
-        lift: The lift type
-        input_type: How the capacity was determined
-        input_load_kg: Load in kg (for 1rm or best_set)
-        input_reps: Reps performed (for best_set)
-        input_rpe: RPE rating 6-10 (optional for best_set)
-    
-    Returns:
-        CapacityInitializationResult with anchor and model capacity
-    
-    Raises:
-        ValueError: If input parameters are invalid
-    """
+    """Initialize capacity profile from user input."""
     if input_type == CapacityInputType.ONE_RM:
         if input_load_kg is None:
             raise ValueError("input_load_kg required for 1rm input_type")
@@ -163,15 +478,12 @@ def initialize_lift_capacity(
         if input_load_kg is None or input_reps is None:
             raise ValueError("input_load_kg and input_reps required for best_set input_type")
         
-        # Compute e1RM from set
         e1rm = compute_e1rm_from_set(input_load_kg, input_reps, input_rpe)
-        
         anchor = e1rm
         model = e1rm
         confidence = determine_confidence_from_set(input_reps, input_rpe)
         
     elif input_type == CapacityInputType.UNKNOWN:
-        # Use conservative defaults
         default = LIFT_DEFAULT_CAPACITY.get(lift, 80.0)
         anchor = default
         model = default
@@ -188,121 +500,26 @@ def initialize_lift_capacity(
     )
 
 
-def is_quality_strength_set(
-    lift: LiftType,
-    load_kg: float,
-    reps: int,
-    rpe: Optional[float],
-    velocity_loss: Optional[float],
-    anchor_capacity: float,
-    min_relative_load: float = 0.70,  # At least 70% of capacity
-    max_reps: int = 12,  # More than 12 reps not reliable for strength
-    max_velocity_loss: float = 0.30,  # VL > 30% indicates fatigue
-) -> QualitySetResult:
-    """
-    Determine if a set is "quality" for capacity estimation.
-    
-    Quality criteria:
-    1. Load is at least min_relative_load % of anchor capacity
-    2. Reps <= max_reps (high rep sets not reliable)
-    3. Velocity loss <= max_velocity_loss (if available)
-    4. RPE >= 7 (if available, indicates sufficient effort)
-    
-    Args:
-        lift: The lift type
-        load_kg: Load in kg
-        reps: Reps performed
-        rpe: Optional RPE (6-10)
-        velocity_loss: Optional velocity loss % (0-1)
-        anchor_capacity: Current anchor capacity
-        min_relative_load: Minimum % of capacity to qualify
-        max_reps: Maximum reps to qualify
-        max_velocity_loss: Maximum velocity loss to qualify
-    
-    Returns:
-        QualitySetResult with quality determination and estimated e1RM
-    """
-    if anchor_capacity <= 0:
-        return QualitySetResult(
-            is_quality=False,
-            reason="Invalid anchor capacity"
-        )
-    
-    relative_load = load_kg / anchor_capacity
-    
-    # Check load threshold
-    if relative_load < min_relative_load:
-        return QualitySetResult(
-            is_quality=False,
-            reason=f"Load too light ({relative_load:.1%} < {min_relative_load:.0%})"
-        )
-    
-    # Check rep count
-    if reps > max_reps:
-        return QualitySetResult(
-            is_quality=False,
-            reason=f"Too many reps ({reps} > {max_reps})"
-        )
-    
-    # Check velocity loss if available
-    if velocity_loss is not None and velocity_loss > max_velocity_loss:
-        return QualitySetResult(
-            is_quality=False,
-            reason=f"Velocity loss too high ({velocity_loss:.1%} > {max_velocity_loss:.0%})"
-        )
-    
-    # Check RPE if available (should be sufficient effort)
-    if rpe is not None and rpe < 7:
-        return QualitySetResult(
-            is_quality=False,
-            reason=f"RPE too low ({rpe} < 7)"
-        )
-    
-    # Compute quality score (0-1)
-    quality_score = min(1.0, relative_load)
-    if velocity_loss is not None:
-        quality_score *= (1 - velocity_loss)
-    if rpe is not None:
-        quality_score *= (rpe - 6) / 4  # Normalize RPE 7-10 to 0.25-1.0
-    
-    # Compute estimated e1RM from this set
-    estimated_e1rm = compute_e1rm_from_set(load_kg, reps, rpe)
-    
-    return QualitySetResult(
-        is_quality=True,
-        estimated_e1rm=estimated_e1rm,
-        quality_score=quality_score,
-        reason="Quality set"
-    )
+def get_default_capacity(lift: LiftType) -> float:
+    """Get default capacity for a lift type."""
+    return LIFT_DEFAULT_CAPACITY.get(lift, 80.0)
 
 
+# Backwards compatibility wrapper for old detect_breakthrough signature
 def detect_breakthrough(
     current_anchor: float,
     current_model: float,
     signal_e1rm: float,
     provisional_count: int = 0,
-    confirmation_threshold_pct: float = 2.5,  # Need 2.5% improvement for provisional
-    confirmation_required_count: int = 2,  # Need 2 provisional signals for confirmation
-    model_adjustment_rate: float = 0.3,  # Model moves 30% toward signal
+    confirmation_threshold_pct: float = 2.5,
+    confirmation_required_count: int = 2,
+    model_adjustment_rate: float = 0.3,
 ) -> BreakthroughDetectionResult:
     """
-    Detect breakthroughs from performance signals.
+    Backwards-compatible wrapper for detect_breakthrough_v2.
     
-    Breakthrough logic:
-    1. Provisional breakthrough: signal exceeds anchor by threshold_pct
-    2. Confirmed breakthrough: provisional_count + 1 >= confirmation_required_count
-    
-    Args:
-        current_anchor: Current anchor capacity
-        current_model: Current model capacity
-        signal_e1rm: New performance signal (e1RM estimate)
-        provisional_count: Current count of provisional breakthroughs
-        confirmation_threshold_pct: % improvement needed for provisional
-        confirmation_required_count: Provisional signals needed for confirmation
-        model_adjustment_rate: How fast model adjusts to signals
-    
-    Returns:
-        BreakthroughDetectionResult
+    Takes signal_e1rm as float (old signature) instead of PerformanceSignal (new signature).
+    Implements old-style confirmation logic (count-based, not time-based).
     """
     if current_anchor <= 0:
         return BreakthroughDetectionResult(
@@ -311,16 +528,14 @@ def detect_breakthrough(
             reason="Invalid anchor capacity"
         )
     
-    # Calculate delta from anchor
     delta_pct = (signal_e1rm - current_anchor) / current_anchor * 100
     
-    # Check for provisional breakthrough
+    # Check if signal meets provisional threshold
     is_provisional = delta_pct >= confirmation_threshold_pct
     
     if not is_provisional:
-        # No breakthrough, but model may still drift toward signal
+        # Model drifts toward signal
         new_model = current_model + (signal_e1rm - current_model) * model_adjustment_rate
-        
         return BreakthroughDetectionResult(
             is_provisional_breakthrough=False,
             is_confirmed_breakthrough=False,
@@ -332,13 +547,13 @@ def detect_breakthrough(
     # Provisional breakthrough detected
     new_provisional_count = provisional_count + 1
     
-    # Check for confirmed breakthrough
+    # Old logic: confirmed if count reaches required (no time window)
     is_confirmed = new_provisional_count >= confirmation_required_count
     
     if is_confirmed:
-        # Confirm breakthrough: update anchor to signal
+        # Old behavior: full anchor update (not partial)
         new_anchor = signal_e1rm
-        new_model = signal_e1rm  # Reset model to confirmed value
+        new_model = signal_e1rm
         
         return BreakthroughDetectionResult(
             is_provisional_breakthrough=True,
@@ -349,7 +564,7 @@ def detect_breakthrough(
             reason=f"Confirmed breakthrough: {delta_pct:+.1f}% improvement"
         )
     else:
-        # Provisional only: model drifts toward signal, anchor stays
+        # Provisional only
         new_model = current_model + (signal_e1rm - current_model) * model_adjustment_rate
         
         return BreakthroughDetectionResult(
@@ -361,6 +576,5 @@ def detect_breakthrough(
         )
 
 
-def get_default_capacity(lift: LiftType) -> float:
-    """Get default capacity for a lift type."""
-    return LIFT_DEFAULT_CAPACITY.get(lift, 80.0)
+# Keep backwards compatibility for the old QualitySetResult too
+QualitySetResultWithE1RM = QualitySetResult

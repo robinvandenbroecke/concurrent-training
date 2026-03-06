@@ -1,0 +1,27 @@
+{
+  "athlete_id": 199,
+  "date_range": {
+    "from": "2026-01-01",
+    "to": "2026-03-12"
+  },
+  "metrics": {
+    "rep_errors_count": 512,
+    "day_errors_count": 31,
+    "rep_rmse": 0.3399,
+    "rep_mae": 0.3378,
+    "v_pred_min": 0.041,
+    "v_pred_max": 0.32
+  },
+  "per_lift": {
+    "squat": {
+      "count": 384,
+      "rmse": 0.3267,
+      "mae": 0.3253
+    },
+    "deadlift": {
+      "count": 128,
+      "rmse": 0.3767,
+      "mae": 0.3752
+    }
+  }
+}

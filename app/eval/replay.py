@@ -244,20 +244,32 @@ class ReplayRunner:
         if not profile_db:
             return
         
-        profile = LiftVelocityProfile(
-            lift=lift.value,
-            a=profile_db.a,
-            b=profile_db.b
-        )
+        # Sanitize profile values
+        a_val = profile_db.a
+        b_val = profile_db.b
+        if b_val <= 0:
+            b_val = abs(b_val) if b_val != 0 else 0.003
+        if a_val <= 0:
+            a_val = 0.55
+        
+        try:
+            profile = LiftVelocityProfile(
+                lift=lift.value,
+                a=a_val,
+                b=b_val
+            )
+        except ValueError:
+            profile = LiftVelocityProfile.calibrated_profile(lift.value)
         
         # Step through each set
         for set_idx, set_data in enumerate(sets_data):
-            reps = set_data.get("reps", [])
-            if len(reps) < 2:
+            velocities = set_data.get("velocities", [])
+            reps = set_data.get("reps", 0)
+            
+            if len(velocities) < 2 or reps < 2:
                 continue
             
             # Initialize state at start of set
-            # Simplified: start fresh for each set
             from app.domain.rep_engine import RepState
             params = RepEngineParams()
             state = RepState(
@@ -267,15 +279,15 @@ class ReplayRunner:
                 params=params
             )
             
-            v_ref = profile.a - profile.b * set_data.get("weight", 0)
+            v_ref = profile.a - profile.b * set_data.get("load_kg", set_data.get("weight", 0))
             
             # For each rep starting from 2nd
-            for rep_idx in range(1, len(reps)):
+            for rep_idx in range(1, len(velocities)):
                 # Predict velocity for this rep (before observing)
                 v_pred = state.predict_velocity(v_ref, lift.value)
                 
                 # Get observed velocity
-                v_obs = reps[rep_idx].get("velocity", 0)
+                v_obs = velocities[rep_idx]
                 
                 # Log error
                 self.rep_errors.append({
@@ -290,7 +302,7 @@ class ReplayRunner:
                 
                 # Update state with observed velocity
                 y = v_obs / v_ref if v_ref > 0 else 1.0
-                state.apply_rep(lift.value, set_data.get("weight", 0), y, rep_idx)
+                state.apply_rep(lift.value, set_data.get("load_kg", set_data.get("weight", 0)), y, rep_idx)
     
     def _compute_readiness_from_state(self, lift_state: PerLiftState, day_state) -> float:
         """Compute readiness from day state."""
@@ -300,22 +312,20 @@ class ReplayRunner:
     def _has_vbt_data(self, sets_data: List[Dict]) -> bool:
         """Check if sets have velocity data."""
         for s in sets_data:
-            reps = s.get("reps", [])
-            for r in reps:
-                if "velocity" in r:
-                    return True
+            velocities = s.get("velocities", [])
+            if velocities and len(velocities) > 0:
+                return True
         return False
     
     def _convert_sets_for_orchestrator(self, sets_data: List[Dict]) -> List[Dict]:
         """Convert raw sets to orchestrator format."""
         converted = []
         for s in sets_data:
-            reps = s.get("reps", [])
             converted.append({
-                "load_kg": s.get("weight", 0),
-                "reps": len(reps),
-                "velocities": [r.get("velocity", 0) for r in reps],
-                "rest_sec": reps[0].get("rest_before", 0) if reps else None,
+                "load_kg": s.get("load_kg", s.get("weight", 0)),
+                "reps": s.get("reps", 0),
+                "velocities": s.get("velocities", []),
+                "rest_sec": s.get("rest_sec", None),
             })
         return converted
     
@@ -324,18 +334,14 @@ class ReplayRunner:
         best_perf_y = None
         
         for set_data in sets_data:
-            reps = set_data.get("reps", [])
-            if len(reps) < 2 or len(reps) > 6:
+            velocities = set_data.get("velocities", [])
+            reps = set_data.get("reps", 0)
+            
+            if len(velocities) < 2 or reps < 2 or reps > 6:
                 continue  # Skip sets with too few or too many reps
             
             # Compute y for first 2 reps
-            v_refs = []
-            v_obs_list = []
-            for rep in reps[:2]:
-                v_obs = rep.get("velocity", 0)
-                # Estimate v_ref from load (simplified)
-                # This is approximate; better would be to use profile
-                v_obs_list.append(v_obs)
+            v_obs_list = velocities[:2]
             
             if len(v_obs_list) >= 2 and v_obs_list[0] > 0:
                 # Simple proxy: ratio of rep 2 to rep 1

@@ -203,87 +203,87 @@ class TestQualitySetDetection:
         """Basic quality set detection"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,  # 140/200 = 70%
+            load_kg=150,  # 150/200 = 75%
             reps=5,
             rpe=8,
             velocity_loss=0.20,
             anchor_capacity=200
         )
-        
+
         assert result.is_quality is True
-        assert result.estimated_e1rm is not None
+        assert result.signal.signal_value is not None
         assert result.quality_score > 0
     
     def test_load_too_light_not_quality(self):
-        """Load below 70% of anchor is not quality"""
+        """Load below 75% of anchor is not quality"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=100,  # 100/200 = 50%
+            load_kg=100,  # 100/200 = 50% < 75%
             reps=5,
             rpe=8,
             velocity_loss=0.20,
             anchor_capacity=200
         )
-        
+
         assert result.is_quality is False
         assert "too light" in result.reason.lower()
-    
+
     def test_too_many_reps_not_quality(self):
-        """More than 12 reps is not quality"""
+        """More than 6 reps is not quality for standard lifts"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,
-            reps=15,
+            load_kg=150,  # 75%
+            reps=8,  # > 6
             rpe=8,
             velocity_loss=0.20,
             anchor_capacity=200
         )
-        
+
         assert result.is_quality is False
         assert "too many reps" in result.reason.lower()
-    
+
     def test_high_velocity_loss_not_quality(self):
-        """Velocity loss > 30% is not quality"""
+        """Velocity loss > 25% is not quality"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,
+            load_kg=150,  # 75%
             reps=5,
             rpe=8,
-            velocity_loss=0.35,
+            velocity_loss=0.30,  # > 25%
             anchor_capacity=200
         )
-        
+
         assert result.is_quality is False
         assert "velocity loss" in result.reason.lower()
-    
+
     def test_low_rpe_not_quality(self):
         """RPE < 7 is not quality (insufficient effort)"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,
+            load_kg=150,  # 75%
             reps=5,
             rpe=6,
             velocity_loss=0.20,
             anchor_capacity=200
         )
-        
+
         assert result.is_quality is False
-        assert "rpe too low" in result.reason.lower()
-    
+        assert "rpe" in result.reason.lower()
+
     def test_invalid_anchor_not_quality(self):
         """Invalid anchor capacity returns not quality"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,
+            load_kg=150,
             reps=5,
             rpe=8,
             velocity_loss=0.20,
             anchor_capacity=0
         )
-        
+
         assert result.is_quality is False
         assert "invalid" in result.reason.lower()
-    
+
     def test_quality_score_components(self):
         """Quality score considers multiple factors"""
         # High relative load, low VL, high RPE = high score
@@ -295,24 +295,24 @@ class TestQualitySetDetection:
             velocity_loss=0.10,
             anchor_capacity=200
         )
-        
+
         # Lower relative load = lower score
         result_lower = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,  # 70%
+            load_kg=150,  # 75%
             reps=5,
             rpe=8,
             velocity_loss=0.20,
             anchor_capacity=200
         )
-        
+
         assert result_high.quality_score > result_lower.quality_score
-    
+
     def test_optional_params(self):
         """RPE and velocity loss are optional"""
         result = is_quality_strength_set(
             lift=LiftType.SQUAT,
-            load_kg=140,
+            load_kg=150,  # 75%
             reps=5,
             rpe=None,
             velocity_loss=None,

@@ -380,5 +380,48 @@ def import_strength_csv(
         raise typer.Exit(1)
 
 
+@app.command()
+def import_endurance_csv(
+    csv_path: str = typer.Option(..., "--path", "-p", help="Path to endurance CSV file"),
+    athlete_id: int = typer.Option(..., "--athlete_id", "-a", help="Athlete ID"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse only, don't create records"),
+):
+    """Import endurance sessions from CSV file."""
+    from app.adapters.endurance_csv import import_endurance_csv as import_csv
+
+    if not os.path.exists(csv_path):
+        typer.echo(f"Error: File not found: {csv_path}", err=True)
+        raise typer.Exit(1)
+
+    db = next(get_db())
+
+    typer.echo(f"Importing endurance data from: {csv_path}")
+    typer.echo(f"Mode: {'DRY RUN' if dry_run else 'LIVE'}")
+    typer.echo()
+
+    try:
+        result = import_csv(db, athlete_id, csv_path, dry_run=dry_run)
+        
+        typer.echo(f"=== Import Results ===")
+        typer.echo(f"Sessions created: {result.sessions_created}")
+        typer.echo(f"Sessions skipped (duplicate): {result.sessions_skipped}")
+        
+        if result.errors:
+            typer.echo(f"\nErrors ({len(result.errors)}):")
+            for err in result.errors[:10]:
+                typer.echo(f"  • {err}")
+            if len(result.errors) > 10:
+                typer.echo(f"  ... and {len(result.errors) - 10} more")
+        
+        if result.session_ids:
+            typer.echo(f"\nSession IDs: {', '.join(result.session_ids[:5])}")
+            if len(result.session_ids) > 5:
+                typer.echo(f"  ... and {len(result.session_ids) - 5} more")
+                
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

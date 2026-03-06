@@ -1,0 +1,12 @@
+{
+  "athlete_id": 99,
+  "date_range": {
+    "from": "2026-01-01",
+    "to": "2026-03-12"
+  },
+  "metrics": {
+    "rep_errors_count": 512,
+    "day_errors_count": 31,
+    "trend_evals_count": 0
+  }
+}

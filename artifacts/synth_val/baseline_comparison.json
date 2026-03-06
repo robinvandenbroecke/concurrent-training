@@ -1,0 +1,20 @@
+{
+  "model_performance": {
+    "rep_level_rmse": 0.3399,
+    "rep_level_mae": 0.3378,
+    "day_level_mae": 0.08,
+    "trend_accuracy": 0.75
+  },
+  "velocity_threshold_baseline": {
+    "rep_level_rmse": 0.18,
+    "rep_level_mae": 0.15,
+    "day_level_mae": 0.15,
+    "trend_accuracy": 0.65
+  },
+  "banister_baseline": {
+    "rep_level_rmse": 0.2,
+    "rep_level_mae": 0.18,
+    "day_level_mae": 0.18,
+    "trend_accuracy": 0.6
+  }
+}

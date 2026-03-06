@@ -217,15 +217,17 @@ class TestCapacityProfileService:
             input_load_kg=100
         )
         
-        # Process quality set indicating ~110kg capacity (10% increase)
+        # Process quality set indicating ~103.1kg capacity (3.1% increase)
+        # Above 2.5% threshold for provisional, below 4% for immediate confirmation
+        # 91kg x 3 @ RPE 9: e1RM = 91 * (1 + 4/30) = 91 * 1.133 = 103.1
         result = service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=105,
+            load_kg=91,
             reps=3,
             rpe=9
         )
-        
+
         assert result["is_quality"] is True
         assert result["breakthrough"]["is_provisional"] is True
         assert result["breakthrough"]["is_confirmed"] is False
@@ -246,26 +248,26 @@ class TestCapacityProfileService:
             input_load_kg=100
         )
         
-        # First signal (provisional)
+        # First signal (provisional) - ~3.3% increase
         service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=105,
+            load_kg=100,
             reps=3,
             rpe=9
         )
-        
-        # Second signal (should confirm)
+
+        # Second signal (should confirm) - another ~3.3% increase
         result = service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=106,
+            load_kg=101,
             reps=3,
             rpe=9
         )
-        
+
         assert result["breakthrough"]["is_confirmed"] is True
-        
+
         # Verify profile updated
         profile = service.get_profile(sample_athlete.id, LiftType.SQUAT)
         assert profile.provisional_breakthrough_count == 0
@@ -316,14 +318,18 @@ class TestCapacityProfileService:
         service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=105,
+            load_kg=91,  # ~3.1% increase, provisional but not confirmed
             reps=3,
             rpe=9
         )
-        
+
+        # Verify provisional was created
+        profile = service.get_profile(sample_athlete.id, LiftType.SQUAT)
+        assert profile.provisional_breakthrough_count == 1
+
         # Manually confirm
         result = service.confirm_provisional_breakthrough(sample_athlete.id, LiftType.SQUAT)
-        
+
         assert result is not None
         assert result["confirmed"] is True
         assert result["new_anchor"] > 100
@@ -358,11 +364,11 @@ class TestCapacityProfileService:
         service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=105,
+            load_kg=91,  # ~3.1% increase, provisional but not confirmed
             reps=3,
             rpe=9
         )
-        
+
         # Verify provisional exists
         profile = service.get_profile(sample_athlete.id, LiftType.SQUAT)
         assert profile.provisional_breakthrough_count == 1
@@ -429,24 +435,23 @@ class TestCapacityProfileIntegration:
         )
 
         # Week 1: Normal training (no breakthrough)
-        # 140kg x 5 @ RPE 8: adjusted_reps = 5 + 2 = 7, e1RM = 140 * 1.233 = 172.6 < 200
+        # 150kg x 5 @ RPE 8: adjusted_reps = 5 + 2 = 7, e1RM = 150 * 1.233 = 185 < 200
         result1 = service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=140,  # 70% of 200
+            load_kg=150,  # 75% of 200 (minimum for quality)
             reps=5,
             rpe=8
         )
         assert result1["breakthrough"]["is_provisional"] is False
 
         # Week 2: Strong session (provisional)
-        # 170kg x 3 @ RPE 9: adjusted_reps = 3 + 1 = 4, e1RM = 170 * 1.133 = 192.6 < 200? No
-        # Need higher: 180kg x 3 @ RPE 9: e1RM = 180 * 1.133 = 204, which is ~2% increase
-        # Let's go higher: 185kg x 3 @ RPE 9: e1RM = 185 * 1.133 = 209.6, which is ~4.8% increase
+        # 182kg x 3 @ RPE 9: adjusted_reps = 4, e1RM = 182 * 1.133 = 206.2 (~3.1% increase)
+        # Above 2.5% threshold for provisional, below 4% for immediate confirmation
         result2 = service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=185,
+            load_kg=182,
             reps=3,
             rpe=9
         )
@@ -457,7 +462,7 @@ class TestCapacityProfileIntegration:
         result3 = service.process_quality_set(
             athlete_id=sample_athlete.id,
             lift=LiftType.SQUAT,
-            load_kg=186,
+            load_kg=183,  # Similar signal to confirm
             reps=3,
             rpe=9
         )
