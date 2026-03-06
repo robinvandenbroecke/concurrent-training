@@ -12,7 +12,7 @@ Refined implementation with:
 Inspired by Xert-style profile updates for endurance.
 """
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Union
 from datetime import datetime, date, timedelta
 from enum import Enum
 
@@ -105,6 +105,110 @@ STRONG_SIGNAL_THRESHOLD_PCT = 4.0  # % above anchor for immediate confirmation
 ANCHOR_UPDATE_ALPHA = 0.5  # Partial update factor (0.5 = halfway to signal)
 MODEL_CAPACITY_BLEND = 0.3  # Weight for recent signal in model capacity
 CONFIRMED_PROVISIONAL_COUNT = 2  # Provisional signals needed for confirmation
+
+# Sprint E2.1: Lift-specific default capacities (kg)
+# Used as final fallback when no profile, day-state, or performance data exists
+LIFT_SPECIFIC_DEFAULTS: Dict[LiftType, float] = {
+    LiftType.SQUAT: 140.0,
+    LiftType.BENCH: 100.0,
+    LiftType.DEADLIFT: 180.0,
+    LiftType.PRESS: 70.0,
+    LiftType.POWER_CLEAN: 95.0,
+    LiftType.CLEAN: 95.0,
+    LiftType.OTHER: 100.0,
+}
+
+
+def normalize_lift_type(lift: Union[LiftType, str]) -> LiftType:
+    """Normalize lift type string or enum to canonical LiftType."""
+    if isinstance(lift, LiftType):
+        return lift
+    
+    lift_lower = str(lift).lower().strip()
+    
+    # Handle aliases
+    aliases = {
+        'clean': LiftType.CLEAN,
+        'power_clean': LiftType.POWER_CLEAN,
+        'power clean': LiftType.POWER_CLEAN,
+        'squat': LiftType.SQUAT,
+        'bench': LiftType.BENCH,
+        'bench_press': LiftType.BENCH,
+        'bench press': LiftType.BENCH,
+        'deadlift': LiftType.DEADLIFT,
+        'press': LiftType.PRESS,
+        'overhead_press': LiftType.PRESS,
+        'overhead press': LiftType.PRESS,
+        'shoulder_press': LiftType.PRESS,
+        'shoulder press': LiftType.PRESS,
+    }
+    
+    if lift_lower in aliases:
+        return aliases[lift_lower]
+    
+    # Try direct enum lookup
+    try:
+        return LiftType(lift_lower)
+    except ValueError:
+        return LiftType.OTHER
+
+
+def get_lift_capacity_estimate(
+    db,
+    athlete_id: int,
+    lift: Union[LiftType, str],
+    query_date: Optional[date] = None,
+) -> Tuple[float, str]:
+    """
+    Sprint E2.1: Canonical capacity lookup for production strength impulse path.
+    
+    Lookup hierarchy (in order of preference):
+    1) LiftCapacityProfile.model_capacity - latest profile for athlete + lift on/before query_date
+    2) Lift day-state capacity C_l - latest available lift/day state on/before query_date
+    3) Performance snapshot / e1RM-derived estimate - NOT IMPLEMENTED (skip for now)
+    4) Lift-specific default fallback
+    
+    Args:
+        db: SQLAlchemy session
+        athlete_id: Athlete ID
+        lift: Lift type (string or LiftType enum)
+        query_date: Date for lookup (default: today)
+    
+    Returns:
+        Tuple of (capacity_value, source_string)
+        Source strings: "capacity_profile" | "day_state" | "default"
+    """
+    from sqlalchemy import desc
+    import app.models as db_models
+    
+    if query_date is None:
+        query_date = date.today()
+    
+    query_date_str = query_date.isoformat() if isinstance(query_date, date) else str(query_date)
+    lift_normalized = normalize_lift_type(lift)
+    
+    # 1) Try LiftCapacityProfile.model_capacity (preferred)
+    profile = db.query(db_models.LiftCapacityProfile).filter(
+        db_models.LiftCapacityProfile.athlete_id == athlete_id,
+        db_models.LiftCapacityProfile.lift == lift_normalized,
+    ).order_by(desc(db_models.LiftCapacityProfile.updated_at)).first()
+    
+    if profile and profile.model_capacity > 0:
+        return (float(profile.model_capacity), "capacity_profile")
+    
+    # 2) Try Lift day-state capacity C_l
+    lift_day_state = db.query(db_models.LiftDayState).filter(
+        db_models.LiftDayState.athlete_id == athlete_id,
+        db_models.LiftDayState.lift == lift_normalized,
+        db_models.LiftDayState.date <= query_date_str,
+    ).order_by(desc(db_models.LiftDayState.date)).first()
+    
+    if lift_day_state and lift_day_state.C_l and lift_day_state.C_l > 0:
+        return (float(lift_day_state.C_l), "day_state")
+    
+    # 4) Lift-specific default fallback
+    default_capacity = LIFT_SPECIFIC_DEFAULTS.get(lift_normalized, 100.0)
+    return (default_capacity, "default")
 
 
 # Confidence-dependent breakthrough thresholds

@@ -26,6 +26,9 @@ from app.domain.rep_engine import (
     SessionInput,
     simulate_strength_session,
 )
+
+# Sprint E2.1: Capacity lookup for production strength impulse path
+from app.services.capacity_service import get_lift_capacity_estimate, normalize_lift_type
 from app.domain.day_engine import (
     DayEngineParams,
     SetImpulse,
@@ -335,7 +338,9 @@ class EngineOrchestrator:
         
         # Compute strength impulses for day_engine
         strength_impulses = self._compute_strength_impulses(
-            lift.value, sets_data, rep_output
+            lift.value, sets_data, rep_output,
+            athlete_id=athlete_id,
+            session_date=session_date,
         )
         
         # Update day state
@@ -743,9 +748,15 @@ class EngineOrchestrator:
         self,
         lift: str,
         sets_data: List[Dict],
-        rep_output: Any
+        rep_output: Any,
+        athlete_id: Optional[int] = None,
+        session_date: Optional[date] = None,
     ) -> StrengthImpulses:
-        """Compute strength impulses from rep_engine output."""
+        """Compute strength impulses from rep_engine output.
+        
+        Sprint E2.1: Now uses athlete/lift-specific capacity lookup instead of
+        hardcoded 200kg reference for intensity calculation.
+        """
         per_lift = {lift: 0.0}
         u_sys = 0.0
         u_legs = 0.0
@@ -756,12 +767,31 @@ class EngineOrchestrator:
         # Check if this is a legs lift
         is_legs = lift in ['squat', 'deadlift', 'clean']
         
+        # Sprint E2.1: Get athlete/lift-specific capacity estimate
+        capacity_estimate = 200.0  # Fallback default
+        capacity_source = "fallback"
+        
+        if athlete_id is not None and self.db is not None:
+            try:
+                capacity_estimate, capacity_source = get_lift_capacity_estimate(
+                    db=self.db,
+                    athlete_id=athlete_id,
+                    lift=lift,
+                    query_date=session_date,
+                )
+            except Exception:
+                # On any error, use fallback (already set)
+                pass
+        
         for set_data in sets_data:
             load_kg = set_data.get("load_kg", 0)
             reps = set_data.get("reps", 0)
             
-            # Simple impulse calculation
-            intensity = min(1.0, load_kg / 200)  # Rough intensity estimate
+            # Sprint E2.1: Use capacity-based intensity with clamping
+            # intensity = load / capacity, clamped to [0.20, 1.20]
+            intensity = load_kg / max(capacity_estimate, 1.0)
+            intensity = max(0.20, min(1.20, intensity))
+            
             impulse = (load_kg * reps) * (intensity ** 1.2)
             
             per_lift[lift] += impulse
@@ -776,13 +806,14 @@ class EngineOrchestrator:
                 lift=lift,
                 tonnage=load_kg * reps,
                 intensity=intensity,
-                velocity_factor=0.9,  # Placeholder
-                vl=0.15,    # Placeholder
+                velocity_factor=0.9,  # TODO(Sprint E2.2): Replace placeholder
+                vl=0.15,    # TODO(Sprint E2.2): Replace placeholder
                 reps=reps,
                 avg_intensity_pct=intensity * 100
             ))
         
-        return StrengthImpulses(
+        # Store capacity info in internal summary for debugging
+        impulses = StrengthImpulses(
             per_lift=per_lift,
             u_sys=u_sys,
             u_legs=u_legs,
@@ -790,6 +821,12 @@ class EngineOrchestrator:
             u_legs_high_intensity=u_legs_high_intensity,
             sets=set_impulses
         )
+        
+        # Attach capacity metadata for debugging (non-breaking)
+        impulses._capacity_estimate = capacity_estimate
+        impulses._capacity_source = capacity_source
+        
+        return impulses
     
     def _compute_endurance_impulses(
         self,
