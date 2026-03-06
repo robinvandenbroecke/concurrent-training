@@ -2,7 +2,7 @@
 FastAPI application - main entry point
 """
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Security, status
@@ -289,6 +289,203 @@ def compute_performance(
     }
 
 
+# ============================================================================
+# Strava Integration Endpoints
+# ============================================================================
+
+from fastapi.responses import HTMLResponse, RedirectResponse
+from app.integrations import StravaService, StravaError, StravaAuthError
+
+
+@app.get("/integrations/strava", response_class=HTMLResponse)
+def strava_status_page(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Strava integration status page - minimal HTML UI
+    """
+    service = StravaService(db)
+    connection = service.get_connection(athlete_id)
+    
+    if not service.is_configured():
+        return HTMLResponse(content="""
+        <html>
+        <head><title>Strava Integration</title></head>
+        <body>
+            <h1>Strava Integration</h1>
+            <p style="color: red;">Strava OAuth is not configured.</p>
+            <p>Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables.</p>
+        </body>
+        </html>
+        """)
+    
+    if connection and connection.is_active:
+        # Connected state
+        html = f"""
+        <html>
+        <head><title>Strava Integration</title></head>
+        <body>
+            <h1>Strava Integration</h1>
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 5px;">
+                <h3>✅ Connected</h3>
+                <p><strong>Strava Athlete:</strong> {connection.strava_athlete_name or connection.strava_athlete_id}</p>
+                <p><strong>Connected since:</strong> {connection.created_at.strftime('%Y-%m-%d') if connection.created_at else 'Unknown'}</p>
+                <p><strong>Last sync:</strong> {connection.last_sync_at.strftime('%Y-%m-%d %H:%M') if connection.last_sync_at else 'Never'}</p>
+                <p><strong>Token expires:</strong> {datetime.fromtimestamp(connection.expires_at).strftime('%Y-%m-%d %H:%M')}</p>
+                {f'<p style="color: red;"><strong>Last error:</strong> {connection.last_sync_error}</p>' if connection.last_sync_error else ''}
+            </div>
+            <div style="margin-top: 20px;">
+                <form action="/integrations/strava/sync" method="post" style="display: inline;">
+                    <input type="hidden" name="athlete_id" value="{athlete_id}">
+                    <button type="submit">Sync Last 30 Days</button>
+                </form>
+                <form action="/integrations/strava/disconnect" method="post" style="display: inline; margin-left: 10px;">
+                    <input type="hidden" name="athlete_id" value="{athlete_id}">
+                    <button type="submit" style="background: #f44336; color: white;">Disconnect</button>
+                </form>
+            </div>
+            <div style="margin-top: 20px;">
+                <a href="/integrations/strava/login?athlete_id={athlete_id}">Reconnect / Refresh Connection</a>
+            </div>
+        </body>
+        </html>
+        """
+    else:
+        # Disconnected state
+        html = f"""
+        <html>
+        <head><title>Strava Integration</title></head>
+        <body>
+            <h1>Strava Integration</h1>
+            <div style="background: #ffebee; padding: 15px; border-radius: 5px;">
+                <h3>❌ Not Connected</h3>
+                <p>Connect your Strava account to automatically import activities.</p>
+            </div>
+            <div style="margin-top: 20px;">
+                <a href="/integrations/strava/login?athlete_id={athlete_id}">
+                    <button style="background: #fc4c02; color: white; font-size: 16px; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+                        Connect with Strava
+                    </button>
+                </a>
+            </div>
+        </body>
+        </html>
+        """
+    
+    return HTMLResponse(content=html)
+
+
+@app.get("/integrations/strava/login")
+def strava_login(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Initiate Strava OAuth flow
+    """
+    service = StravaService(db)
+    
+    if not service.is_configured():
+        raise HTTPException(status_code=503, detail="Strava OAuth not configured")
+    
+    try:
+        authorize_url = service.build_authorize_url(athlete_id)
+        return RedirectResponse(url=authorize_url)
+    except StravaError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/integrations/strava/callback")
+def strava_callback(
+    code: str = Query(..., description="Authorization code"),
+    state: str = Query(..., description="State token"),
+    scope: str = Query("", description="Granted scopes"),
+    db: Session = Depends(get_db)
+):
+    """
+    Strava OAuth callback - exchange code for tokens
+    """
+    service = StravaService(db)
+    
+    if not service.is_configured():
+        raise HTTPException(status_code=503, detail="Strava OAuth not configured")
+    
+    try:
+        # Exchange code for token
+        token_response = service.exchange_code_for_token(code)
+        
+        # Extract athlete_id from state
+        # State format: "athlete_id:timestamp:hash"
+        try:
+            athlete_id = int(state.split(":")[0])
+        except (ValueError, IndexError):
+            raise HTTPException(status_code=400, detail="Invalid state parameter")
+        
+        # Create/update connection
+        connection = service.create_or_update_connection(
+            athlete_id=athlete_id,
+            token_response=token_response,
+            accepted_scopes=scope
+        )
+        
+        # Redirect to status page
+        return RedirectResponse(url=f"/integrations/strava?athlete_id={athlete_id}")
+    
+    except StravaAuthError as e:
+        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
+    except StravaError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/integrations/strava/sync")
+def strava_sync(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    days_back: int = Query(30, ge=1, le=365, description="Days to sync"),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync Strava activities for athlete
+    """
+    service = StravaService(db)
+    
+    if not service.is_configured():
+        raise HTTPException(status_code=503, detail="Strava OAuth not configured")
+    
+    try:
+        result = service.sync_activities(athlete_id, days_back=days_back)
+        return {
+            "status": "success",
+            "athlete_id": athlete_id,
+            "imported": result["imported"],
+            "skipped": result["skipped"],
+            "errors": result["errors"],
+            "total_fetched": result["total_fetched"],
+            "synced_at": result["synced_at"]
+        }
+    except StravaAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except StravaError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/integrations/strava/disconnect")
+def strava_disconnect(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Disconnect Strava for athlete
+    """
+    service = StravaService(db)
+    
+    disconnected = service.disconnect(athlete_id)
+    if not disconnected:
+        raise HTTPException(status_code=404, detail="No Strava connection found")
+    
+    return {"status": "disconnected", "athlete_id": athlete_id}
+
+
 # Goal endpoints (Sprint 7)
 @app.post("/goals/create")
 def create_goal_endpoint(
@@ -510,6 +707,211 @@ def get_recent_sessions_endpoint(
             }
             for s in sessions["endurance"]
         ]
+    }
+
+
+# ============================================================================
+# Sprint E3: Capacity Anchor + Breakthrough System
+# ============================================================================
+
+@app.post("/capacity/initialize")
+def initialize_capacity_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    lift: LiftType = Query(..., description="Lift type"),
+    input_type: str = Query(..., description="Input type: 1rm, best_set, unknown"),
+    input_load_kg: Optional[float] = Query(None, description="Load in kg (for 1rm/best_set)"),
+    input_reps: Optional[int] = Query(None, description="Reps performed (for best_set)"),
+    input_rpe: Optional[float] = Query(None, description="RPE 6-10 (optional for best_set)"),
+    overwrite: bool = Query(False, description="Overwrite existing profile"),
+    db: Session = Depends(get_db)
+):
+    """
+    Initialize lift capacity profile from user input (onboarding).
+    
+    Input types:
+    - 1rm: Direct 1RM input (highest confidence)
+    - best_set: Recent best set with load/reps/RPE
+    - unknown: Use conservative defaults (low confidence)
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    
+    try:
+        profile = service.initialize_from_input(
+            athlete_id=athlete_id,
+            lift=lift,
+            input_type=input_type,
+            input_load_kg=input_load_kg,
+            input_reps=input_reps,
+            input_rpe=input_rpe,
+            overwrite=overwrite
+        )
+        
+        return {
+            "status": "initialized",
+            "athlete_id": athlete_id,
+            "lift": lift.value,
+            "input_type": profile.input_type,
+            "anchor_capacity": profile.anchor_capacity,
+            "model_capacity": profile.model_capacity,
+            "confidence": profile.confidence,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/capacity/{athlete_id}/{lift}")
+def get_capacity_endpoint(
+    athlete_id: int,
+    lift: LiftType,
+    db: Session = Depends(get_db)
+):
+    """
+    Get capacity profile for a specific lift.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    profile = service.get_profile(athlete_id, lift)
+    
+    if not profile:
+        raise HTTPException(status_code=404, detail="Capacity profile not found")
+    
+    return {
+        "athlete_id": athlete_id,
+        "lift": lift.value,
+        "anchor_capacity": profile.anchor_capacity,
+        "model_capacity": profile.model_capacity,
+        "confidence": profile.confidence,
+        "input_type": profile.input_type,
+        "input_load_kg": profile.input_load_kg,
+        "input_reps": profile.input_reps,
+        "input_rpe": profile.input_rpe,
+        "provisional_breakthrough_count": profile.provisional_breakthrough_count,
+        "last_confirmed_breakthrough_at": profile.last_confirmed_breakthrough_at.isoformat() if profile.last_confirmed_breakthrough_at else None,
+        "last_signal_value": profile.last_signal_value,
+        "created_at": profile.created_at.isoformat() if profile.created_at else None,
+        "updated_at": profile.updated_at.isoformat() if profile.updated_at else None
+    }
+
+
+@app.get("/capacity/{athlete_id}")
+def get_all_capacities_endpoint(
+    athlete_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all capacity profiles for an athlete.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    profiles = service.get_all_profiles(athlete_id)
+    
+    return {
+        "athlete_id": athlete_id,
+        "profiles": [
+            {
+                "lift": p.lift.value,
+                "anchor_capacity": p.anchor_capacity,
+                "model_capacity": p.model_capacity,
+                "confidence": p.confidence,
+                "input_type": p.input_type,
+                "provisional_breakthrough_count": p.provisional_breakthrough_count
+            }
+            for p in profiles
+        ]
+    }
+
+
+@app.post("/capacity/process-set")
+def process_quality_set_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    lift: LiftType = Query(..., description="Lift type"),
+    load_kg: float = Query(..., description="Load in kg"),
+    reps: int = Query(..., description="Reps performed"),
+    rpe: Optional[float] = Query(None, description="RPE 6-10 (optional)"),
+    velocity_loss: Optional[float] = Query(None, description="Velocity loss % (optional)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Process a strength set for capacity estimation.
+    
+    Evaluates set quality and detects breakthroughs.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    
+    result = service.process_quality_set(
+        athlete_id=athlete_id,
+        lift=lift,
+        load_kg=load_kg,
+        reps=reps,
+        rpe=rpe,
+        velocity_loss=velocity_loss
+    )
+    
+    return {
+        "athlete_id": athlete_id,
+        "lift": lift.value,
+        **result
+    }
+
+
+@app.post("/capacity/confirm-breakthrough")
+def confirm_breakthrough_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    lift: LiftType = Query(..., description="Lift type"),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually confirm a provisional breakthrough.
+    
+    Updates anchor_capacity to match the last signal.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    
+    result = service.confirm_provisional_breakthrough(athlete_id, lift)
+    
+    if not result:
+        raise HTTPException(status_code=400, detail="No provisional breakthrough to confirm")
+    
+    return {
+        "status": "confirmed",
+        "athlete_id": athlete_id,
+        "lift": lift.value,
+        **result
+    }
+
+
+@app.post("/capacity/reset-provisional")
+def reset_provisional_endpoint(
+    athlete_id: int = Query(..., description="Athlete ID"),
+    lift: LiftType = Query(..., description="Lift type"),
+    db: Session = Depends(get_db)
+):
+    """
+    Reset provisional breakthrough count.
+    
+    Use if athlete believes signals were due to fatigue/error.
+    """
+    from app.services.capacity_profile_service import CapacityProfileService
+    
+    service = CapacityProfileService(db)
+    success = service.reset_provisional_breakthroughs(athlete_id, lift)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Capacity profile not found")
+    
+    return {
+        "status": "reset",
+        "athlete_id": athlete_id,
+        "lift": lift.value
     }
 
 

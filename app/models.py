@@ -252,3 +252,76 @@ class Goal(Base):
     )
     
     athlete = relationship("Athlete")
+
+
+class StravaConnection(Base):
+    """Strava OAuth connection for an athlete"""
+    __tablename__ = "strava_connections"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False, unique=True)
+    
+    # Strava athlete info
+    strava_athlete_id = Column(String(50), nullable=False)
+    strava_athlete_name = Column(String(255), nullable=True)
+    
+    # OAuth tokens (stored as plaintext for now; encryption-at-rest can be added later)
+    access_token = Column(String(255), nullable=False)
+    refresh_token = Column(String(255), nullable=False)
+    expires_at = Column(Integer, nullable=False)  # Unix timestamp
+    
+    # Scopes accepted by user
+    accepted_scopes = Column(String(255), nullable=True)
+    
+    # Sync tracking
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    last_sync_error = Column(String(500), nullable=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    athlete = relationship("Athlete")
+
+
+class LiftCapacityProfile(Base):
+    """Sprint E3: Lift capacity anchor + breakthrough system
+    
+    Stores stable reference capacity (anchor) and operational capacity (model).
+    Anchor is only updated by confirmed breakthroughs; model drifts based on performance.
+    """
+    __tablename__ = "lift_capacity_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
+    lift = Column(SQLEnum(LiftType, name="lift_type"), nullable=False)
+    
+    # Input tracking (how was initial capacity determined)
+    input_type = Column(String(20), nullable=False)  # "1rm", "best_set", "unknown"
+    input_load_kg = Column(Float, nullable=True)  # Original input load
+    input_reps = Column(Integer, nullable=True)  # Original input reps
+    input_rpe = Column(Float, nullable=True)  # Original input RPE (6-10)
+    
+    # Capacity estimates
+    anchor_capacity = Column(Float, nullable=False)  # Stable reference (confirmed breakthroughs only)
+    model_capacity = Column(Float, nullable=False)  # Operational estimate (planning/intensity)
+    
+    # Confidence in capacity estimate
+    confidence = Column(String(20), nullable=False, default="low")  # "high", "medium", "low"
+    
+    # Breakthrough tracking
+    provisional_breakthrough_count = Column(Integer, default=0)  # Unconfirmed signals
+    last_provisional_at = Column(DateTime(timezone=True), nullable=True)
+    last_confirmed_breakthrough_at = Column(DateTime(timezone=True), nullable=True)
+    last_signal_value = Column(Float, nullable=True)  # Most recent performance signal (e1RM estimate)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('athlete_id', 'lift', name='uq_athlete_lift_capacity'),
+    )
+    
+    athlete = relationship("Athlete")
