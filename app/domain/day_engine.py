@@ -19,23 +19,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 import math
 from datetime import date, timedelta
-from enum import Enum
 
+# Import canonical enums from single source of truth
+from app.types import LiftType, EnduranceSport
 
-class LiftType(str, Enum):
-    """Standard lift types."""
-    SQUAT = "squat"
-    BENCH = "bench"
-    DEADLIFT = "deadlift"
-    PRESS = "press"
-    CLEAN = "clean"
-
-
-class EnduranceMode(str, Enum):
-    """Endurance activity modes."""
-    RUNNING = "running"
-    CYCLING = "cycling"
-    SWIMMING = "swimming"
+# Backwards compatibility alias - EnduranceMode is deprecated, use EnduranceSport
+EnduranceMode = EnduranceSport
 
 
 @dataclass(frozen=True)

@@ -27,8 +27,6 @@ from app.domain.rep_engine import (
     simulate_strength_session,
 )
 from app.domain.day_engine import (
-    LiftType as DayEngineLiftType,
-    EnduranceMode,
     DayEngineParams,
     SetImpulse,
     StrengthImpulses,
@@ -40,6 +38,9 @@ from app.domain.day_engine import (
     compute_readiness,
     ReadinessOutput as Readiness,
 )
+
+# Use canonical EnduranceSport (EnduranceMode is deprecated alias)
+EnduranceMode = EnduranceSport
 from app.domain.performance_engine import (
     StrengthSessionMetrics,
     EnduranceSessionMetrics,
@@ -219,12 +220,30 @@ class EngineOrchestrator:
             # Return empty performance snapshot for idempotent case
             return existing_session, existing_day_state, {"idempotent": True, "existing_session_id": existing_session.id}
 
-        # Convert to rep_engine profile
-        profile = LiftVelocityProfile(
-            lift=lift.value,
-            a=profile_db.a,
-            b=profile_db.b
-        )
+        # Convert to rep_engine profile with validation/sanitization
+        a_val = profile_db.a
+        b_val = profile_db.b
+        
+        # Fix invalid profile values
+        if b_val <= 0:
+            # b must be positive so v_ref decreases with load
+            b_val = abs(b_val) if b_val != 0 else 0.003
+        if a_val <= 0:
+            a_val = 0.55  # Default intercept
+        
+        try:
+            profile = LiftVelocityProfile(
+                lift=lift.value,
+                a=a_val,
+                b=b_val
+            )
+        except ValueError as e:
+            # Fall back to calibrated profile if validation fails
+            profile = LiftVelocityProfile.calibrated_profile(lift.value)
+            # Update DB with corrected values
+            profile_db.a = profile.a
+            profile_db.b = profile.b
+            self.db.commit()
 
         # Get current day state
         day_state = self._get_or_create_day_state(athlete_id, session_date)

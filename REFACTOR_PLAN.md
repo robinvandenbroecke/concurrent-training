@@ -1,6 +1,35 @@
 # Enum Unification Refactor Plan
 
-## Executive Summary
+## ✅ COMPLETED - Sprint E1
+
+**Status**: All enum centralization tasks completed.  
+**Date**: 2024-03-06  
+**Tests**: 10 new tests added, all 449 tests passing.
+
+### Summary of Changes
+
+- Removed duplicate `LiftType` from `app/domain/day_engine.py`
+- Removed duplicate `EnduranceMode` from `app/domain/day_engine.py` (now uses `EnduranceSport` alias)
+- Updated `app/services/engine_orchestrator.py` to use canonical enums
+- Added `CLEAN` value to `LiftType` for backwards compatibility
+- Added `OTHER` values to all enums
+- Added comprehensive regression tests in `tests/test_enum_centralization.py`
+
+### Canonical Source of Truth
+
+All enums now live in **`app/types.py`**:
+
+```python
+from app.types import LiftType, EnduranceSport, EnduranceIntensity
+```
+
+These are re-exported from:
+- `app/domain/__init__.py`
+- `app/domain/day_engine.py` (EnduranceMode = EnduranceSport for backwards compat)
+
+---
+
+## Executive Summary (Original)
 
 This document outlines a plan to eliminate duplicate enum definitions (`LiftType`, `EnduranceSport`, `EnduranceIntensity`) across the concurrent-training codebase. Currently, these enums are defined in three different locations, causing type mismatches and potential runtime errors.
 
