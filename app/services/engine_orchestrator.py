@@ -827,7 +827,7 @@ class EngineOrchestrator:
                 avg_intensity_pct=intensity * 100
             ))
         
-        # Sprint P1: Collect per-set features for debug summary
+        # Sprint P1.1: Collect per-set features for debug summary
         feature_sources = [s.velocity_factor for s in set_impulses]
         vl_values = [s.vl for s in set_impulses]
 
@@ -841,11 +841,13 @@ class EngineOrchestrator:
             sets=set_impulses
         )
 
-        # Sprint P1: Attach debug metadata (non-breaking)
+        # Sprint P1.1: Attach trace/debug metadata (non-breaking, for transparency)
         impulses._capacity_estimate = capacity_estimate
         impulses._capacity_source = capacity_source
         impulses._velocity_factors = feature_sources
         impulses._vl_values = vl_values
+        impulses._alpha_i = ALPHA_I
+        impulses._p_vl = P_VL
 
         return impulses
     

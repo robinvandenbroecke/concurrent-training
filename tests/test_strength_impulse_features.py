@@ -763,3 +763,140 @@ class TestImpulseAffectsProductionPath:
         # Impulse should still be positive and reasonable
         assert impulses.per_lift["deadlift"] > 0
         assert impulses.sets[0].vl >= 0.0  # Should be clamped or valid
+
+
+class TestDebugMetadata:
+    """Test P1.1: Debug/trace metadata is attached to impulses."""
+
+    def test_debug_metadata_attached(self, db_session, sample_athlete):
+        """Debug metadata includes feature_source, velocity_factor, vl."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "squat"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="squat",
+                a=0.55, b=0.0030
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        mock_rep = MagicMock()
+        mock_rep.y = 0.90
+        mock_set = MagicMock()
+        mock_set.VL = 0.20
+        mock_set.reps = [mock_rep, mock_rep]
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set]
+
+        impulses = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=[{"load_kg": 100, "reps": 5}],
+            rep_output=mock_session,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Check debug metadata exists
+        assert hasattr(impulses, '_capacity_estimate')
+        assert hasattr(impulses, '_capacity_source')
+        assert hasattr(impulses, '_velocity_factors')
+        assert hasattr(impulses, '_vl_values')
+        assert hasattr(impulses, '_alpha_i')
+        assert hasattr(impulses, '_p_vl')
+
+        # Verify values
+        assert impulses._alpha_i == 1.2
+        assert impulses._p_vl == 1.5
+        assert len(impulses._velocity_factors) == 1
+        assert len(impulses._vl_values) == 1
+
+    def test_feature_source_in_set_impulse(self, db_session, sample_athlete):
+        """SetImpulse contains source information via attached features."""
+        from app.services.strength_impulse_features import compute_strength_impulse_features
+
+        # Test rep_engine source
+        mock_rep = MagicMock()
+        mock_rep.y = 0.85
+        mock_set = MagicMock()
+        mock_set.VL = 0.15
+        mock_set.reps = [mock_rep]
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set]
+
+        features = compute_strength_impulse_features(
+            rep_output=mock_session,
+            set_idx=0,
+            lift="squat"
+        )
+        assert features.source == "rep_engine"
+
+        # Test derived_from_velocities source
+        features2 = compute_strength_impulse_features(
+            rep_output=None,
+            set_idx=0,
+            set_data={"load_kg": 100, "velocities": [0.22, 0.20]},
+            lift="squat"
+        )
+        assert features2.source == "derived_from_velocities"
+
+        # Test neutral_fallback source
+        features3 = compute_strength_impulse_features(
+            rep_output=None,
+            set_idx=0,
+            set_data={"velocities": []},
+            lift="squat"
+        )
+        assert features3.source == "neutral_fallback"
+
+
+class TestFeatureSourceHierarchy:
+    """Test P1.1: Feature source hierarchy is respected."""
+
+    def test_rep_engine_preferred_over_raw_velocities(self, db_session, sample_athlete):
+        """rep_engine summaries are preferred over raw velocity derivation."""
+        from app.services.strength_impulse_features import compute_strength_impulse_features
+
+        # Both rep_engine and raw velocities available
+        mock_rep = MagicMock()
+        mock_rep.y = 0.88
+        mock_set = MagicMock()
+        mock_set.VL = 0.25
+        mock_set.reps = [mock_rep, mock_rep]
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set]
+
+        # Raw velocities would give different values
+        set_data = {"load_kg": 100, "velocities": [0.30, 0.25]}  # Different from rep_engine
+
+        features = compute_strength_impulse_features(
+            rep_output=mock_session,
+            set_idx=0,
+            set_data=set_data,  # Should be ignored when rep_engine available
+            lift="squat"
+        )
+
+        # Should use rep_engine, not raw velocities
+        assert features.source == "rep_engine"
+        assert features.velocity_factor == pytest.approx(0.88, abs=0.01)
+
+    def test_raw_velocities_used_when_no_rep_engine(self, db_session, sample_athlete):
+        """Raw velocities are used when rep_engine summaries unavailable."""
+        from app.services.strength_impulse_features import compute_strength_impulse_features
+
+        features = compute_strength_impulse_features(
+            rep_output=None,
+            set_idx=0,
+            set_data={"load_kg": 100, "velocities": [0.22, 0.20]},
+            lift="squat"
+        )
+
+        assert features.source == "derived_from_velocities"
+        assert features.vl is not None
+        assert features.velocity_factor != 1.0  # Should be computed from velocities
