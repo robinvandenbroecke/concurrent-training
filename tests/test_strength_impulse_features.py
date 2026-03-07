@@ -376,3 +376,122 @@ class TestVelocityFactorNotPlaceholder:
 
         doc = inspect.getdoc(compute_strength_impulse_features)
         assert "placeholder" in doc.lower() or "Sprint P1" in doc
+
+
+class TestRealVelocitiesChangeImpulse:
+    """Test that same load/reps with different velocity data produces different impulses."""
+
+    def test_better_velocity_data_alters_impulse(self, db_session, sample_athlete):
+        """Same load/reps but better velocity -> different impulse characteristics."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        # Ensure profile exists
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "squat"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="squat",
+                a=0.55,
+                b=0.0030,
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+        sets_data = [{"load_kg": 100, "reps": 5}]
+
+        # Case 1: Good velocity data (fast, minimal fatigue)
+        mock_rep_good = MagicMock()
+        mock_rep_good.y = 1.0  # At reference velocity
+        mock_set_good = MagicMock()
+        mock_set_good.VL = 0.10  # Low velocity loss
+        mock_set_good.reps = [mock_rep_good, mock_rep_good]
+        mock_session_good = MagicMock()
+        mock_session_good.sets = [mock_set_good]
+
+        impulses_good = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=sets_data,
+            rep_output=mock_session_good,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Case 2: Poor velocity data (slow, high fatigue)
+        mock_rep_poor = MagicMock()
+        mock_rep_poor.y = 0.70  # Below reference velocity
+        mock_set_poor = MagicMock()
+        mock_set_poor.VL = 0.40  # High velocity loss
+        mock_set_poor.reps = [mock_rep_poor, mock_rep_poor]
+        mock_session_poor = MagicMock()
+        mock_session_poor.sets = [mock_set_poor]
+
+        impulses_poor = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=sets_data,
+            rep_output=mock_session_poor,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Both should have same intensity (based on load/capacity)
+        assert impulses_good.sets[0].intensity == impulses_poor.sets[0].intensity
+
+        # But velocity_factor and vl should differ
+        assert impulses_good.sets[0].velocity_factor > impulses_poor.sets[0].velocity_factor
+        assert impulses_good.sets[0].vl < impulses_poor.sets[0].vl
+
+    def test_real_velocities_vs_fallback_produce_different_features(self, db_session, sample_athlete):
+        """Real velocities produce different features than neutral fallback."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "bench"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="bench",
+                a=0.60,
+                b=0.0028,
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+        sets_data = [{"load_kg": 80, "reps": 5}]
+
+        # Case 1: With real rep_engine data
+        mock_rep = MagicMock()
+        mock_rep.y = 0.90
+        mock_set = MagicMock()
+        mock_set.VL = 0.25
+        mock_set.reps = [mock_rep, mock_rep]
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set]
+
+        impulses_real = orchestrator._compute_strength_impulses(
+            lift="bench",
+            sets_data=sets_data,
+            rep_output=mock_session,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Case 2: Without rep_engine (neutral fallback)
+        impulses_fallback = orchestrator._compute_strength_impulses(
+            lift="bench",
+            sets_data=sets_data,
+            rep_output=None,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Neutral fallback should have velocity_factor = 1.0
+        assert impulses_fallback.sets[0].velocity_factor == pytest.approx(1.0, abs=0.001)
+
+        # Real data should have different values
+        assert impulses_real.sets[0].velocity_factor != pytest.approx(1.0, abs=0.01) or \
+               impulses_real.sets[0].vl != pytest.approx(0.0, abs=0.01)

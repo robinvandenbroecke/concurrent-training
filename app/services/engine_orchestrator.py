@@ -817,6 +817,10 @@ class EngineOrchestrator:
                 avg_intensity_pct=intensity * 100
             ))
         
+        # Sprint P1: Collect per-set features for debug summary
+        feature_sources = [s.velocity_factor for s in set_impulses]
+        vl_values = [s.vl for s in set_impulses]
+
         # Store capacity info in internal summary for debugging
         impulses = StrengthImpulses(
             per_lift=per_lift,
@@ -826,11 +830,13 @@ class EngineOrchestrator:
             u_legs_high_intensity=u_legs_high_intensity,
             sets=set_impulses
         )
-        
-        # Attach capacity metadata for debugging (non-breaking)
+
+        # Sprint P1: Attach debug metadata (non-breaking)
         impulses._capacity_estimate = capacity_estimate
         impulses._capacity_source = capacity_source
-        
+        impulses._velocity_factors = feature_sources
+        impulses._vl_values = vl_values
+
         return impulses
     
     def _compute_endurance_impulses(
