@@ -1,16 +1,45 @@
 {
   "model_vs_baselines": {
     "rep_level": {
-      "model_rmse": null,
-      "baseline_velocity_threshold_rmse": null,
-      "baseline_banister_rmse": null
+      "model_rmse": 0.17086,
+      "model_mae": 0.144236,
+      "n_samples": 735
     },
     "day_level": {
-      "model_rmse": null,
-      "baseline_velocity_threshold_rmse": null,
-      "baseline_banister_rmse": null
+      "model_mae": 1.059508,
+      "baseline_velocity_threshold_mae": 0.88549,
+      "baseline_banister_mae": 0.956474,
+      "n_samples": 34
     }
   },
-  "notes": "Baseline comparison requires explicit baseline runs. See replay artifacts for baseline logs.",
-  "baselines_available": true
+  "per_lift_rep_metrics": {
+    "power_clean": {
+      "rmse": 0.20728680982017098,
+      "mae": 0.1715372881355932,
+      "n": 118
+    },
+    "bench": {
+      "rmse": 0.17770109333211365,
+      "mae": 0.15982040816326532,
+      "n": 98
+    },
+    "deadlift": {
+      "rmse": 0.1290676706788258,
+      "mae": 0.11166987951807228,
+      "n": 83
+    },
+    "press": {
+      "rmse": 0.17962638026565522,
+      "mae": 0.1563756329113924,
+      "n": 316
+    },
+    "squat": {
+      "rmse": 0.11952335476103962,
+      "mae": 0.09523666666666666,
+      "n": 120
+    }
+  },
+  "trend_classification": {},
+  "endurance": {},
+  "notes": "V2 dataset intentionally harder than V1 with model-mismatch, nonlinearity, noise, and asymmetric bad days."
 }

@@ -1,0 +1,1 @@
+{"day_metrics":{"mae_baseline_a":0.88549,"mae_baseline_b":0.956474,"mae_model":1.059508},"n_day_errors":34,"n_rep_errors":735,"rep_metrics":{"mae":0.144236,"n_samples":735,"rmse":0.17086}}

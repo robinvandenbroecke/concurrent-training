@@ -13,25 +13,34 @@
       "missing_rest_pct": 13.597733711048159,
       "missing_rpe_pct": 7.932011331444759,
       "lifts": [
+        "deadlift",
         "bench",
         "power_clean",
-        "press",
         "squat",
-        "deadlift"
+        "press"
       ]
     },
     "endurance": {
       "total_sessions": 44,
       "sports": [
-        "cycling",
         "swimming",
+        "cycling",
         "running"
       ]
     }
   },
   "metrics": {
-    "rep_level": {},
-    "day_level": {},
+    "rep_level": {
+      "rmse": 0.17086,
+      "mae": 0.144236,
+      "n_samples": 735
+    },
+    "day_level": {
+      "mae_model": 1.059508,
+      "mae_baseline_a": 0.88549,
+      "mae_baseline_b": 0.956474,
+      "n_samples": 34
+    },
     "trend_classification": {},
     "endurance": {}
   },

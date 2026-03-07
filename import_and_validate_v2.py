@@ -159,7 +159,10 @@ def run_replay_and_validate(db, athlete_id: int = 299):
         dry_run=False
     )
     
-    # Extract metrics
+    # Write artifacts
+    runner.write_artifacts("synth_v2_run")
+    
+    # Extract metrics from ValidationReport
     metrics = {
         'rep_level': {},
         'day_level': {},
@@ -167,35 +170,36 @@ def run_replay_and_validate(db, athlete_id: int = 299):
         'endurance': {},
     }
     
-    if hasattr(report, 'strength_rep') and report.strength_rep:
+    # Rep-level metrics
+    if report.rep_level_rmse is not None:
         metrics['rep_level'] = {
-            'rmse': report.strength_rep.get('rmse'),
-            'mae': report.strength_rep.get('mae'),
-            'r2': report.strength_rep.get('r2'),
-            'n_samples': report.strength_rep.get('n', 0),
+            'rmse': report.rep_level_rmse,
+            'mae': report.rep_level_mae,
+            'n_samples': len(runner.rep_errors) if runner.rep_errors else 0,
         }
     
-    if hasattr(report, 'strength_day') and report.strength_day:
+    # Day-level metrics (includes baseline comparisons)
+    if report.day_level_mae_model is not None:
         metrics['day_level'] = {
-            'rmse': report.strength_day.get('rmse'),
-            'mae': report.strength_day.get('mae'),
-            'r2': report.strength_day.get('r2'),
-            'n_samples': report.strength_day.get('n', 0),
+            'mae_model': report.day_level_mae_model,
+            'mae_baseline_a': report.day_level_mae_baseline_a,
+            'mae_baseline_b': report.day_level_mae_baseline_b,
+            'n_samples': len(runner.day_errors) if runner.day_errors else 0,
         }
     
-    if hasattr(report, 'trend_metrics') and report.trend_metrics:
+    # Trend classification
+    if report.trend_accuracy_model is not None:
         metrics['trend_classification'] = {
-            'accuracy': report.trend_metrics.get('accuracy'),
-            'precision': report.trend_metrics.get('precision'),
-            'recall': report.trend_metrics.get('recall'),
-            'f1': report.trend_metrics.get('f1'),
+            'accuracy_model': report.trend_accuracy_model,
+            'accuracy_baseline_a': report.trend_accuracy_baseline_a,
+            'accuracy_baseline_b': report.trend_accuracy_baseline_b,
         }
     
-    if hasattr(report, 'endurance_metrics') and report.endurance_metrics:
+    # Endurance
+    if report.endurance_accuracy_model is not None:
         metrics['endurance'] = {
-            'accuracy': report.endurance_metrics.get('accuracy'),
-            'precision': report.endurance_metrics.get('precision'),
-            'recall': report.endurance_metrics.get('recall'),
+            'accuracy_model': report.endurance_accuracy_model,
+            'accuracy_baseline': report.endurance_accuracy_baseline,
         }
     
     return metrics, report, runner
@@ -251,27 +255,30 @@ def generate_summary_json(data_quality, metrics, per_lift_metrics, output_path: 
     return summary
 
 
-def generate_baseline_comparison(runner, output_path: str):
+def generate_baseline_comparison(metrics, per_lift_metrics, output_path: str):
     """Generate baseline_comparison.json."""
+    dl = metrics.get('day_level', {})
+    rl = metrics.get('rep_level', {})
+    
     comparison = {
         'model_vs_baselines': {
             'rep_level': {
-                'model_rmse': None,
-                'baseline_velocity_threshold_rmse': None,
-                'baseline_banister_rmse': None,
+                'model_rmse': rl.get('rmse'),
+                'model_mae': rl.get('mae'),
+                'n_samples': rl.get('n_samples'),
             },
             'day_level': {
-                'model_rmse': None,
-                'baseline_velocity_threshold_rmse': None,
-                'baseline_banister_rmse': None,
+                'model_mae': dl.get('mae_model'),
+                'baseline_velocity_threshold_mae': dl.get('mae_baseline_a'),
+                'baseline_banister_mae': dl.get('mae_baseline_b'),
+                'n_samples': dl.get('n_samples'),
             }
         },
-        'notes': 'Baseline comparison requires explicit baseline runs. See replay artifacts for baseline logs.'
+        'per_lift_rep_metrics': per_lift_metrics,
+        'trend_classification': metrics.get('trend_classification', {}),
+        'endurance': metrics.get('endurance', {}),
+        'notes': 'V2 dataset intentionally harder than V1 with model-mismatch, nonlinearity, noise, and asymmetric bad days.'
     }
-    
-    # Try to extract baseline metrics if available
-    if hasattr(runner, 'baseline_a') and runner.baseline_a:
-        comparison['baselines_available'] = True
     
     with open(output_path, 'w') as f:
         json.dump(comparison, f, indent=2)
@@ -313,21 +320,25 @@ def print_per_lift_metrics(per_lift):
 def print_model_vs_baselines(metrics):
     """Print day-level model vs baselines comparison."""
     print("\n" + "=" * 60)
-    print("DAY-LEVEL MODEL PERFORMANCE")
+    print("DAY-LEVEL MODEL vs BASELINES")
     print("=" * 60)
     
     dl = metrics.get('day_level', {})
-    print(f"  RMSE: {dl.get('rmse', 'N/A')}")
-    print(f"  MAE: {dl.get('mae', 'N/A')}")
-    print(f"  R²: {dl.get('r2', 'N/A')}")
+    print(f"  Model MAE: {dl.get('mae_model', 'N/A')}")
+    print(f"  Baseline A (Velocity Threshold) MAE: {dl.get('mae_baseline_a', 'N/A')}")
+    print(f"  Baseline B (Banister) MAE: {dl.get('mae_baseline_b', 'N/A')}")
     print(f"  N samples: {dl.get('n_samples', 'N/A')}")
     
     print("\nTrend Classification:")
     tc = metrics.get('trend_classification', {})
-    print(f"  Accuracy: {tc.get('accuracy', 'N/A')}")
-    print(f"  Precision: {tc.get('precision', 'N/A')}")
-    print(f"  Recall: {tc.get('recall', 'N/A')}")
-    print(f"  F1: {tc.get('f1', 'N/A')}")
+    print(f"  Model Accuracy: {tc.get('accuracy_model', 'N/A')}")
+    print(f"  Baseline A Accuracy: {tc.get('accuracy_baseline_a', 'N/A')}")
+    print(f"  Baseline B Accuracy: {tc.get('accuracy_baseline_b', 'N/A')}")
+    
+    print("\nEndurance Classification:")
+    e = metrics.get('endurance', {})
+    print(f"  Model Accuracy: {e.get('accuracy_model', 'N/A')}")
+    print(f"  Baseline Accuracy: {e.get('accuracy_baseline', 'N/A')}")
 
 
 def print_v2_harder_than_v1_notes():
@@ -404,7 +415,7 @@ def main():
         )
         
         baseline_comparison = generate_baseline_comparison(
-            runner,
+            metrics, per_lift,
             './artifacts/synth_v2_run/baseline_comparison.json'
         )
         
