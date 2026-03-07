@@ -29,7 +29,7 @@ from app.domain.rep_engine import (
 
 # Sprint E2.1: Capacity lookup for production strength impulse path
 from app.services.capacity_service import get_lift_capacity_estimate, normalize_lift_type
-from app.services.strength_impulse_features import compute_strength_impulse_features
+from app.services.strength_impulse_features import compute_strength_impulse_features, compute_metabolic_impulse
 from app.domain.day_engine import (
     DayEngineParams,
     SetImpulse,
@@ -780,13 +780,14 @@ class EngineOrchestrator:
             query_date=session_date,
         )
         
-        # Sprint P1.1: Constants for impulse computation
+        # Sprint P1.1/P2: Constants for impulse computation
         ALPHA_I = 1.2  # Intensity exponent
         P_VL = 1.5     # VL penalty factor
 
         for set_idx, set_data in enumerate(sets_data):
             load_kg = set_data.get("load_kg", 0)
             reps = set_data.get("reps", 0)
+            rest_sec = set_data.get("rest_sec")  # Sprint P2: rest before set
 
             # Sprint E2.1: Use capacity-based intensity with clamping
             # intensity = load / capacity, clamped to [0.20, 1.20]
@@ -809,8 +810,18 @@ class EngineOrchestrator:
 
             set_impulse = tonnage * intensity_term * velocity_term * vl_term
 
+            # Sprint P2: Compute metabolic impulse based on set features
+            set_metabolic = compute_metabolic_impulse(
+                load_kg=load_kg,
+                reps=reps,
+                rest_sec=rest_sec,
+                vl=features.vl if features.vl is not None else 0.0,
+                intensity=intensity,
+            )
+
             per_lift[lift] += set_impulse
             u_sys += set_impulse * (1.3 if is_legs else 0.7)
+            u_met += set_metabolic  # Sprint P2: Accumulate metabolic impulse
 
             if is_legs:
                 u_legs += set_impulse
@@ -841,13 +852,14 @@ class EngineOrchestrator:
             sets=set_impulses
         )
 
-        # Sprint P1.1: Attach trace/debug metadata (non-breaking, for transparency)
+        # Sprint P1.1/P2: Attach trace/debug metadata (non-breaking, for transparency)
         impulses._capacity_estimate = capacity_estimate
         impulses._capacity_source = capacity_source
         impulses._velocity_factors = feature_sources
         impulses._vl_values = vl_values
         impulses._alpha_i = ALPHA_I
         impulses._p_vl = P_VL
+        impulses._u_met = u_met  # Sprint P2: Expose metabolic impulse for debugging
 
         return impulses
     

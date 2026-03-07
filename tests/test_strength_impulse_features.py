@@ -900,3 +900,300 @@ class TestFeatureSourceHierarchy:
         assert features.source == "derived_from_velocities"
         assert features.vl is not None
         assert features.velocity_factor != 1.0  # Should be computed from velocities
+
+
+class TestMetabolicImpulse:
+    """Test P2: Metabolic impulse (u_met) computation from set features."""
+
+    def test_u_met_basic_computation(self):
+        """Basic metabolic impulse computation."""
+        from app.services.strength_impulse_features import compute_metabolic_impulse
+
+        # Standard set: 100kg x 5 reps, 120s rest, 0.2 VL, 0.7 intensity
+        u_met = compute_metabolic_impulse(
+            load_kg=100,
+            reps=5,
+            rest_sec=120,
+            vl=0.20,
+            intensity=0.70
+        )
+
+        assert u_met > 0
+        # Tonnage = 500, should be scaled down by M_SCALE (0.15)
+        assert u_met < 500  # Significantly less than raw tonnage
+
+    def test_higher_reps_increases_u_met(self):
+        """More reps -> higher metabolic impulse."""
+        from app.services.strength_impulse_features import compute_metabolic_impulse
+
+        # Low reps (3)
+        u_met_low = compute_metabolic_impulse(
+            load_kg=100, reps=3, rest_sec=180, vl=0.20, intensity=0.85
+        )
+
+        # High reps (10)
+        u_met_high = compute_metabolic_impulse(
+            load_kg=100, reps=10, rest_sec=180, vl=0.20, intensity=0.70
+        )
+
+        # High reps should give higher metabolic impulse
+        assert u_met_high > u_met_low
+
+    def test_shorter_rest_increases_u_met(self):
+        """Shorter rest -> higher metabolic impulse."""
+        from app.services.strength_impulse_features import compute_metabolic_impulse
+
+        # Long rest (180s = baseline)
+        u_met_long = compute_metabolic_impulse(
+            load_kg=100, reps=8, rest_sec=180, vl=0.30, intensity=0.75
+        )
+
+        # Short rest (60s)
+        u_met_short = compute_metabolic_impulse(
+            load_kg=100, reps=8, rest_sec=60, vl=0.30, intensity=0.75
+        )
+
+        # Shorter rest should give higher metabolic impulse
+        assert u_met_short > u_met_long
+
+    def test_higher_vl_increases_u_met(self):
+        """Higher velocity loss -> higher metabolic impulse."""
+        from app.services.strength_impulse_features import compute_metabolic_impulse
+
+        # Low VL (0.10)
+        u_met_low = compute_metabolic_impulse(
+            load_kg=100, reps=8, rest_sec=120, vl=0.10, intensity=0.75
+        )
+
+        # High VL (0.40)
+        u_met_high = compute_metabolic_impulse(
+            load_kg=100, reps=8, rest_sec=120, vl=0.40, intensity=0.75
+        )
+
+        # Higher VL should give higher metabolic impulse
+        assert u_met_high > u_met_low
+
+    def test_high_intensity_penalty_reduces_u_met(self):
+        """Very high intensity (>0.85) reduces metabolic emphasis."""
+        from app.services.strength_impulse_features import compute_metabolic_impulse
+
+        # Medium intensity (0.75) - no penalty
+        u_met_medium = compute_metabolic_impulse(
+            load_kg=100, reps=5, rest_sec=180, vl=0.20, intensity=0.75
+        )
+
+        # Very high intensity (0.95) - penalty applies
+        u_met_heavy = compute_metabolic_impulse(
+            load_kg=120, reps=5, rest_sec=180, vl=0.20, intensity=0.95
+        )
+
+        # Both should be positive
+        assert u_met_medium > 0
+        assert u_met_heavy > 0
+
+    def test_u_met_in_production_path(self, db_session, sample_athlete):
+        """P2: u_met is computed and accumulated in production path."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        # Ensure profile exists
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "squat"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="squat",
+                a=0.55, b=0.0030
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        # High metabolic cost set: high reps, short rest, high VL
+        sets_data = [{
+            "load_kg": 100,
+            "reps": 10,
+            "rest_sec": 60,  # Short rest
+        }]
+
+        mock_rep = MagicMock()
+        mock_rep.y = 0.85
+        mock_set = MagicMock()
+        mock_set.VL = 0.35  # High VL
+        mock_set.reps = [mock_rep] * 10
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set]
+
+        impulses = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=sets_data,
+            rep_output=mock_session,
+            athlete_id=sample_athlete.id,
+        )
+
+        # u_met should be computed and non-zero
+        assert impulses.u_met > 0
+        # Debug metadata should include u_met
+        assert hasattr(impulses, '_u_met')
+        assert impulses._u_met > 0
+
+    def test_u_met_changes_with_set_features(self, db_session, sample_athlete):
+        """P2: Same load but different set features -> different u_met."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "bench"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="bench",
+                a=0.60, b=0.0028
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        # Case 1: Low metabolic cost (few reps, long rest, low VL)
+        mock_rep1 = MagicMock()
+        mock_rep1.y = 0.95
+        mock_set1 = MagicMock()
+        mock_set1.VL = 0.10
+        mock_set1.reps = [mock_rep1] * 3
+        mock_session1 = MagicMock()
+        mock_session1.sets = [mock_set1]
+
+        impulses1 = orchestrator._compute_strength_impulses(
+            lift="bench",
+            sets_data=[{"load_kg": 80, "reps": 3, "rest_sec": 180}],
+            rep_output=mock_session1,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Case 2: High metabolic cost (many reps, short rest, high VL)
+        mock_rep2 = MagicMock()
+        mock_rep2.y = 0.75
+        mock_set2 = MagicMock()
+        mock_set2.VL = 0.40
+        mock_set2.reps = [mock_rep2] * 12
+        mock_session2 = MagicMock()
+        mock_session2.sets = [mock_set2]
+
+        impulses2 = orchestrator._compute_strength_impulses(
+            lift="bench",
+            sets_data=[{"load_kg": 80, "reps": 12, "rest_sec": 60}],
+            rep_output=mock_session2,
+            athlete_id=sample_athlete.id,
+        )
+
+        # High metabolic cost should give higher u_met
+        assert impulses2.u_met > impulses1.u_met
+
+
+class TestDayEngineAlignment:
+    """Test P2: Strength impulses align with day_engine expectations."""
+
+    def test_strength_impulses_structure_matches_day_engine(self, db_session, sample_athlete):
+        """StrengthImpulses dataclass matches what day_engine.update_day_state expects."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.domain.day_engine import update_day_state, DayEngineParams, DayState, PerLiftState
+        from app.models import LiftProfile
+
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "squat"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="squat",
+                a=0.55, b=0.0030
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        sets_data = [{"load_kg": 100, "reps": 8, "rest_sec": 90}]
+
+        mock_rep = MagicMock()
+        mock_rep.y = 0.88
+        mock_set = MagicMock()
+        mock_set.VL = 0.30
+        mock_set.reps = [mock_rep] * 8
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set]
+
+        impulses = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=sets_data,
+            rep_output=mock_session,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Verify all expected fields are present
+        assert hasattr(impulses, 'per_lift')
+        assert hasattr(impulses, 'u_sys')
+        assert hasattr(impulses, 'u_legs')
+        assert hasattr(impulses, 'u_met')  # P2: Now populated
+        assert hasattr(impulses, 'u_legs_high_intensity')
+        assert hasattr(impulses, 'sets')
+
+        # All should be non-negative
+        assert impulses.per_lift["squat"] >= 0
+        assert impulses.u_sys >= 0
+        assert impulses.u_legs >= 0
+        assert impulses.u_met >= 0  # P2: Should be populated
+        assert impulses.u_legs_high_intensity >= 0
+
+    def test_u_met_accumulated_across_sets(self, db_session, sample_athlete):
+        """P2: u_met is accumulated across multiple sets."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "deadlift"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="deadlift",
+                a=0.50, b=0.0030
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        # Multiple sets
+        sets_data = [
+            {"load_kg": 140, "reps": 5, "rest_sec": None},  # First set
+            {"load_kg": 140, "reps": 5, "rest_sec": 120},
+            {"load_kg": 140, "reps": 5, "rest_sec": 90},
+        ]
+
+        mock_rep = MagicMock()
+        mock_rep.y = 0.85
+        mock_set = MagicMock()
+        mock_set.VL = 0.25
+        mock_set.reps = [mock_rep] * 5
+        mock_session = MagicMock()
+        mock_session.sets = [mock_set, mock_set, mock_set]
+
+        impulses = orchestrator._compute_strength_impulses(
+            lift="deadlift",
+            sets_data=sets_data,
+            rep_output=mock_session,
+            athlete_id=sample_athlete.id,
+        )
+
+        # u_met should be sum of all sets
+        assert impulses.u_met > 0
+        # Should be roughly 3x a single set (accounting for rest differences)

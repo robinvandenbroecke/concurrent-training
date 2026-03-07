@@ -1,13 +1,23 @@
 """
-Sprint P1: Strength impulse feature computation from rep_engine outputs.
+Sprint P1/P2: Strength impulse feature computation from rep_engine outputs.
 
 Replaces placeholder velocity_factor and vl with real rep_engine-derived values.
+Adds metabolic impulse (u_met) computation aligned with day_engine expectations.
 """
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 import statistics
 
 from app.domain.rep_engine import LiftVelocityProfile
+
+
+# Sprint P2: Metabolic impulse constants
+K_REP = 0.10      # Reps density factor
+K_REST = 0.50     # Rest factor (shorter rest = higher metabolic cost)
+K_VL_MET = 1.5    # VL metabolic factor
+K_INT = 0.30      # Intensity penalty factor (heavy low-rep = less metabolic)
+M_SCALE = 0.15    # Metabolic scaling factor
+INTENSITY_PENALTY_MIN = 0.6  # Floor for intensity penalty
 
 
 @dataclass
@@ -255,3 +265,58 @@ def compute_strength_impulse_features(
         vl=0.0,
         source="neutral_fallback"
     )
+
+
+def compute_metabolic_impulse(
+    load_kg: float,
+    reps: int,
+    rest_sec: Optional[float],
+    vl: float,
+    intensity: float,
+) -> float:
+    """
+    Sprint P2: Compute metabolic impulse (u_met) for a strength set.
+
+    Formula:
+    - tonnage = load_kg * reps
+    - rep_density_factor = 1 + K_REP * max(0, reps - 3)
+    - rest_factor = 1 + K_REST * max(0, (180 - rest_sec) / 180)
+    - vl_factor = 1 + K_VL_MET * vl
+    - intensity_penalty = max(INTENSITY_PENALTY_MIN, 1 - K_INT * max(0, intensity - 0.85))
+    - set_metabolic_impulse = tonnage * rep_density_factor * rest_factor * vl_factor * intensity_penalty * M_SCALE
+
+    Interpretation:
+    - More reps -> higher metabolic cost
+    - Shorter rest (<180s) -> higher metabolic cost
+    - Higher VL -> higher metabolic cost
+    - Very heavy low-rep work (>85% intensity) -> relatively less metabolic emphasis
+
+    Args:
+        load_kg: Load in kg
+        reps: Number of reps
+        rest_sec: Rest before this set in seconds (None for first set)
+        vl: Velocity loss (0.0-1.0)
+        intensity: Relative intensity (load/capacity, 0.0-1.0)
+
+    Returns:
+        Metabolic impulse contribution for this set
+    """
+    tonnage = load_kg * reps
+
+    # Reps density factor: more reps = more metabolic
+    rep_density_factor = 1.0 + K_REP * max(0, reps - 3)
+
+    # Rest factor: shorter rest = more metabolic (default 180s if None/first set)
+    rest_sec = rest_sec if rest_sec is not None else 180.0
+    rest_factor = 1.0 + K_REST * max(0.0, (180.0 - rest_sec) / 180.0)
+
+    # VL factor: higher fatigue = more metabolic
+    vl_factor = 1.0 + K_VL_MET * vl
+
+    # Intensity penalty: very heavy low-rep = less metabolic emphasis
+    intensity_penalty = max(
+        INTENSITY_PENALTY_MIN,
+        1.0 - K_INT * max(0.0, intensity - 0.85)
+    )
+
+    return tonnage * rep_density_factor * rest_factor * vl_factor * intensity_penalty * M_SCALE
