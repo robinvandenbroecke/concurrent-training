@@ -29,6 +29,7 @@ from app.domain.rep_engine import (
 
 # Sprint E2.1: Capacity lookup for production strength impulse path
 from app.services.capacity_service import get_lift_capacity_estimate, normalize_lift_type
+from app.services.strength_impulse_features import compute_strength_impulse_features
 from app.domain.day_engine import (
     DayEngineParams,
     SetImpulse,
@@ -753,9 +754,12 @@ class EngineOrchestrator:
         session_date: Optional[date] = None,
     ) -> StrengthImpulses:
         """Compute strength impulses from rep_engine output.
-        
+
         Sprint E2.2: Uses athlete/lift-specific capacity lookup with full hierarchy.
         NEVER falls back to universal 200kg - always uses lift-specific default.
+
+        Sprint P1: Uses real rep_engine-derived velocity_factor and vl.
+        Replaces placeholder values (0.9, 0.15) with actual y and VL from rep_output.
         """
         per_lift = {lift: 0.0}
         u_sys = 0.0
@@ -776,31 +780,39 @@ class EngineOrchestrator:
             query_date=session_date,
         )
         
-        for set_data in sets_data:
+        for set_idx, set_data in enumerate(sets_data):
             load_kg = set_data.get("load_kg", 0)
             reps = set_data.get("reps", 0)
-            
+
             # Sprint E2.1: Use capacity-based intensity with clamping
             # intensity = load / capacity, clamped to [0.20, 1.20]
             intensity = load_kg / max(capacity_estimate, 1.0)
             intensity = max(0.20, min(1.20, intensity))
-            
+
             impulse = (load_kg * reps) * (intensity ** 1.2)
-            
+
             per_lift[lift] += impulse
             u_sys += impulse * (1.3 if is_legs else 0.7)
-            
+
             if is_legs:
                 u_legs += impulse
                 if intensity > 0.85:
                     u_legs_high_intensity += impulse * 0.5
-            
+
+            # Sprint P1: Compute real velocity_factor and vl from rep_engine output
+            features = compute_strength_impulse_features(
+                rep_output=rep_output,
+                set_idx=set_idx,
+                set_data=set_data,
+                lift=lift,
+            )
+
             set_impulses.append(SetImpulse(
                 lift=lift,
                 tonnage=load_kg * reps,
                 intensity=intensity,
-                velocity_factor=0.9,  # TODO(Sprint E2.2): Replace placeholder
-                vl=0.15,    # TODO(Sprint E2.2): Replace placeholder
+                velocity_factor=features.velocity_factor,
+                vl=features.vl if features.vl is not None else 0.0,
                 reps=reps,
                 avg_intensity_pct=intensity * 100
             ))

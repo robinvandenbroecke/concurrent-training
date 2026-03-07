@@ -336,17 +336,20 @@ class TestEngineOrchestratorIntegration:
         assert impulses.sets[0].intensity == pytest.approx(1.20, abs=0.01)
     
     def test_placeholder_comments_present(self, db_session, sample_athlete):
-        """Placeholder TODO comments are present for velocity_factor and vl."""
+        """Sprint P1: Placeholders replaced with real rep_engine-derived values."""
         from app.services.engine_orchestrator import EngineOrchestrator
+        from app.services.strength_impulse_features import compute_strength_impulse_features
         import inspect
-        
-        # Check source code for TODO comments
+
+        # Check source code - should now use real feature computation
         source = inspect.getsource(EngineOrchestrator._compute_strength_impulses)
-        
-        # Should contain TODO for Sprint E2.2
-        assert "TODO(Sprint E2.2)" in source
-        assert "velocity_factor" in source
-        assert "vl" in source
+
+        # Sprint P1: Real implementation in place
+        assert "compute_strength_impulse_features" in source
+        assert "Sprint P1" in source or "velocity_factor" in source
+
+        # Verify the helper module exists and is imported
+        assert compute_strength_impulse_features is not None
 
 
 class TestCapacityLookupHierarchyE22:
