@@ -1,0 +1,61 @@
+{
+  "comparison": {
+    "legacy_mapping": {
+      "mae": 1.0819,
+      "description": "Original hand-tuned readiness-based mapping"
+    },
+    "default_constrained": {
+      "mae": 1.1833,
+      "description": "Constrained mapping with default params",
+      "params": {
+        "a": 0.6,
+        "b_l": 0.25,
+        "b_sys": 0.15,
+        "b_t": 0.1,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    "calibrated_constrained": {
+      "mae": 0.8211,
+      "description": "Constrained mapping with calibrated params",
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6428571428571428,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    }
+  },
+  "per_lift_mae": {
+    "legacy": {
+      "press": 1.4408,
+      "bench": 0.8154,
+      "deadlift": 1.1479,
+      "power_clean": 1.1748,
+      "squat": 0.3184
+    },
+    "default_constrained": {
+      "press": 1.5252,
+      "bench": 0.8767,
+      "deadlift": 1.2979,
+      "power_clean": 1.2713,
+      "squat": 0.4684
+    },
+    "calibrated_constrained": {
+      "press": 1.1056,
+      "bench": 0.5917,
+      "deadlift": 0.9394,
+      "power_clean": 0.9205,
+      "squat": 0.0684
+    }
+  },
+  "improvement": {
+    "legacy_to_calibrated": 0.2608,
+    "legacy_to_calibrated_pct": 24.1
+  }
+}

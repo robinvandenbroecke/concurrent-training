@@ -19,8 +19,12 @@ from app.eval.validation import (
     compute_day_level_strength_metrics,
     compute_trend_classification_metrics,
     compute_endurance_classification_metrics,
-    predict_perf_y_from_readiness,
     ValidationReport,
+)
+from app.domain.observation_mapping import (
+    predict_perf_y_constrained,
+    predict_perf_y_from_readiness_legacy,
+    ObservationMappingParams,
 )
 from app.eval.baselines import BaselineVelocityThreshold, BaselineBanister, BaselineEndurance
 from app.services.engine_orchestrator import EngineOrchestrator
@@ -130,13 +134,35 @@ class ReplayRunner:
         # Get predictions BEFORE applying
         day_state = self.orchestrator.get_day_state_snapshot(athlete_id, session_date)
         
-        # Model prediction
+        # Model predictions (multiple modes for comparison)
+        pred_perf_y_legacy = 0.85  # Default
+        pred_perf_y_constrained = 0.85  # Default
+        
         if day_state:
             lift_state = day_state.per_lift.get(lift.value, PerLiftState())
+            
+            # LEGACY: Simple readiness-based prediction
             readiness_model = self._compute_readiness_from_state(lift_state, day_state)
-            pred_perf_y_model = predict_perf_y_from_readiness(readiness_model)
+            pred_perf_y_legacy = predict_perf_y_from_readiness_legacy(readiness_model)
+            
+            # CONSTRAINED: New mapping using internal states
+            D_l = getattr(lift_state, 'D_l', 0.0)
+            D_sys = day_state.D_sys
+            T_legs = getattr(day_state, 'T_legs', 0.0)
+            
+            pred_perf_y_constrained = predict_perf_y_constrained(
+                D_l=D_l,
+                D_sys=D_sys,
+                T_legs=T_legs,
+                lift=lift.value
+            )
+            
+            # Use constrained as primary model prediction
+            pred_perf_y_model = pred_perf_y_constrained
         else:
             pred_perf_y_model = 0.85  # Default
+            pred_perf_y_legacy = 0.85
+            pred_perf_y_constrained = 0.85
         
         # Baseline A prediction
         pred_perf_y_a = self.baseline_a.predict_perf_y(lift.value, session_date)
@@ -171,12 +197,14 @@ class ReplayRunner:
         # Observe actual perf_y from session
         observed_perf_y = self._extract_observed_perf_y(sets_data)
         
-        # Log day-level error
+        # Log day-level error (with both legacy and constrained predictions)
         if observed_perf_y:
             self.day_errors.append({
                 "date": session_date.isoformat(),
                 "lift": lift.value,
                 "predicted_model": pred_perf_y_model,
+                "predicted_legacy": pred_perf_y_legacy,
+                "predicted_constrained": pred_perf_y_constrained,
                 "predicted_baseline_a": pred_perf_y_a,
                 "predicted_baseline_b": pred_perf_y_b,
                 "observed": observed_perf_y,
