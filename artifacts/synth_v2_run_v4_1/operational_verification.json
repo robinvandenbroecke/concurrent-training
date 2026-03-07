@@ -1,0 +1,23 @@
+{
+  "operational_params": {
+    "source": "calibrated_config",
+    "config_path": "./artifacts/config/observation_mapping_params.json",
+    "params": {
+      "a": 1.0,
+      "b_l": 0.0,
+      "b_sys": 0.0,
+      "b_t": 0.6428571428571428,
+      "y_min": 0.6,
+      "y_max": 1.1,
+      "per_lift_a": null
+    }
+  },
+  "day_error_count": 63,
+  "params_source_distribution": {
+    "calibrated_config": 63
+  },
+  "mae": {
+    "constrained": 0.8210935454365101,
+    "legacy": 1.0818923736768777
+  }
+}

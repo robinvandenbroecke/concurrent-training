@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "global": {
+    "a": 1.0,
+    "b_l": 0.0,
+    "b_sys": 0.0,
+    "b_t": 0.6428571428571428,
+    "y_min": 0.6,
+    "y_max": 1.1
+  },
+  "per_lift": null,
+  "installed_at": "2026-03-07 14:49:24.467894",
+  "source": "calibrated_v4"
+}

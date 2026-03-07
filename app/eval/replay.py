@@ -26,6 +26,10 @@ from app.domain.observation_mapping import (
     predict_perf_y_from_readiness_legacy,
     ObservationMappingParams,
 )
+from app.services.observation_mapping_service import (
+    get_observation_mapping_params,
+    predict_perf_y_operational,
+)
 from app.eval.baselines import BaselineVelocityThreshold, BaselineBanister, BaselineEndurance
 from app.services.engine_orchestrator import EngineOrchestrator
 from app.domain.rep_engine import simulate_strength_session, LiftVelocityProfile, SessionInput, SetInput, RepEngineParams
@@ -137,24 +141,25 @@ class ReplayRunner:
         # Model predictions (multiple modes for comparison)
         pred_perf_y_legacy = 0.85  # Default
         pred_perf_y_constrained = 0.85  # Default
+        params_source = "default"
         
         if day_state:
             lift_state = day_state.per_lift.get(lift.value, PerLiftState())
             
-            # LEGACY: Simple readiness-based prediction
+            # LEGACY: Simple readiness-based prediction (for comparison only)
             readiness_model = self._compute_readiness_from_state(lift_state, day_state)
             pred_perf_y_legacy = predict_perf_y_from_readiness_legacy(readiness_model)
             
-            # CONSTRAINED: New mapping using internal states
+            # OPERATIONAL: Use calibrated constrained mapping via service layer
             D_l = getattr(lift_state, 'D_l', 0.0)
             D_sys = day_state.D_sys
             T_legs = getattr(day_state, 'T_legs', 0.0)
             
-            pred_perf_y_constrained = predict_perf_y_constrained(
+            pred_perf_y_constrained, params_source = predict_perf_y_operational(
                 D_l=D_l,
                 D_sys=D_sys,
                 T_legs=T_legs,
-                lift=lift.value
+                lift=lift.value,
             )
             
             # Use constrained as primary model prediction
@@ -208,6 +213,7 @@ class ReplayRunner:
                 "predicted_baseline_a": pred_perf_y_a,
                 "predicted_baseline_b": pred_perf_y_b,
                 "observed": observed_perf_y,
+                "params_source": params_source,
             })
             
             # Update baselines with observation
