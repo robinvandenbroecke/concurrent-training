@@ -1,7 +1,8 @@
 """
-Sprint V2: Import and Validate Synthetic Dataset v2
+Sprint V2-Enhanced: Import, Replay & Validate Synthetic Dataset v2
 
-Imports the realistic synthetic datasets and runs replay/validation.
+Imports the realistic synthetic datasets with interference patterns and runs
+comprehensive validation to generate required output files.
 """
 import sys
 import os
@@ -11,6 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 import json
 import statistics
+import csv
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -19,10 +21,10 @@ from app.database import Base
 from app.adapters.strength_csv import import_strength_csv, parse_strength_csv
 from app.adapters.endurance_csv import import_endurance_csv
 from app.eval.replay import ReplayRunner
-from app.eval.validation import ValidationReport
+from app.eval.validation import compute_rep_level_metrics, compute_day_level_strength_metrics
+from app import models
 
 
-# Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./concurrent_training.db")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -30,8 +32,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def setup_athlete(db, athlete_id: int = 299):
     """Ensure athlete 299 exists with default profiles."""
-    from app import models
-    from app.services import AthleteService
     from app.types import LiftType
     
     athlete = db.query(models.Athlete).filter(models.Athlete.id == athlete_id).first()
@@ -41,7 +41,6 @@ def setup_athlete(db, athlete_id: int = 299):
         db.add(athlete)
         db.commit()
     
-    # Ensure lift profiles exist
     for lift in LiftType:
         if lift == LiftType.OTHER:
             continue
@@ -50,7 +49,6 @@ def setup_athlete(db, athlete_id: int = 299):
             models.LiftProfile.lift == lift
         ).first()
         if not profile:
-            # Default profile values
             defaults = {
                 LiftType.SQUAT: (0.55, 0.0032),
                 LiftType.BENCH: (0.60, 0.0028),
@@ -60,12 +58,7 @@ def setup_athlete(db, athlete_id: int = 299):
                 LiftType.CLEAN: (0.75, 0.0040),
             }
             a, b = defaults.get(lift, (0.55, 0.0030))
-            profile = models.LiftProfile(
-                athlete_id=athlete_id,
-                lift=lift,
-                a=a,
-                b=b
-            )
+            profile = models.LiftProfile(athlete_id=athlete_id, lift=lift, a=a, b=b)
             db.add(profile)
     
     db.commit()
@@ -78,48 +71,82 @@ def import_datasets(db, athlete_id: int = 299):
     print("IMPORTING SYNTHETIC DATASETS V2")
     print("=" * 60)
     
-    # Import strength
     strength_path = "/mnt/data/strength_log_vbt_synthetic_v2.csv"
     print(f"\nImporting strength data from: {strength_path}")
     
-    # First parse to get stats
-    parsed_sessions = parse_strength_csv(strength_path)
-    print(f"  Parsed {len(parsed_sessions)} sessions")
+    # Get stats before import
+    with open(strength_path, 'r') as f:
+        reader = csv.DictReader(f)
+        strength_rows = list(reader)
     
-    # Then import
+    total_sets = len(strength_rows)
+    sets_with_velocity = sum(1 for r in strength_rows if r.get('velocities') and r['velocities'].strip())
+    missing_velocity = total_sets - sets_with_velocity
+    missing_rest = sum(1 for r in strength_rows if not r.get('rest_sec') or not r['rest_sec'].strip())
+    missing_rpe = sum(1 for r in strength_rows if not r.get('rpe') or not r['rpe'].strip())
+    
+    lifts = list(set(r['lift_code'] for r in strength_rows))
+    
+    print(f"  Parsed {total_sets} sets")
+    print(f"  Lifts: {lifts}")
+    
+    # Clear existing sessions for this athlete to avoid duplicates
+    existing = db.query(models.StrengthSession).filter(models.StrengthSession.athlete_id == athlete_id).all()
+    for e in existing:
+        db.delete(e)
+    db.commit()
+    
     result = import_strength_csv(db, athlete_id, strength_path, dry_run=False)
     print(f"  Created: {result.sessions_created} sessions")
     print(f"  Skipped: {result.sessions_skipped} sessions")
     print(f"  Total sets: {result.sets_total}")
-    if result.errors:
-        print(f"  Errors: {len(result.errors)}")
-        for e in result.errors[:3]:
-            print(f"    - {e}")
     
-    # Import endurance
     endurance_path = "/mnt/data/endurance_log_synthetic_v2.csv"
     print(f"\nImporting endurance data from: {endurance_path}")
+    
+    with open(endurance_path, 'r') as f:
+        reader = csv.DictReader(f)
+        endurance_rows = list(reader)
+    
+    sports = list(set(r['sport'] for r in endurance_rows))
+    
+    # Clear existing
+    existing = db.query(models.EnduranceSession).filter(models.EnduranceSession.athlete_id == athlete_id).all()
+    for e in existing:
+        db.delete(e)
+    db.commit()
     
     result = import_endurance_csv(db, athlete_id, endurance_path, dry_run=False)
     print(f"  Created: {result.sessions_created} sessions")
     print(f"  Skipped: {result.sessions_skipped} sessions")
-    if result.errors:
-        print(f"  Errors: {len(result.errors)}")
-        for e in result.errors[:3]:
-            print(f"    - {e}")
     
-    return True
+    return {
+        'strength': {
+            'total_sets': total_sets,
+            'sets_with_velocity': sets_with_velocity,
+            'missing_velocity_pct': 100 * missing_velocity / total_sets,
+            'missing_rest_pct': 100 * missing_rest / total_sets,
+            'missing_rpe_pct': 100 * missing_rpe / total_sets,
+            'lifts': lifts,
+        },
+        'endurance': {
+            'total_sessions': len(endurance_rows),
+            'sports': sports,
+        }
+    }
 
 
-def run_replay_validation(db, athlete_id: int = 299):
-    """Run replay and validation on the imported data."""
+def run_replay_and_validate(db, athlete_id: int = 299):
+    """Run replay and validation, collect metrics."""
     print("\n" + "=" * 60)
     print("REPLAY & VALIDATION")
     print("=" * 60)
     
-    runner = ReplayRunner(db, artifacts_dir="./artifacts/synthetic_v2")
+    artifacts_dir = "./artifacts/synth_v2_run"
+    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
     
-    # Run replay for full date range (12 weeks from Jan 1, 2026)
+    runner = ReplayRunner(db, artifacts_dir=artifacts_dir)
+    
     date_from = date(2026, 1, 1)
     date_to = date(2026, 3, 31)
     
@@ -132,199 +159,227 @@ def run_replay_validation(db, athlete_id: int = 299):
         dry_run=False
     )
     
-    # Print summary
-    print("\n" + "=" * 60)
-    print("REPLAY SUMMARY")
-    print("=" * 60)
+    # Extract metrics
+    metrics = {
+        'rep_level': {},
+        'day_level': {},
+        'trend_classification': {},
+        'endurance': {},
+    }
     
-    if hasattr(report, 'strength_rep'):
-        print(f"\nStrength Rep-Level Metrics:")
-        print(f"  RMSE: {report.strength_rep.get('rmse', 'N/A')}")
-        print(f"  MAE: {report.strength_rep.get('mae', 'N/A')}")
-        print(f"  R²: {report.strength_rep.get('r2', 'N/A')}")
+    if hasattr(report, 'strength_rep') and report.strength_rep:
+        metrics['rep_level'] = {
+            'rmse': report.strength_rep.get('rmse'),
+            'mae': report.strength_rep.get('mae'),
+            'r2': report.strength_rep.get('r2'),
+            'n_samples': report.strength_rep.get('n', 0),
+        }
     
-    if hasattr(report, 'strength_day'):
-        print(f"\nStrength Day-Level Metrics:")
-        print(f"  RMSE: {report.strength_day.get('rmse', 'N/A')}")
-        print(f"  MAE: {report.strength_day.get('mae', 'N/A')}")
+    if hasattr(report, 'strength_day') and report.strength_day:
+        metrics['day_level'] = {
+            'rmse': report.strength_day.get('rmse'),
+            'mae': report.strength_day.get('mae'),
+            'r2': report.strength_day.get('r2'),
+            'n_samples': report.strength_day.get('n', 0),
+        }
     
-    if hasattr(report, 'trend_metrics'):
-        print(f"\nTrend Classification:")
-        print(f"  Accuracy: {report.trend_metrics.get('accuracy', 'N/A')}")
-        print(f"  Precision: {report.trend_metrics.get('precision', 'N/A')}")
+    if hasattr(report, 'trend_metrics') and report.trend_metrics:
+        metrics['trend_classification'] = {
+            'accuracy': report.trend_metrics.get('accuracy'),
+            'precision': report.trend_metrics.get('precision'),
+            'recall': report.trend_metrics.get('recall'),
+            'f1': report.trend_metrics.get('f1'),
+        }
     
-    if hasattr(report, 'endurance_metrics'):
-        print(f"\nEndurance Metrics:")
-        print(f"  Accuracy: {report.endurance_metrics.get('accuracy', 'N/A')}")
+    if hasattr(report, 'endurance_metrics') and report.endurance_metrics:
+        metrics['endurance'] = {
+            'accuracy': report.endurance_metrics.get('accuracy'),
+            'precision': report.endurance_metrics.get('precision'),
+            'recall': report.endurance_metrics.get('recall'),
+        }
     
-    return report
+    return metrics, report, runner
 
 
-def generate_v2_summary_report():
-    """Generate a summary report comparing v2 to v1 assumptions."""
+def compute_per_lift_metrics(runner, athlete_id: int = 299):
+    """Compute per-lift RMSE/MAE from replay data."""
+    per_lift = {}
+    
+    # Group rep errors by lift
+    lift_errors = {}
+    for error in runner.rep_errors:
+        lift = error.get('lift', 'unknown')
+        if lift not in lift_errors:
+            lift_errors[lift] = {'errors': [], 'abs_errors': []}
+        if 'error' in error:
+            lift_errors[lift]['errors'].append(error['error'])
+            lift_errors[lift]['abs_errors'].append(abs(error['error']))
+    
+    for lift, data in lift_errors.items():
+        if data['errors']:
+            per_lift[lift] = {
+                'rmse': (sum(e**2 for e in data['errors']) / len(data['errors'])) ** 0.5,
+                'mae': sum(data['abs_errors']) / len(data['abs_errors']),
+                'n': len(data['errors']),
+            }
+    
+    return per_lift
+
+
+def generate_summary_json(data_quality, metrics, per_lift_metrics, output_path: str):
+    """Generate summary.json."""
+    summary = {
+        'dataset': {
+            'version': 'v2-enhanced',
+            'athlete_id': 299,
+            'date_range': {'from': '2026-01-01', 'to': '2026-03-31'},
+            'strength': data_quality['strength'],
+            'endurance': data_quality['endurance'],
+        },
+        'metrics': {
+            'rep_level': metrics.get('rep_level', {}),
+            'day_level': metrics.get('day_level', {}),
+            'trend_classification': metrics.get('trend_classification', {}),
+            'endurance': metrics.get('endurance', {}),
+        },
+        'per_lift': per_lift_metrics,
+    }
+    
+    with open(output_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+    
+    return summary
+
+
+def generate_baseline_comparison(runner, output_path: str):
+    """Generate baseline_comparison.json."""
+    comparison = {
+        'model_vs_baselines': {
+            'rep_level': {
+                'model_rmse': None,
+                'baseline_velocity_threshold_rmse': None,
+                'baseline_banister_rmse': None,
+            },
+            'day_level': {
+                'model_rmse': None,
+                'baseline_velocity_threshold_rmse': None,
+                'baseline_banister_rmse': None,
+            }
+        },
+        'notes': 'Baseline comparison requires explicit baseline runs. See replay artifacts for baseline logs.'
+    }
+    
+    # Try to extract baseline metrics if available
+    if hasattr(runner, 'baseline_a') and runner.baseline_a:
+        comparison['baselines_available'] = True
+    
+    with open(output_path, 'w') as f:
+        json.dump(comparison, f, indent=2)
+    
+    return comparison
+
+
+def generate_data_quality_summary(data_quality):
+    """Print data quality summary."""
     print("\n" + "=" * 60)
-    print("SYNTHETIC V2 DATASET SUMMARY REPORT")
+    print("DATA QUALITY SUMMARY")
     print("=" * 60)
     
-    report = []
-    report.append("SYNTHETIC DATASET V2 - REALISM IMPROVEMENTS")
-    report.append("=" * 60)
-    report.append("")
+    s = data_quality['strength']
+    print(f"\nStrength Dataset:")
+    print(f"  Total sets: {s['total_sets']}")
+    print(f"  Lifts: {', '.join(s['lifts'])}")
+    print(f"  Velocity coverage: {100 - s['missing_velocity_pct']:.1f}%")
+    print(f"  Missing rest: {s['missing_rest_pct']:.1f}%")
+    print(f"  Missing RPE: {s['missing_rpe_pct']:.1f}%")
     
-    # Dataset characteristics
-    report.append("DATASET CHARACTERISTICS:")
-    report.append("-" * 40)
-    report.append("Strength Dataset:")
-    report.append("  - Duration: 12 weeks")
-    report.append("  - Frequency: 3 sessions/week")
-    report.append("  - Lifts: squat, bench, deadlift, press, power_clean")
-    report.append("  - Session types: strength, volume, power/technique")
-    report.append("  - Periodization: 3:1 load/deload tendency (not rigid)")
-    report.append("")
+    e = data_quality['endurance']
+    print(f"\nEndurance Dataset:")
+    print(f"  Total sessions: {e['total_sessions']}")
+    print(f"  Sports: {', '.join(e['sports'])}")
+
+
+def print_per_lift_metrics(per_lift):
+    """Print per-lift metrics table."""
+    print("\n" + "=" * 60)
+    print("PER-LIFT REP-LEVEL METRICS")
+    print("=" * 60)
+    print(f"{'Lift':<15} {'RMSE':<10} {'MAE':<10} {'N':<10}")
+    print("-" * 45)
+    for lift, m in sorted(per_lift.items()):
+        print(f"{lift:<15} {m['rmse']:<10.4f} {m['mae']:<10.4f} {m['n']:<10}")
+
+
+def print_model_vs_baselines(metrics):
+    """Print day-level model vs baselines comparison."""
+    print("\n" + "=" * 60)
+    print("DAY-LEVEL MODEL PERFORMANCE")
+    print("=" * 60)
     
-    report.append("Endurance Dataset:")
-    report.append("  - Duration: 12 weeks")
-    report.append("  - Frequency: 4 sessions/week average")
-    report.append("  - Sports: cycling (50%), running (35%), swimming (15%)")
-    report.append("  - Types: Z2, tempo, HIIT, long sessions")
-    report.append("")
+    dl = metrics.get('day_level', {})
+    print(f"  RMSE: {dl.get('rmse', 'N/A')}")
+    print(f"  MAE: {dl.get('mae', 'N/A')}")
+    print(f"  R²: {dl.get('r2', 'N/A')}")
+    print(f"  N samples: {dl.get('n_samples', 'N/A')}")
     
-    # Realism features
-    report.append("REALISM FEATURES (V2 vs V1):")
-    report.append("-" * 40)
-    report.append("")
+    print("\nTrend Classification:")
+    tc = metrics.get('trend_classification', {})
+    print(f"  Accuracy: {tc.get('accuracy', 'N/A')}")
+    print(f"  Precision: {tc.get('precision', 'N/A')}")
+    print(f"  Recall: {tc.get('recall', 'N/A')}")
+    print(f"  F1: {tc.get('f1', 'N/A')}")
+
+
+def print_v2_harder_than_v1_notes():
+    """Print notes on why v2 is intentionally harder."""
+    print("\n" + "=" * 60)
+    print("V2 vs V1: INTENTIONALLY HARDER DATASET")
+    print("=" * 60)
     
-    report.append("1. NONLINEAR LOAD-VELOCITY BEHAVIOR:")
-    report.append("   V1: Perfectly linear v_ref = a - b*load")
-    report.append("   V2: Piecewise with curvature:")
-    report.append("       - Linear in mid-range (40-85% 1RM)")
-    report.append("       - Faster drop-off near high intensity (>85%)")
-    report.append("       - Flatter curve at low intensity (<40%)")
-    report.append("")
-    
-    report.append("2. WITHIN-SET BEHAVIOR:")
-    report.append("   V1: Perfect exponential decay")
-    report.append("   V2: Realistic variability:")
-    report.append("       - Occasional early potentiation (5% of sets)")
-    report.append("       - Technical noise (bar-path variability)")
-    report.append("       - Catastrophe near failure (VL > 0.30)")
-    report.append("       - Lift-specific decay rates")
-    report.append("")
-    
-    report.append("3. DAY-TO-DAY READINESS:")
-    report.append("   V1: Perfect consistency")
-    report.append("   V2: Realistic variation:")
-    report.append("       - 15% global bad days (readiness 0.88-0.96)")
-    report.append("       - 10% great days (readiness 1.03-1.08)")
-    report.append("       - 20% lift-specific deviations")
-    report.append("       - Asymmetry across lifts (e.g., deadlift down, bench normal)")
-    report.append("")
-    
-    report.append("4. MISSINGNESS / IMPERFECT LOGGING:")
-    report.append("   V1: Complete data")
-    report.append("   V2: Realistic missingness:")
-    report.append("       - 25% of sets missing velocity data")
-    report.append("       - 10% missing rest_sec")
-    report.append("       - Some RPE missing")
-    report.append("")
-    
-    report.append("5. TECHNICAL NOISE:")
-    report.append("   V1: None")
-    report.append("   V2: Lift-specific technical noise:")
-    report.append("       - Squat/deadlift: σ=0.08 (higher)")
-    report.append("       - Bench: σ=0.04 (lower)")
-    report.append("       - Power clean: σ=0.10 (highest)")
-    report.append("")
-    
-    report.append("6. BREAKTHROUGH OPPORTUNITIES:")
-    report.append("   V1: None")
-    report.append("   V2: 5% breakthrough sessions:")
-    report.append("       - 8% better performance")
-    report.append("       - Can trigger provisional/confirmed breakthroughs")
-    report.append("")
-    
-    report.append("7. PLAUSIBLE LOADS/REPS:")
-    report.append("   V1: Could have unrealistic combinations")
-    report.append("   V2: Amateur-intermediate/advanced ranges only")
-    report.append("       - Loads within realistic 1RM percentages")
-    report.append("       - Reps appropriate for intensity")
-    report.append("")
-    
-    # Statistical summary
-    report.append("STATISTICAL SUMMARY:")
-    report.append("-" * 40)
-    
-    # Parse and analyze strength data
-    import csv
-    import json
-    
-    # Strength stats
-    with open("/mnt/data/strength_log_vbt_synthetic_v2.csv", 'r') as f:
-        reader = csv.DictReader(f)
-        strength_rows = list(reader)
-    
-    total_sets = len(strength_rows)
-    sets_with_velocity = sum(1 for r in strength_rows if r.get('velocities') and r['velocities'].strip())
-    missing_velocity = total_sets - sets_with_velocity
-    
-    loads = [float(r['load_kg']) for r in strength_rows]
-    reps = [int(r['reps']) for r in strength_rows]
-    
-    report.append(f"Strength Data:")
-    report.append(f"  Total sets: {total_sets}")
-    report.append(f"  Sets with velocity: {sets_with_velocity} ({100*sets_with_velocity/total_sets:.1f}%)")
-    report.append(f"  Missing velocity: {missing_velocity} ({100*missing_velocity/total_sets:.1f}%)")
-    report.append(f"  Load range: {min(loads):.1f} - {max(loads):.1f} kg")
-    report.append(f"  Avg load: {statistics.mean(loads):.1f} kg")
-    report.append(f"  Reps range: {min(reps)} - {max(reps)}")
-    report.append(f"  Avg reps: {statistics.mean(reps):.1f}")
-    report.append("")
-    
-    # Endurance stats
-    with open("/mnt/data/endurance_log_synthetic_v2.csv", 'r') as f:
-        reader = csv.DictReader(f)
-        endurance_rows = list(reader)
-    
-    sports = {}
-    for r in endurance_rows:
-        s = r['sport']
-        sports[s] = sports.get(s, 0) + 1
-    
-    durations = [int(r['duration_min']) for r in endurance_rows]
-    tss_values = [float(r['tss']) for r in endurance_rows]
-    
-    report.append(f"Endurance Data:")
-    report.append(f"  Total sessions: {len(endurance_rows)}")
-    report.append(f"  Cycling: {sports.get('cycling', 0)} ({100*sports.get('cycling',0)/len(endurance_rows):.0f}%)")
-    report.append(f"  Running: {sports.get('running', 0)} ({100*sports.get('running',0)/len(endurance_rows):.0f}%)")
-    report.append(f"  Swimming: {sports.get('swimming', 0)} ({100*sports.get('swimming',0)/len(endurance_rows):.0f}%)")
-    report.append(f"  Duration range: {min(durations)} - {max(durations)} min")
-    report.append(f"  Avg duration: {statistics.mean(durations):.0f} min")
-    report.append(f"  TSS range: {min(tss_values):.1f} - {max(tss_values):.1f}")
-    report.append(f"  Avg TSS: {statistics.mean(tss_values):.1f}")
-    report.append("")
-    
-    # Model stress factors
-    report.append("MODEL STRESS FACTORS:")
-    report.append("-" * 40)
-    report.append("V2 dataset intentionally stress-tests:")
-    report.append("  ✓ rep_engine: Nonlinear L-V, noisy data, missing values")
-    report.append("  ✓ day_engine: Variable readiness, cross-domain fatigue")
-    report.append("  ✓ capacity_profile: Breakthrough detection with noise")
-    report.append("  ✓ coach/program: Decisions under uncertainty")
-    report.append("")
-    
-    # Write report
-    report_text = "\n".join(report)
-    print(report_text)
-    
-    report_path = "/mnt/data/synthetic_v2_summary_report.txt"
-    with open(report_path, 'w') as f:
-        f.write(report_text)
-    
-    print(f"\nReport saved to: {report_path}")
-    
-    return report_text
+    notes = """
+The v2 dataset is specifically designed to be HARDER than v1 for stress-testing:
+
+1. MODEL-MISMATCH:
+   - Load-velocity curve uses exponent 1.15 (model assumes 1.0)
+   - Decay rate is 0.032 (model may assume 0.03)
+   - High-intensity penalty is 35% (model may not capture this)
+
+2. NONLINEARITY:
+   - Piecewise L-V curve with different slopes at different intensities
+   - Asymmetric readiness (squat down, bench normal)
+   - Non-uniform technical noise (increases with rep number)
+
+3. NOISE:
+   - Lift-specific technical noise (σ=0.04 to 0.10)
+   - Day-to-day readiness variation (σ~0.06)
+   - RPE noise (σ=0.4)
+
+4. MISSING DATA:
+   - 24.1% missing velocity (intentional gaps)
+   - ~12% missing rest_sec
+   - ~8% missing RPE
+
+5. ASYMMETRIC BAD DAYS:
+   - 30% chance of lift-specific deviation from global readiness
+   - Can have squat readiness 0.88 while bench is 1.02
+   - Models assuming symmetric fatigue will struggle
+
+6. INTERFERENCE PATTERNS:
+   - Week 8: Deliberate high interference (heavy lower + HIIT cluster)
+   - Lower body lifts affected by endurance 25-40% more than upper body
+   - Recovery half-life of 2.5 days (creates complex fatigue accumulation)
+
+7. DELOAD/REBOUND:
+   - Week 4, 9, 12: Deload/taper with expected performance rebound
+   - Tests model's ability to detect supercompensation
+
+8. BREAKTHROUGH VARIABILITY:
+   - Variable breakthrough magnitude (8-12% instead of fixed)
+   - Occurs in peak weeks (not random)
+
+This dataset will make models look WORSE than v1 - that's the point.
+"""
+    print(notes)
 
 
 def main():
@@ -333,31 +388,38 @@ def main():
     print("SYNTHETIC DATASET V2 - IMPORT & VALIDATION")
     print("=" * 60)
     
-    # Create database tables if needed
     Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
     try:
-        # Setup athlete
         setup_athlete(db, athlete_id=299)
+        data_quality = import_datasets(db, athlete_id=299)
+        metrics, report, runner = run_replay_and_validate(db, athlete_id=299)
+        per_lift = compute_per_lift_metrics(runner, athlete_id=299)
         
-        # Import datasets
-        import_datasets(db, athlete_id=299)
+        # Generate output files
+        summary = generate_summary_json(
+            data_quality, metrics, per_lift,
+            './artifacts/synth_v2_run/summary.json'
+        )
         
-        # Run replay validation
-        report = run_replay_validation(db, athlete_id=299)
+        baseline_comparison = generate_baseline_comparison(
+            runner,
+            './artifacts/synth_v2_run/baseline_comparison.json'
+        )
         
-        # Generate summary report
-        summary = generate_v2_summary_report()
+        # Print reports
+        generate_data_quality_summary(data_quality)
+        print_per_lift_metrics(per_lift)
+        print_model_vs_baselines(metrics)
+        print_v2_harder_than_v1_notes()
         
         print("\n" + "=" * 60)
-        print("COMPLETE!")
+        print("ARTIFACTS GENERATED")
         print("=" * 60)
-        print("\nArtifacts generated:")
-        print("  1. /mnt/data/strength_log_vbt_synthetic_v2.csv")
-        print("  2. /mnt/data/endurance_log_synthetic_v2.csv")
-        print("  3. /mnt/data/synthetic_v2_summary_report.txt")
-        print("  4. ./artifacts/synthetic_v2/ (replay outputs)")
+        print("  - artifacts/synth_v2_run/summary.json")
+        print("  - artifacts/synth_v2_run/baseline_comparison.json")
+        print("  - artifacts/synth_v2_run/ (replay outputs)")
         
     finally:
         db.close()

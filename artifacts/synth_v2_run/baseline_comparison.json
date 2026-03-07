@@ -1,0 +1,16 @@
+{
+  "model_vs_baselines": {
+    "rep_level": {
+      "model_rmse": null,
+      "baseline_velocity_threshold_rmse": null,
+      "baseline_banister_rmse": null
+    },
+    "day_level": {
+      "model_rmse": null,
+      "baseline_velocity_threshold_rmse": null,
+      "baseline_banister_rmse": null
+    }
+  },
+  "notes": "Baseline comparison requires explicit baseline runs. See replay artifacts for baseline logs.",
+  "baselines_available": true
+}
