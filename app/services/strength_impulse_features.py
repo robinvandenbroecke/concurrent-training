@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 import statistics
 
+from app.domain.rep_engine import LiftVelocityProfile
+
 
 @dataclass
 class StrengthImpulseFeatures:
@@ -138,6 +140,53 @@ def extract_features_from_rep_output(
         )
 
 
+def compute_velocity_factor_from_raw_velocities(
+    velocities: List[float],
+    load_kg: float,
+    lift: str,
+) -> Optional[float]:
+    """
+    Compute velocity_factor from raw velocities using calibrated lift profile.
+    
+    Calculates y_i = v_obs_i / v_ref(load) for each rep, then takes median
+    of first 1-2 reps as velocity_factor.
+    
+    Args:
+        velocities: List of observed velocities (m/s)
+        load_kg: Load in kg
+        lift: Lift identifier
+    
+    Returns:
+        velocity_factor in [0.5, 1.2], or None if cannot compute
+    """
+    if not velocities or len(velocities) < 1:
+        return None
+    
+    try:
+        # Get calibrated profile for this lift
+        profile = LiftVelocityProfile.calibrated_profile(lift)
+        v_ref = profile.v_ref(load_kg)
+        
+        if v_ref <= 0:
+            return None
+        
+        # Compute y = v_obs / v_ref for each rep
+        y_values = [v / v_ref for v in velocities if v > 0]
+        
+        if not y_values:
+            return None
+        
+        # Use median of first 1-2 reps
+        y_sample = y_values[:2] if len(y_values) >= 2 else y_values
+        y_median = statistics.median(y_sample)
+        
+        # Clamp to valid range
+        return max(0.5, min(1.2, y_median))
+        
+    except Exception:
+        return None
+
+
 def compute_strength_impulse_features(
     rep_output: Any,
     set_idx: int,
@@ -147,44 +196,62 @@ def compute_strength_impulse_features(
     """
     Canonical helper to compute strength impulse features for a set.
     
-    Sprint P1: Replaces placeholder velocity_factor=0.9 and vl=0.15
-    with real rep_engine-derived values.
+    Sprint P1.1: Replaces placeholder velocity_factor=0.9 and vl=0.15
+    with real rep_engine-derived values. Now derives velocity_factor from
+    raw velocities when rep_engine summaries are unavailable.
     
     Priority:
-    1. rep_engine SessionOutput (if available) - source="rep_engine"
-    2. Derived from raw velocities (if rep_output unavailable) - source="derived_from_velocities"
-    3. Neutral fallback (no velocity data) - source="neutral_fallback", velocity_factor=1.0
+    A) rep_engine SessionOutput with y values - source="rep_engine"
+    B) Raw velocities JSON with lift profile - source="derived_from_velocities"
+       - vl = 1 - last/first
+       - velocity_factor = median(y_i) from v_obs/v_ref
+    C) Neutral fallback - source="neutral_fallback", velocity_factor=1.0, vl=0.0
     
     Args:
         rep_output: SessionOutput from rep_engine, or None
         set_idx: Index of the set in the session
-        set_data: Optional raw set data with velocities
+        set_data: Optional raw set data with velocities and load
         lift: Optional lift identifier
     
     Returns:
         StrengthImpulseFeatures with velocity_factor, vl, and source
     """
-    # Try rep_engine output first
+    # A) Try rep_engine output first
     if rep_output is not None:
         features = extract_features_from_rep_output(rep_output, set_idx, lift or "")
         if features.source == "rep_engine":
             return features
     
-    # Fallback: derive from raw velocities if available
+    # B) Derive from raw velocities if available
     if set_data is not None:
         velocities = set_data.get("velocities", [])
+        load_kg = set_data.get("load_kg", 0)
+        
         if velocities and len(velocities) >= 2:
             vl = compute_set_vl(velocities)
-            # Without rep_engine y values, use neutral velocity_factor
-            return StrengthImpulseFeatures(
-                velocity_factor=1.0,
-                vl=vl,
-                source="derived_from_velocities"
+            
+            # Sprint P1.1: Also compute velocity_factor from raw velocities
+            velocity_factor = compute_velocity_factor_from_raw_velocities(
+                velocities, load_kg, lift or ""
             )
+            
+            if velocity_factor is not None:
+                return StrengthImpulseFeatures(
+                    velocity_factor=velocity_factor,
+                    vl=vl,
+                    source="derived_from_velocities"
+                )
+            else:
+                # Could not compute velocity_factor, but have VL
+                return StrengthImpulseFeatures(
+                    velocity_factor=1.0,
+                    vl=vl,
+                    source="derived_from_velocities"
+                )
     
-    # Final fallback: neutral values (explicit, documented)
+    # C) Neutral fallback: no velocity data
     return StrengthImpulseFeatures(
         velocity_factor=1.0,  # Neutral: v_obs == v_ref
-        vl=None,
+        vl=0.0,
         source="neutral_fallback"
     )

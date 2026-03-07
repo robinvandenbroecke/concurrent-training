@@ -780,6 +780,10 @@ class EngineOrchestrator:
             query_date=session_date,
         )
         
+        # Sprint P1.1: Constants for impulse computation
+        ALPHA_I = 1.2  # Intensity exponent
+        P_VL = 1.5     # VL penalty factor
+
         for set_idx, set_data in enumerate(sets_data):
             load_kg = set_data.get("load_kg", 0)
             reps = set_data.get("reps", 0)
@@ -789,16 +793,6 @@ class EngineOrchestrator:
             intensity = load_kg / max(capacity_estimate, 1.0)
             intensity = max(0.20, min(1.20, intensity))
 
-            impulse = (load_kg * reps) * (intensity ** 1.2)
-
-            per_lift[lift] += impulse
-            u_sys += impulse * (1.3 if is_legs else 0.7)
-
-            if is_legs:
-                u_legs += impulse
-                if intensity > 0.85:
-                    u_legs_high_intensity += impulse * 0.5
-
             # Sprint P1: Compute real velocity_factor and vl from rep_engine output
             features = compute_strength_impulse_features(
                 rep_output=rep_output,
@@ -807,9 +801,25 @@ class EngineOrchestrator:
                 lift=lift,
             )
 
+            # Sprint P1.1: Compute set impulse with velocity-derived features
+            tonnage = load_kg * reps
+            intensity_term = intensity ** ALPHA_I
+            velocity_term = features.velocity_factor
+            vl_term = (1.0 + P_VL * features.vl) if features.vl is not None else 1.0
+
+            set_impulse = tonnage * intensity_term * velocity_term * vl_term
+
+            per_lift[lift] += set_impulse
+            u_sys += set_impulse * (1.3 if is_legs else 0.7)
+
+            if is_legs:
+                u_legs += set_impulse
+                if intensity > 0.85:
+                    u_legs_high_intensity += set_impulse * 0.5
+
             set_impulses.append(SetImpulse(
                 lift=lift,
-                tonnage=load_kg * reps,
+                tonnage=tonnage,
                 intensity=intensity,
                 velocity_factor=features.velocity_factor,
                 vl=features.vl if features.vl is not None else 0.0,
