@@ -176,13 +176,8 @@ class TestLookupHierarchy:
         assert source == "day_state"
     
     def test_falls_back_to_performance_snapshot(self, db_session, sample_athlete):
-        """5) If no profile and no day state, use latest performance estimate.
-        
-        NOTE: Performance snapshot integration is a placeholder for future Sprint.
-        Currently falls through to default, which is the expected behavior until
-        performance snapshot lookup is implemented.
-        """
-        # Create a performance snapshot (will be used in future Sprint)
+        """5) If no profile and no day state, use latest performance estimate."""
+        # Create a performance snapshot with e1rm estimate for press
         from app.models import PerformanceSnapshot
         
         snapshot = PerformanceSnapshot(
@@ -202,16 +197,16 @@ class TestLookupHierarchy:
         db_session.add(snapshot)
         db_session.commit()
         
-        # For now, this falls through to default (performance lookup not yet implemented)
-        # In future Sprint, this should return the e1rm_estimate from snapshot
+        # Should now return performance estimate from snapshot
         capacity, source = get_lift_capacity_estimate(
             db=db_session,
             athlete_id=sample_athlete.id,
             lift=LiftType.PRESS,
         )
         
-        # Currently returns default (placeholder behavior)
-        assert source in ["default"]  # Will be "performance" in future Sprint
+        # Sprint E2.2: Performance lookup is now implemented
+        assert source == "performance"
+        assert capacity == 65.0
     
     def test_final_default_fallback(self, db_session, sample_athlete):
         """6) If nothing exists, return lift-specific default."""

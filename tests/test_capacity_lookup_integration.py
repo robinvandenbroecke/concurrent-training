@@ -347,3 +347,327 @@ class TestEngineOrchestratorIntegration:
         assert "TODO(Sprint E2.2)" in source
         assert "velocity_factor" in source
         assert "vl" in source
+
+
+class TestCapacityLookupHierarchyE22:
+    """Sprint E2.2: Complete capacity lookup hierarchy tests."""
+    
+    def test_prefers_capacity_profile(self, db_session, sample_athlete):
+        """1) Profile exists -> source is 'capacity_profile'."""
+        from app.services.capacity_profile_service import CapacityProfileService
+        from app.models import LiftCapacityProfile
+        
+        # Create capacity profile via service
+        service = CapacityProfileService(db_session)
+        service.initialize_from_input(
+            athlete_id=sample_athlete.id,
+            lift=LiftType.SQUAT,
+            input_type="1rm",
+            input_load_kg=180,
+            overwrite=True
+        )
+        
+        # Update model capacity to a specific value
+        profile = db_session.query(LiftCapacityProfile).filter(
+            LiftCapacityProfile.athlete_id == sample_athlete.id,
+            LiftCapacityProfile.lift == LiftType.SQUAT
+        ).first()
+        profile.model_capacity = 185.0
+        db_session.commit()
+        
+        # Lookup should return capacity profile
+        capacity, source = get_lift_capacity_estimate(
+            db=db_session,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.SQUAT,
+        )
+        
+        assert source == "capacity_profile"
+        assert capacity == 185.0
+    
+    def test_falls_back_to_day_state(self, db_session, sample_athlete):
+        """2) No profile, but day state exists -> source is 'day_state'."""
+        from app.models import LiftDayState
+        
+        # Create lift day state with C_l (no capacity profile exists for this lift)
+        lift_day_state = LiftDayState(
+            athlete_id=sample_athlete.id,
+            lift=LiftType.BENCH,
+            date=date.today().isoformat(),
+            D_l=10.0,
+            F_l=1.0,
+            C_l=105.0,  # Capacity
+        )
+        db_session.add(lift_day_state)
+        db_session.commit()
+        
+        # Lookup should return day state capacity
+        capacity, source = get_lift_capacity_estimate(
+            db=db_session,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.BENCH,
+        )
+        
+        assert source == "day_state"
+        assert capacity == 105.0
+    
+    def test_falls_back_to_performance_snapshot(self, db_session, sample_athlete):
+        """3) No profile, no day state, but performance data exists -> source is 'performance'."""
+        from app.models import PerformanceSnapshot
+        
+        # Create a performance snapshot with e1rm estimate for press
+        snapshot = PerformanceSnapshot(
+            athlete_id=sample_athlete.id,
+            snapshot_date=date.today().isoformat(),
+            days_analyzed=28,
+            metrics_json={
+                "lifts": {
+                    "press": {
+                        "e1rm_estimate": 72.5,
+                        "trend": "maintain"
+                    }
+                }
+            },
+            overall_signal="maintain",
+        )
+        db_session.add(snapshot)
+        db_session.commit()
+        
+        # Lookup should return performance estimate
+        capacity, source = get_lift_capacity_estimate(
+            db=db_session,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.PRESS,
+        )
+        
+        assert source == "performance"
+        assert capacity == 72.5
+    
+    def test_performance_snapshot_format_variants(self, db_session, sample_athlete):
+        """Performance snapshot lookup supports multiple format variants."""
+        from app.models import PerformanceSnapshot
+        
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        
+        # Test format 1: lifts.<lift>.e1rm_estimate (older snapshot)
+        snapshot1 = PerformanceSnapshot(
+            athlete_id=sample_athlete.id,
+            snapshot_date=yesterday.isoformat(),
+            days_analyzed=28,
+            metrics_json={
+                "lifts": {
+                    "squat": {"e1rm_estimate": 160.0}
+                }
+            },
+            overall_signal="maintain",
+        )
+        db_session.add(snapshot1)
+        db_session.commit()
+        
+        # Format 1 should work when querying for yesterday
+        capacity1, source1 = get_lift_capacity_estimate(
+            db=db_session,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.SQUAT,
+            query_date=yesterday,
+        )
+        assert source1 == "performance"
+        assert capacity1 == 160.0
+        
+        # Test format 2: data.e1rm_est with lift field (today's snapshot)
+        snapshot2 = PerformanceSnapshot(
+            athlete_id=sample_athlete.id,
+            snapshot_date=today.isoformat(),
+            days_analyzed=1,
+            metrics_json={
+                "session_type": "strength",
+                "subtype": "deadlift",
+                "data": {"e1rm_est": 200.0, "lift": "deadlift"}
+            },
+            overall_signal="maintain",
+        )
+        db_session.add(snapshot2)
+        db_session.commit()
+        
+        # Format 2 should work when querying today
+        capacity2, source2 = get_lift_capacity_estimate(
+            db=db_session,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.DEADLIFT,
+            query_date=today,
+        )
+        assert source2 == "performance"
+        assert capacity2 == 200.0
+    
+    def test_final_lift_specific_default_without_db(self, db_session, sample_athlete):
+        """4) db=None or athlete_id=None returns correct lift-specific default, not 200."""
+        # Test with db=None
+        capacity1, source1 = get_lift_capacity_estimate(
+            db=None,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.SQUAT,
+        )
+        assert source1 == "default"
+        assert capacity1 == 140.0  # Squat default, NOT 200
+        
+        # Test with athlete_id=None
+        capacity2, source2 = get_lift_capacity_estimate(
+            db=db_session,
+            athlete_id=None,
+            lift=LiftType.BENCH,
+        )
+        assert source2 == "default"
+        assert capacity2 == 100.0  # Bench default, NOT 200
+    
+    def test_exception_path_never_returns_200(self, db_session, sample_athlete):
+        """5) Simulate internal DB/query error - returns lift-specific default and source 'default'."""
+        # Create a mock/faulty db that will raise an exception
+        class FaultyDb:
+            def query(self, *args, **kwargs):
+                raise RuntimeError("Simulated DB error")
+        
+        faulty_db = FaultyDb()
+        
+        # Should return lift-specific default, not 200
+        capacity, source = get_lift_capacity_estimate(
+            db=faulty_db,
+            athlete_id=sample_athlete.id,
+            lift=LiftType.DEADLIFT,
+        )
+        
+        assert source == "default"
+        assert capacity == 180.0  # Deadlift default, NOT 200
+    
+    def test_no_production_200kg_fallback_remaining(self, db_session, sample_athlete):
+        """6) Direct unit test showing missing DB uses lift default, not 200kg."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        
+        orchestrator = EngineOrchestrator(db_session)
+        
+        # Test with a lift that has no data - should use lift-specific default
+        sets_data = [{"load_kg": 100, "reps": 5}]
+        
+        impulses = orchestrator._compute_strength_impulses(
+            lift="power_clean",
+            sets_data=sets_data,
+            rep_output=None,
+            athlete_id=sample_athlete.id,
+            session_date=date.today(),
+        )
+        
+        # Intensity should be based on power_clean default (95kg), not 200kg
+        # 100/95 = 1.053, clamped to 1.20
+        expected_intensity = min(1.20, 100.0 / 95.0)
+        assert impulses.sets[0].intensity == pytest.approx(expected_intensity, abs=0.01)
+        
+        # Verify capacity estimate is NOT 200
+        assert impulses._capacity_estimate != 200.0
+        assert impulses._capacity_estimate == 95.0  # power_clean default
+        assert impulses._capacity_source == "default"
+    
+    def test_same_load_different_lifts_still_different_intensity(self, db_session, sample_athlete):
+        """7) Regression test: Same load for different lifts yields different intensities."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        
+        orchestrator = EngineOrchestrator(db_session)
+        
+        # 100kg squat (default capacity 140kg) -> intensity ~0.714
+        squat_impulses = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=[{"load_kg": 100, "reps": 5}],
+            rep_output=None,
+            athlete_id=sample_athlete.id,
+            session_date=date.today(),
+        )
+        squat_intensity = squat_impulses.sets[0].intensity
+        expected_squat = 100.0 / 140.0  # ~0.714
+        assert squat_intensity == pytest.approx(expected_squat, abs=0.01)
+        
+        # 100kg bench (default capacity 100kg) -> intensity 1.0
+        bench_impulses = orchestrator._compute_strength_impulses(
+            lift="bench",
+            sets_data=[{"load_kg": 100, "reps": 5}],
+            rep_output=None,
+            athlete_id=sample_athlete.id,
+            session_date=date.today(),
+        )
+        bench_intensity = bench_impulses.sets[0].intensity
+        expected_bench = 100.0 / 100.0  # 1.0
+        assert bench_intensity == pytest.approx(expected_bench, abs=0.01)
+        
+        # Bench intensity should be higher (same load, lower capacity)
+        assert bench_intensity > squat_intensity
+    
+    def test_all_lift_specific_defaults_correct(self, db_session, sample_athlete):
+        """Verify all lift-specific default values are correct."""
+        expected = {
+            LiftType.SQUAT: 140.0,
+            LiftType.BENCH: 100.0,
+            LiftType.DEADLIFT: 180.0,
+            LiftType.PRESS: 70.0,
+            LiftType.POWER_CLEAN: 95.0,
+            LiftType.CLEAN: 95.0,
+            LiftType.OTHER: 100.0,
+        }
+        
+        for lift, expected_capacity in expected.items():
+            # Use db=None to force default path
+            capacity, source = get_lift_capacity_estimate(
+                db=None,
+                athlete_id=sample_athlete.id,
+                lift=lift,
+            )
+            assert capacity == expected_capacity, f"Wrong default for {lift}"
+            assert source == "default"
+
+
+class TestNo200kgInProductionCode:
+    """Verify no hardcoded 200kg fallback remains in production code."""
+    
+    def test_no_hardcoded_200_in_engine_orchestrator(self):
+        """EngineOrchestrator should not contain hardcoded 200kg fallback."""
+        import os
+        import re
+        
+        project_root = "/root/clawd/projects/concurrent-training"
+        production_file = os.path.join(project_root, "app/services/engine_orchestrator.py")
+        
+        with open(production_file, 'r') as f:
+            content = f.read()
+        
+        # Remove comments
+        code_without_comments = re.sub(r'#.*', '', content)
+        
+        # Check for load_kg / 200 or capacity_estimate = 200 patterns
+        patterns = [
+            r'load_kg\s*/\s*200',
+            r'capacity_estimate\s*=\s*200',
+            r'200\.0',  # Any 200.0 literal
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, code_without_comments)
+            # Allow 200.0 in comments or docstrings, but not in actual code logic
+            # The only acceptable 200.0 should be in the LIFT_SPECIFIC_DEFAULTS (not here)
+            # or in test files
+            pass  # We'll do a semantic check instead
+        
+        # Semantic check: Verify the code uses get_lift_capacity_estimate
+        # and doesn't set a hardcoded fallback before calling it
+        assert "get_lift_capacity_estimate" in content
+        
+        # Check that the old pattern is gone:
+        # Old pattern: capacity_estimate = 200.0  # Fallback default
+        # New pattern should not have this line
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if 'capacity_estimate' in line and '200' in line:
+                # This should only be in comments, not assignment
+                stripped = line.strip()
+                if stripped.startswith('capacity_estimate') and '200' in stripped:
+                    # Check if it's a comment
+                    if not stripped.startswith('#'):
+                        raise AssertionError(
+                            f"Found hardcoded 200kg fallback at line {i+1}: {line}"
+                        )

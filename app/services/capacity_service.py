@@ -153,62 +153,165 @@ def normalize_lift_type(lift: Union[LiftType, str]) -> LiftType:
         return LiftType.OTHER
 
 
+def _extract_capacity_from_performance_snapshot(
+    snapshot_metrics: Dict,
+    lift: LiftType,
+) -> Optional[float]:
+    """
+    Extract lift-specific capacity estimate from performance snapshot metrics.
+    
+    Looks for e1RM estimate or current strength metric in the snapshot data.
+    Supports multiple schema formats for flexibility.
+    
+    Args:
+        snapshot_metrics: The metrics_json from a PerformanceSnapshot
+        lift: The lift type to find capacity for
+    
+    Returns:
+        Capacity value if found and valid, None otherwise
+    """
+    if not snapshot_metrics:
+        return None
+    
+    lift_value = lift.value
+    
+    # Format 1: lifts.<lift>.e1rm_estimate (most specific)
+    lifts_data = snapshot_metrics.get("lifts", {})
+    if lift_value in lifts_data:
+        lift_data = lifts_data[lift_value]
+        if isinstance(lift_data, dict):
+            # Try e1rm_estimate first
+            e1rm = lift_data.get("e1rm_estimate")
+            if e1rm and e1rm > 0:
+                return float(e1rm)
+            # Fallback to current_estimate or capacity
+            for key in ["current_estimate", "capacity", "e1rm"]:
+                val = lift_data.get(key)
+                if val and val > 0:
+                    return float(val)
+    
+    # Format 2: strength.<lift>.e1rm (alternative schema)
+    strength_data = snapshot_metrics.get("strength", {})
+    if lift_value in strength_data:
+        lift_data = strength_data[lift_value]
+        if isinstance(lift_data, dict):
+            for key in ["e1rm_estimate", "e1rm", "current_estimate", "capacity"]:
+                val = lift_data.get(key)
+                if val and val > 0:
+                    return float(val)
+    
+    # Format 3: data.e1rm_est or data.lift_e1rm (from strength performance snapshot)
+    data = snapshot_metrics.get("data", {})
+    if isinstance(data, dict):
+        # Direct e1rm_est at top level of data
+        e1rm_est = data.get("e1rm_est")
+        if e1rm_est and e1rm_est > 0:
+            # Check if lift matches (if specified in snapshot)
+            snapshot_lift = data.get("lift")
+            if snapshot_lift is None or snapshot_lift == lift_value:
+                return float(e1rm_est)
+    
+    # Format 4: Check session_type strength and subtype
+    session_type = snapshot_metrics.get("session_type", "")
+    subtype = snapshot_metrics.get("subtype", "")
+    if session_type == "strength" and subtype == lift_value:
+        data = snapshot_metrics.get("data", {})
+        if isinstance(data, dict):
+            e1rm_est = data.get("e1rm_est")
+            if e1rm_est and e1rm_est > 0:
+                return float(e1rm_est)
+    
+    return None
+
+
 def get_lift_capacity_estimate(
     db,
-    athlete_id: int,
+    athlete_id: Optional[int],
     lift: Union[LiftType, str],
     query_date: Optional[date] = None,
 ) -> Tuple[float, str]:
     """
-    Sprint E2.1: Canonical capacity lookup for production strength impulse path.
+    Sprint E2.2: Canonical capacity lookup for production strength impulse path.
     
     Lookup hierarchy (in order of preference):
     1) LiftCapacityProfile.model_capacity - latest profile for athlete + lift on/before query_date
     2) Lift day-state capacity C_l - latest available lift/day state on/before query_date
-    3) Performance snapshot / e1RM-derived estimate - NOT IMPLEMENTED (skip for now)
-    4) Lift-specific default fallback
+    3) Performance snapshot / e1RM-derived estimate - latest reliable lift-specific metric
+    4) Lift-specific default fallback (NEVER returns 200kg universal fallback)
+    
+    Edge cases:
+    - If db is None or athlete_id is None: skips DB-backed sources, goes directly to default
+    - On any DB error: returns lift-specific default with source "default"
     
     Args:
-        db: SQLAlchemy session
-        athlete_id: Athlete ID
+        db: SQLAlchemy session (can be None)
+        athlete_id: Athlete ID (can be None)
         lift: Lift type (string or LiftType enum)
         query_date: Date for lookup (default: today)
     
     Returns:
         Tuple of (capacity_value, source_string)
-        Source strings: "capacity_profile" | "day_state" | "default"
+        Source strings: "capacity_profile" | "day_state" | "performance" | "default"
     """
-    from sqlalchemy import desc
-    import app.models as db_models
-    
-    if query_date is None:
-        query_date = date.today()
-    
-    query_date_str = query_date.isoformat() if isinstance(query_date, date) else str(query_date)
     lift_normalized = normalize_lift_type(lift)
     
-    # 1) Try LiftCapacityProfile.model_capacity (preferred)
-    profile = db.query(db_models.LiftCapacityProfile).filter(
-        db_models.LiftCapacityProfile.athlete_id == athlete_id,
-        db_models.LiftCapacityProfile.lift == lift_normalized,
-    ).order_by(desc(db_models.LiftCapacityProfile.updated_at)).first()
+    # Edge case: No DB or no athlete_id - go directly to lift-specific default
+    if db is None or athlete_id is None:
+        default_capacity = LIFT_SPECIFIC_DEFAULTS.get(lift_normalized, 100.0)
+        return (default_capacity, "default")
     
-    if profile and profile.model_capacity > 0:
-        return (float(profile.model_capacity), "capacity_profile")
-    
-    # 2) Try Lift day-state capacity C_l
-    lift_day_state = db.query(db_models.LiftDayState).filter(
-        db_models.LiftDayState.athlete_id == athlete_id,
-        db_models.LiftDayState.lift == lift_normalized,
-        db_models.LiftDayState.date <= query_date_str,
-    ).order_by(desc(db_models.LiftDayState.date)).first()
-    
-    if lift_day_state and lift_day_state.C_l and lift_day_state.C_l > 0:
-        return (float(lift_day_state.C_l), "day_state")
-    
-    # 4) Lift-specific default fallback
-    default_capacity = LIFT_SPECIFIC_DEFAULTS.get(lift_normalized, 100.0)
-    return (default_capacity, "default")
+    try:
+        from sqlalchemy import desc
+        import app.models as db_models
+        
+        if query_date is None:
+            query_date = date.today()
+        
+        query_date_str = query_date.isoformat() if isinstance(query_date, date) else str(query_date)
+        
+        # 1) Try LiftCapacityProfile.model_capacity (preferred)
+        profile = db.query(db_models.LiftCapacityProfile).filter(
+            db_models.LiftCapacityProfile.athlete_id == athlete_id,
+            db_models.LiftCapacityProfile.lift == lift_normalized,
+        ).order_by(desc(db_models.LiftCapacityProfile.updated_at)).first()
+        
+        if profile and profile.model_capacity > 0:
+            return (float(profile.model_capacity), "capacity_profile")
+        
+        # 2) Try Lift day-state capacity C_l
+        lift_day_state = db.query(db_models.LiftDayState).filter(
+            db_models.LiftDayState.athlete_id == athlete_id,
+            db_models.LiftDayState.lift == lift_normalized,
+            db_models.LiftDayState.date <= query_date_str,
+        ).order_by(desc(db_models.LiftDayState.date)).first()
+        
+        if lift_day_state and lift_day_state.C_l and lift_day_state.C_l > 0:
+            return (float(lift_day_state.C_l), "day_state")
+        
+        # 3) Try Performance snapshot / e1RM-derived estimate
+        # Find the most recent performance snapshot on or before query_date
+        if hasattr(db_models, 'PerformanceSnapshot'):
+            performance_snapshot = db.query(db_models.PerformanceSnapshot).filter(
+                db_models.PerformanceSnapshot.athlete_id == athlete_id,
+                db_models.PerformanceSnapshot.snapshot_date <= query_date_str,
+            ).order_by(desc(db_models.PerformanceSnapshot.snapshot_date)).first()
+            
+            if performance_snapshot and performance_snapshot.metrics_json:
+                capacity = _extract_capacity_from_performance_snapshot(
+                    performance_snapshot.metrics_json,
+                    lift_normalized
+                )
+                if capacity and capacity > 0:
+                    return (float(capacity), "performance")
+        
+        # 4) Lift-specific default fallback (NEVER 200kg)
+        default_capacity = LIFT_SPECIFIC_DEFAULTS.get(lift_normalized, 100.0)
+        return (default_capacity, "default")
+        
+    except Exception:
+        # On any error, return lift-specific default (never 200kg)
+        default_capacity = LIFT_SPECIFIC_DEFAULTS.get(lift_normalized, 100.0)
+        return (default_capacity, "default")
 
 
 # Confidence-dependent breakthrough thresholds

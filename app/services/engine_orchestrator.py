@@ -754,8 +754,8 @@ class EngineOrchestrator:
     ) -> StrengthImpulses:
         """Compute strength impulses from rep_engine output.
         
-        Sprint E2.1: Now uses athlete/lift-specific capacity lookup instead of
-        hardcoded 200kg reference for intensity calculation.
+        Sprint E2.2: Uses athlete/lift-specific capacity lookup with full hierarchy.
+        NEVER falls back to universal 200kg - always uses lift-specific default.
         """
         per_lift = {lift: 0.0}
         u_sys = 0.0
@@ -767,21 +767,14 @@ class EngineOrchestrator:
         # Check if this is a legs lift
         is_legs = lift in ['squat', 'deadlift', 'clean']
         
-        # Sprint E2.1: Get athlete/lift-specific capacity estimate
-        capacity_estimate = 200.0  # Fallback default
-        capacity_source = "fallback"
-        
-        if athlete_id is not None and self.db is not None:
-            try:
-                capacity_estimate, capacity_source = get_lift_capacity_estimate(
-                    db=self.db,
-                    athlete_id=athlete_id,
-                    lift=lift,
-                    query_date=session_date,
-                )
-            except Exception:
-                # On any error, use fallback (already set)
-                pass
+        # Sprint E2.2: Get athlete/lift-specific capacity estimate via canonical lookup
+        # No fallback default here - let the lookup handle it properly
+        capacity_estimate, capacity_source = get_lift_capacity_estimate(
+            db=self.db,
+            athlete_id=athlete_id,
+            lift=lift,
+            query_date=session_date,
+        )
         
         for set_data in sets_data:
             load_kg = set_data.get("load_kg", 0)
