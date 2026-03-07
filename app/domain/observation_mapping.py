@@ -437,8 +437,12 @@ def load_mapping_params(path: str, validate: bool = True, fallback_to_defaults: 
             data = json.load(f)
         
         # Handle both flat and nested formats
+        per_lift = None
         if 'global' in data:
+            per_lift = data.get('per_lift') or data.get('per_lift_a')
             data = data['global']
+        else:
+            per_lift = data.get('per_lift') or data.get('per_lift_a')
         
         if validate:
             is_valid, errors = validate_mapping_params(data)
@@ -449,7 +453,11 @@ def load_mapping_params(path: str, validate: bool = True, fallback_to_defaults: 
                     return ObservationMappingParams.default_params()
                 raise ValueError(f"Invalid params in {path}: {error_msg}")
         
-        return ObservationMappingParams.from_dict(data)
+        # Build params with per_lift if present
+        params = ObservationMappingParams.from_dict(data)
+        if per_lift:
+            params.per_lift_a = per_lift
+        return params
     
     except json.JSONDecodeError as e:
         if fallback_to_defaults:
