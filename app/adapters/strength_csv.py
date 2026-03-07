@@ -46,6 +46,7 @@ LIFT_CODE_MAP = {
     "pc": LiftType.POWER_CLEAN,
     "clean": LiftType.POWER_CLEAN,
     "power clean": LiftType.POWER_CLEAN,
+    "power_clean": LiftType.POWER_CLEAN,
     "other": None,  # Skip unsupported lifts
 }
 
