@@ -21,6 +21,9 @@ from app.domain.observation_mapping import (
     ObservationMappingParams,
     predict_perf_y_constrained,
     predict_perf_y_from_readiness_legacy,
+    load_mapping_params,
+    save_mapping_params,
+    validate_mapping_params,
 )
 
 
@@ -53,7 +56,7 @@ def _find_config_file() -> Optional[str]:
 
 def load_calibrated_params(config_path: Optional[str] = None) -> Optional[ObservationMappingParams]:
     """
-    Load calibrated parameters from config file.
+    Load calibrated parameters from config file with validation.
     
     Args:
         config_path: Explicit path to config file, or None to search default locations
@@ -67,33 +70,11 @@ def load_calibrated_params(config_path: Optional[str] = None) -> Optional[Observ
         return None
     
     try:
-        with open(path, 'r') as f:
-            data = json.load(f)
-        
-        # Handle both flat and nested formats
-        if 'global' in data:
-            # Nested format: { "global": {...}, "per_lift": {...} }
-            global_params = data['global']
-            per_lift = data.get('per_lift')
-        else:
-            # Flat format: direct params
-            global_params = data
-            per_lift = data.get('per_lift_a')
-        
-        # Build params object
-        params = ObservationMappingParams(
-            a=global_params.get('a', 0.6),
-            b_l=global_params.get('b_l', 0.25),
-            b_sys=global_params.get('b_sys', 0.15),
-            b_t=global_params.get('b_t', 0.10),
-            y_min=global_params.get('y_min', 0.60),
-            y_max=global_params.get('y_max', 1.10),
-            per_lift_a=per_lift,
-        )
-        
+        # Use domain layer validation
+        params = load_mapping_params(path, validate=True, fallback_to_defaults=False)
         return params
     
-    except (json.JSONDecodeError, KeyError, TypeError) as e:
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as e:
         print(f"Warning: Failed to load calibrated params from {path}: {e}")
         return None
 
@@ -227,7 +208,7 @@ def install_calibrated_params(
     if create_dirs:
         path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Write with metadata
+    # Write with metadata using domain layer save
     output = {
         "version": 1,
         "global": {

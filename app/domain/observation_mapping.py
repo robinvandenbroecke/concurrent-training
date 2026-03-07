@@ -11,6 +11,7 @@ Constraints:
 """
 
 import json
+import os
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional, Tuple
 import statistics
@@ -367,14 +368,107 @@ def _linspace(start: float, stop: float, num: int) -> List[float]:
     return [start + i * step for i in range(num)]
 
 
-def load_mapping_params(path: str) -> ObservationMappingParams:
-    """Load mapping parameters from JSON file."""
-    with open(path, 'r') as f:
-        data = json.load(f)
-    return ObservationMappingParams.from_dict(data)
+def validate_mapping_params(data: dict) -> tuple[bool, list[str]]:
+    """
+    Validate mapping parameters dict.
+    
+    Returns:
+        (is_valid, list_of_errors)
+    """
+    errors = []
+    
+    # Check required fields
+    required_fields = ['a', 'b_l', 'b_sys', 'b_t', 'y_min', 'y_max']
+    for field in required_fields:
+        if field not in data:
+            errors.append(f"Missing required field: {field}")
+    
+    if errors:
+        return False, errors
+    
+    # Validate types and ranges
+    float_fields = ['a', 'b_l', 'b_sys', 'b_t', 'y_min', 'y_max']
+    for field in float_fields:
+        try:
+            val = float(data[field])
+            if field in ['b_l', 'b_sys', 'b_t'] and val < 0:
+                errors.append(f"{field} must be >= 0, got {val}")
+            if field == 'y_min' and not (0 <= val <= 1):
+                errors.append(f"y_min must be in [0, 1], got {val}")
+            if field == 'y_max' and not (0.5 <= val <= 2):
+                errors.append(f"y_max must be in [0.5, 2], got {val}")
+        except (TypeError, ValueError):
+            errors.append(f"{field} must be numeric, got {type(data[field])}")
+    
+    # Validate y_min < y_max
+    try:
+        if float(data['y_min']) >= float(data['y_max']):
+            errors.append(f"y_min must be < y_max")
+    except (TypeError, ValueError):
+        pass  # Already caught above
+    
+    return len(errors) == 0, errors
 
 
-def save_mapping_params(params: ObservationMappingParams, path: str):
-    """Save mapping parameters to JSON file."""
+def load_mapping_params(path: str, validate: bool = True, fallback_to_defaults: bool = True) -> ObservationMappingParams:
+    """
+    Load mapping parameters from JSON file with validation.
+    
+    Args:
+        path: Path to JSON file
+        validate: If True, validate params before returning
+        fallback_to_defaults: If True and validation fails, return defaults
+    
+    Returns:
+        ObservationMappingParams (loaded or fallback)
+    
+    Raises:
+        ValueError: If validation fails and fallback_to_defaults is False
+        FileNotFoundError: If file doesn't exist
+    """
+    if not os.path.exists(path):
+        if fallback_to_defaults:
+            print(f"Warning: Params file not found at {path}, using defaults")
+            return ObservationMappingParams.default_params()
+        raise FileNotFoundError(f"Params file not found: {path}")
+    
+    try:
+        with open(path, 'r') as f:
+            data = json.load(f)
+        
+        # Handle both flat and nested formats
+        if 'global' in data:
+            data = data['global']
+        
+        if validate:
+            is_valid, errors = validate_mapping_params(data)
+            if not is_valid:
+                error_msg = "; ".join(errors)
+                if fallback_to_defaults:
+                    print(f"Warning: Invalid params in {path}: {error_msg}. Using defaults.")
+                    return ObservationMappingParams.default_params()
+                raise ValueError(f"Invalid params in {path}: {error_msg}")
+        
+        return ObservationMappingParams.from_dict(data)
+    
+    except json.JSONDecodeError as e:
+        if fallback_to_defaults:
+            print(f"Warning: Invalid JSON in {path}: {e}. Using defaults.")
+            return ObservationMappingParams.default_params()
+        raise
+
+
+def save_mapping_params(params: ObservationMappingParams, path: str, create_dirs: bool = True):
+    """
+    Save mapping parameters to JSON file.
+    
+    Args:
+        params: Parameters to save
+        path: Target file path
+        create_dirs: If True, create parent directories
+    """
+    if create_dirs:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    
     with open(path, 'w') as f:
         json.dump(params.to_dict(), f, indent=2)
