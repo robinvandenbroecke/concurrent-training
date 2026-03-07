@@ -1,0 +1,26 @@
+{
+  "A_full_model": {
+    "mae": 1.0819,
+    "description": "Current full model with all components"
+  },
+  "B_no_R_mito": {
+    "mae": 1.7638,
+    "description": "Model without mitochondrial stress component"
+  },
+  "C_no_T_legs": {
+    "mae": 1.7638,
+    "description": "Model without legs tonnage tracking"
+  },
+  "D_simple_readiness": {
+    "mae": 1.7462,
+    "description": "Simple readiness: 1 - D_l - 0.3*D_sys"
+  },
+  "E_banister_baseline": {
+    "mae": 0.9627,
+    "description": "Banister TRIMP-based baseline"
+  },
+  "F_velocity_threshold": {
+    "mae": 0.9036,
+    "description": "Simple velocity threshold baseline"
+  }
+}

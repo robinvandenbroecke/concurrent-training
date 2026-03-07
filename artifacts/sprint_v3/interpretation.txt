@@ -1,0 +1,65 @@
+
+================================================================================
+SPRINT V3: INTERPRETATION
+================================================================================
+
+1. WHICH STATE(S) HURT PERFORMANCE?
+------------------------------------
+
+Best performing configuration: F_velocity_threshold (MAE: 0.9036)
+Worst performing configuration: B_no_R_mito (MAE: 1.7638)
+
+Ablation ranking (best to worst):
+  1. F_velocity_threshold: MAE = 0.9036 - Simple velocity threshold baseline
+  2. E_banister_baseline: MAE = 0.9627 - Banister TRIMP-based baseline
+  3. A_full_model: MAE = 1.0819 - Current full model with all components
+  4. D_simple_readiness: MAE = 1.7462 - Simple readiness: 1 - D_l - 0.3*D_sys
+  5. B_no_R_mito: MAE = 1.7638 - Model without mitochondrial stress component
+  6. C_no_T_legs: MAE = 1.7638 - Model without legs tonnage tracking
+
+Key Finding: If removing a component improves MAE, that component is adding noise
+rather than signal in the current formulation.
+
+
+2. IS OBSERVATION MAPPING THE MAIN BOTTLENECK?
+-----------------------------------------------
+Model 1 (readiness only) MAE: 0.5949
+Model 2 (+D_l +D_sys) MAE: 0.5679
+Model 3 (+T_legs) MAE: 0.5626
+
+Current full model MAE: 1.0819
+
+If recalibration MAE << current model MAE, the observation mapping is the problem.
+If recalibration MAE ~ current model MAE, the internal state computation is the problem.
+
+
+3. SHOULD WE SIMPLIFY OR RECALIBRATE?
+--------------------------------------
+
+RECOMMENDATION: PARTIAL SIMPLIFICATION
+- Some components help, others hurt
+- Keep D_l and D_sys (they capture real fatigue)
+- Consider removing or reformulating R_mito, E_fat, T_legs contributions
+
+
+4. TOP ERROR PATTERNS
+---------------------
+Worst predictions tend to occur when:
+  - 0/10 had missing velocity data
+  - 8/10 had high local fatigue (D_l > 0.3)
+
+
+5. ERROR BY CONTEXT
+-------------------
+
+Legs tonnage impact:
+  - High T_legs: MAE = 0.8087
+  - Low T_legs: MAE = 1.2617
+  - High leg volume helps prediction
+
+
+================================================================================
+CONCLUSION
+================================================================================
+See ablation_summary.json and recalibration_summary.json for detailed numbers.
+The day_error_attribution.csv contains all samples for further analysis.

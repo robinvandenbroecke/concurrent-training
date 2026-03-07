@@ -1,0 +1,158 @@
+{
+  "top_10_worst_errors": [
+    {
+      "date": "2026-01-29",
+      "lift": "press",
+      "error": 3.9359,
+      "predicted": 0.75,
+      "observed": 4.6859,
+      "D_l": 2.442,
+      "D_sys": 1.0741,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-29",
+      "lift": "press",
+      "error": 3.9359,
+      "predicted": 0.75,
+      "observed": 4.6859,
+      "D_l": 2.442,
+      "D_sys": 1.0741,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-22",
+      "lift": "power_clean",
+      "error": 3.3702,
+      "predicted": 0.9308,
+      "observed": 4.301,
+      "D_l": 0.2043,
+      "D_sys": 0.1446,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-22",
+      "lift": "power_clean",
+      "error": 3.3702,
+      "predicted": 0.9308,
+      "observed": 4.301,
+      "D_l": 0.2043,
+      "D_sys": 0.1446,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-10",
+      "lift": "press",
+      "error": 2.1503,
+      "predicted": 0.75,
+      "observed": 2.9003,
+      "D_l": 3.932,
+      "D_sys": 1.9502,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-10",
+      "lift": "press",
+      "error": 2.1503,
+      "predicted": 0.75,
+      "observed": 2.9003,
+      "D_l": 3.932,
+      "D_sys": 1.9502,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-08",
+      "lift": "deadlift",
+      "error": 2.0739,
+      "predicted": 0.75,
+      "observed": 2.8239,
+      "D_l": 3.9291,
+      "D_sys": 2.0095,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-01-08",
+      "lift": "deadlift",
+      "error": 2.0739,
+      "predicted": 0.75,
+      "observed": 2.8239,
+      "D_l": 3.9291,
+      "D_sys": 2.0095,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-02-16",
+      "lift": "deadlift",
+      "error": 2.0212,
+      "predicted": 0.75,
+      "observed": 2.7712,
+      "D_l": 9.6793,
+      "D_sys": 4.4963,
+      "velocity_missing": false
+    },
+    {
+      "date": "2026-03-09",
+      "lift": "bench",
+      "error": 1.7566,
+      "predicted": 0.75,
+      "observed": 2.5066,
+      "D_l": 2.0796,
+      "D_sys": 1.1775,
+      "velocity_missing": false
+    }
+  ],
+  "average_error_by_lift": {
+    "squat": {
+      "mean_error": 0.3184,
+      "n": 6
+    },
+    "bench": {
+      "mean_error": 0.8154,
+      "n": 15
+    },
+    "deadlift": {
+      "mean_error": 1.1479,
+      "n": 14
+    },
+    "press": {
+      "mean_error": 1.4408,
+      "n": 19
+    },
+    "power_clean": {
+      "mean_error": 1.1748,
+      "n": 9
+    }
+  },
+  "error_by_velocity_availability": {
+    "with_velocity": {
+      "mean_error": 1.0819,
+      "n": 63
+    },
+    "without_velocity": {
+      "mean_error": null,
+      "n": 0
+    }
+  },
+  "error_by_t_legs": {
+    "high_t_legs": {
+      "mean_error": 0.8087,
+      "median_t_legs": 0.8266,
+      "n": 25
+    },
+    "low_t_legs": {
+      "mean_error": 1.2617,
+      "n": 38
+    }
+  },
+  "error_by_d_sys": {
+    "high_d_sys": {
+      "mean_error": 0.8373,
+      "median_d_sys": 1.285,
+      "n": 31
+    },
+    "low_d_sys": {
+      "mean_error": 1.3189,
+      "n": 32
+    }
+  }
+}

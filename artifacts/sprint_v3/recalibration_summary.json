@@ -1,0 +1,29 @@
+{
+  "model_1_readiness_only": {
+    "formula": "pred = 1.7365 + 2.9343 * readiness",
+    "mae": 0.5949,
+    "coefficients": {
+      "a": 1.7365,
+      "b": 2.9343
+    }
+  },
+  "model_2_D_l_D_sys": {
+    "formula": "pred = 1.7258 + -0.3314*(1-D_l) + 0.6996*(1-D_sys)",
+    "mae": 0.5679,
+    "coefficients": {
+      "a": 1.7258,
+      "b": -0.3314,
+      "c": 0.6996
+    }
+  },
+  "model_3_with_T_legs": {
+    "formula": "pred = 2.6135 + -0.2703*(1-D_l) + 0.5148*(1-D_sys) + -1.1862*T_legs",
+    "mae": 0.5626,
+    "coefficients": {
+      "a": 2.6135,
+      "b": -0.2703,
+      "c": 0.5148,
+      "d": -1.1862
+    }
+  }
+}
