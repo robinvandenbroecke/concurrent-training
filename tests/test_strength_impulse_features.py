@@ -1095,6 +1095,83 @@ class TestMetabolicImpulse:
         # High metabolic cost should give higher u_met
         assert impulses2.u_met > impulses1.u_met
 
+    def test_normalize_velocities_accepts_various_inputs(self):
+        """P2: normalize_velocities handles JSON string, list, and invalid inputs."""
+        from app.services.strength_impulse_features import normalize_velocities
+        import json
+
+        # JSON string
+        velocities_json = json.dumps([0.55, 0.50, 0.45])
+        result = normalize_velocities(velocities_json)
+        assert result == [0.55, 0.50, 0.45]
+
+        # Python list
+        velocities_list = [0.55, 0.50, 0.45]
+        result = normalize_velocities(velocities_list)
+        assert result == [0.55, 0.50, 0.45]
+
+        # Invalid JSON string
+        result = normalize_velocities("invalid json")
+        assert result is None
+
+        # None input
+        result = normalize_velocities(None)
+        assert result is None
+
+        # Empty list
+        result = normalize_velocities([])
+        assert result is None
+
+    def test_legs_weights_applied_correctly(self, db_session, sample_athlete):
+        """P2: Lift-specific legs weights are applied to u_legs."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        test_cases = [
+            ("squat", 1.0),
+            ("deadlift", 1.2),
+            ("bench", 0.0),
+        ]
+
+        for lift_name, expected_weight in test_cases:
+            # Ensure profile exists
+            existing = db_session.query(LiftProfile).filter(
+                LiftProfile.athlete_id == sample_athlete.id,
+                LiftProfile.lift == lift_name
+            ).first()
+
+            if not existing:
+                db_session.add(LiftProfile(
+                    athlete_id=sample_athlete.id,
+                    lift=lift_name,
+                    a=0.55, b=0.0030
+                ))
+                db_session.commit()
+
+            sets_data = [{"load_kg": 100, "reps": 5}]
+
+            mock_rep = MagicMock()
+            mock_rep.y = 0.85
+            mock_set = MagicMock()
+            mock_set.VL = 0.20
+            mock_set.reps = [mock_rep] * 5
+            mock_session = MagicMock()
+            mock_session.sets = [mock_set]
+
+            impulses = orchestrator._compute_strength_impulses(
+                lift=lift_name,
+                sets_data=sets_data,
+                rep_output=mock_session,
+                athlete_id=sample_athlete.id,
+            )
+
+            if expected_weight > 0:
+                assert impulses.u_legs > 0
+            else:
+                assert impulses.u_legs == 0.0
+
 
 class TestDayEngineAlignment:
     """Test P2: Strength impulses align with day_engine expectations."""
@@ -1197,3 +1274,50 @@ class TestDayEngineAlignment:
         # u_met should be sum of all sets
         assert impulses.u_met > 0
         # Should be roughly 3x a single set (accounting for rest differences)
+
+
+class TestAggregateDebugStats:
+    """Test P2: Aggregate debug stats are computed correctly."""
+
+    def test_aggregate_debug_stats_present(self, db_session, sample_athlete):
+        """P2: Aggregate debug stats are attached to impulses."""
+        from app.services.engine_orchestrator import EngineOrchestrator
+        from app.models import LiftProfile
+
+        existing = db_session.query(LiftProfile).filter(
+            LiftProfile.athlete_id == sample_athlete.id,
+            LiftProfile.lift == "squat"
+        ).first()
+
+        if not existing:
+            db_session.add(LiftProfile(
+                athlete_id=sample_athlete.id,
+                lift="squat",
+                a=0.55, b=0.0030
+            ))
+            db_session.commit()
+
+        orchestrator = EngineOrchestrator(db_session)
+
+        # Multiple sets with different velocity data
+        sets_data = [
+            {"load_kg": 100, "reps": 5, "velocities": [0.22, 0.20]},  # With velocity
+            {"load_kg": 100, "reps": 5},  # No velocity (neutral fallback)
+        ]
+
+        impulses = orchestrator._compute_strength_impulses(
+            lift="squat",
+            sets_data=sets_data,
+            rep_output=None,
+            athlete_id=sample_athlete.id,
+        )
+
+        # Check aggregate stats
+        assert hasattr(impulses, '_avg_velocity_factor')
+        assert hasattr(impulses, '_avg_vl')
+        assert hasattr(impulses, '_total_sets_with_velocity')
+        assert hasattr(impulses, '_total_sets_neutral_fallback')
+
+        # Verify counts
+        assert impulses._total_sets_with_velocity == 1  # First set has velocities
+        assert impulses._total_sets_neutral_fallback == 1  # Second set has no velocities

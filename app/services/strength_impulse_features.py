@@ -20,6 +20,49 @@ M_SCALE = 0.15    # Metabolic scaling factor
 INTENSITY_PENALTY_MIN = 0.6  # Floor for intensity penalty
 
 
+def normalize_velocities(raw_velocities: Any) -> Optional[List[float]]:
+    """
+    Sprint P2: Normalize velocities input to a list of floats.
+    
+    Handles:
+    - JSON string -> parse to list
+    - Python list -> validate floats
+    - Invalid/malformed -> None
+    
+    Args:
+        raw_velocities: Raw velocities input (JSON string, list, or other)
+    
+    Returns:
+        List of float velocities, or None if invalid
+    """
+    if raw_velocities is None:
+        return None
+    
+    velocities = None
+    
+    # Handle JSON string
+    if isinstance(raw_velocities, str):
+        try:
+            import json
+            velocities = json.loads(raw_velocities)
+        except (json.JSONDecodeError, ValueError):
+            return None
+    elif isinstance(raw_velocities, (list, tuple)):
+        velocities = raw_velocities
+    else:
+        return None
+    
+    # Validate and convert to floats
+    if not velocities or not isinstance(velocities, (list, tuple)):
+        return None
+    
+    try:
+        normalized = [float(v) for v in velocities if v is not None]
+        return normalized if len(normalized) >= 1 else None
+    except (ValueError, TypeError):
+        return None
+
+
 @dataclass
 class StrengthImpulseFeatures:
     """Real features computed from rep_engine output for a set."""
@@ -234,7 +277,9 @@ def compute_strength_impulse_features(
     
     # B) Derive from raw velocities if available
     if set_data is not None:
-        velocities = set_data.get("velocities", [])
+        # Sprint P2: Normalize velocities (handles JSON string, list, etc.)
+        raw_velocities = set_data.get("velocities", [])
+        velocities = normalize_velocities(raw_velocities)
         load_kg = set_data.get("load_kg", 0)
         
         if velocities and len(velocities) >= 2:

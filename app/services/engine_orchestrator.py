@@ -768,8 +768,17 @@ class EngineOrchestrator:
         u_legs_high_intensity = 0.0
         set_impulses = []
         
-        # Check if this is a legs lift
-        is_legs = lift in ['squat', 'deadlift', 'clean']
+        # Sprint P2: Legs weights for u_legs contribution
+        LEGS_WEIGHTS = {
+            'squat': 1.0,
+            'deadlift': 1.2,
+            'clean': 0.8,
+            'power_clean': 0.8,
+            'bench': 0.0,
+            'press': 0.0,
+        }
+        legs_weight = LEGS_WEIGHTS.get(lift, 0.0)
+        is_legs = legs_weight > 0
         
         # Sprint E2.2: Get athlete/lift-specific capacity estimate via canonical lookup
         # No fallback default here - let the lookup handle it properly
@@ -823,10 +832,11 @@ class EngineOrchestrator:
             u_sys += set_impulse * (1.3 if is_legs else 0.7)
             u_met += set_metabolic  # Sprint P2: Accumulate metabolic impulse
 
+            # Sprint P2: Legs contribution with lift-specific weight
             if is_legs:
-                u_legs += set_impulse
+                u_legs += legs_weight * set_impulse
                 if intensity > 0.85:
-                    u_legs_high_intensity += set_impulse * 0.5
+                    u_legs_high_intensity += legs_weight * set_impulse * 0.5
 
             set_impulses.append(SetImpulse(
                 lift=lift,
@@ -860,6 +870,16 @@ class EngineOrchestrator:
         impulses._alpha_i = ALPHA_I
         impulses._p_vl = P_VL
         impulses._u_met = u_met  # Sprint P2: Expose metabolic impulse for debugging
+        
+        # Sprint P2: Aggregate debug stats
+        total_sets = len(set_impulses)
+        sets_with_velocity = sum(1 for s in set_impulses if s.velocity_factor != 1.0)
+        sets_neutral_fallback = sum(1 for s in set_impulses if s.velocity_factor == 1.0 and s.vl == 0.0)
+        
+        impulses._avg_velocity_factor = sum(feature_sources) / len(feature_sources) if feature_sources else 1.0
+        impulses._avg_vl = sum(vl_values) / len(vl_values) if vl_values else 0.0
+        impulses._total_sets_with_velocity = sets_with_velocity
+        impulses._total_sets_neutral_fallback = sets_neutral_fallback
 
         return impulses
     
