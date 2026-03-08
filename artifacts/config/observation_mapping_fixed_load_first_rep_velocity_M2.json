@@ -1,0 +1,25 @@
+{
+  "a": 0.8142857142857143,
+  "b_l": 0.0,
+  "b_sys": 0.0,
+  "b_t": 0.2857142857142857,
+  "y_min": 0.6,
+  "y_max": 1.1,
+  "per_lift_a": {
+    "squat": 0.7142857142857144,
+    "power_clean": 0.7714285714285716,
+    "press": 0.7142857142857144,
+    "bench": 0.8285714285714287,
+    "deadlift": 1.0
+  },
+  "per_lift_b_l": {
+    "squat": 0.0,
+    "power_clean": 0.0,
+    "press": 0.0,
+    "bench": 0.0,
+    "deadlift": 0.0
+  },
+  "target_mode": "fixed_load_first_rep_velocity",
+  "mapping_variant": "M2",
+  "updated_at": null
+}

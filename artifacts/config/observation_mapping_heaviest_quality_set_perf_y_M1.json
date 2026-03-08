@@ -1,0 +1,19 @@
+{
+  "a": 0.9285714285714285,
+  "b_l": 0.0,
+  "b_sys": 0.0,
+  "b_t": 0.14285714285714285,
+  "y_min": 0.6,
+  "y_max": 1.1,
+  "per_lift_a": {
+    "squat": 0.2,
+    "power_clean": 0.8285714285714287,
+    "press": 0.9428571428571428,
+    "bench": 0.8285714285714287,
+    "deadlift": 1.0
+  },
+  "per_lift_b_l": null,
+  "target_mode": "heaviest_quality_set_perf_y",
+  "mapping_variant": "M1",
+  "updated_at": null
+}

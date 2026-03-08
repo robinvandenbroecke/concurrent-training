@@ -1,0 +1,54 @@
+{
+  "heaviest_quality_set_perf_y": {
+    "description": "Heaviest quality set perf_y",
+    "per_lift_mae": {
+      "M0": {
+        "squat": 0.2666,
+        "power_clean": 0.236,
+        "press": 0.1483,
+        "bench": 0.1966,
+        "deadlift": 0.1931
+      },
+      "M1": {
+        "squat": 0.1763,
+        "power_clean": 0.2316,
+        "press": 0.149,
+        "bench": 0.1812,
+        "deadlift": 0.1654
+      },
+      "M2": {
+        "squat": 0.1763,
+        "power_clean": 0.2316,
+        "press": 0.149,
+        "bench": 0.1809,
+        "deadlift": 0.1654
+      }
+    }
+  },
+  "fixed_load_first_rep_velocity": {
+    "description": "Fixed-load first-rep velocity",
+    "per_lift_mae": {
+      "M0": {
+        "squat": 0.1747,
+        "power_clean": 0.1548,
+        "press": 0.1649,
+        "bench": 0.1812,
+        "deadlift": 0.2385
+      },
+      "M1": {
+        "squat": 0.1414,
+        "power_clean": 0.1483,
+        "press": 0.1491,
+        "bench": 0.1838,
+        "deadlift": 0.1158
+      },
+      "M2": {
+        "squat": 0.1414,
+        "power_clean": 0.1483,
+        "press": 0.1491,
+        "bench": 0.1838,
+        "deadlift": 0.1158
+      }
+    }
+  }
+}

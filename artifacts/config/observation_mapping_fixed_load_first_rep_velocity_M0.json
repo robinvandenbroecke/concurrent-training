@@ -1,0 +1,13 @@
+{
+  "a": 0.8142857142857143,
+  "b_l": 0.0,
+  "b_sys": 0.0,
+  "b_t": 0.2857142857142857,
+  "y_min": 0.6,
+  "y_max": 1.1,
+  "per_lift_a": null,
+  "per_lift_b_l": null,
+  "target_mode": "fixed_load_first_rep_velocity",
+  "mapping_variant": "M0",
+  "updated_at": null
+}

@@ -1,0 +1,20 @@
+{
+  "heaviest_quality_set_perf_y": {
+    "description": "Heaviest quality set perf_y",
+    "baseline_a_mae": 0.1968,
+    "baseline_b_mae": 0.2278,
+    "best_model_mae": 0.1764,
+    "best_variant": "M2",
+    "model_beats_baseline_a": true,
+    "model_beats_baseline_b": true
+  },
+  "fixed_load_first_rep_velocity": {
+    "description": "Fixed-load first-rep velocity",
+    "baseline_a_mae": 0.1901,
+    "baseline_b_mae": 0.1747,
+    "best_model_mae": 0.1491,
+    "best_variant": "M1",
+    "model_beats_baseline_a": true,
+    "model_beats_baseline_b": true
+  }
+}
