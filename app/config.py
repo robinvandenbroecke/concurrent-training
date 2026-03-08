@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # Sprint A: Feature flag for legacy model
     use_legacy_model: bool = False  # USE_LEGACY_MODEL env var
     
+    # Sprint V4.4: Day-level strength target mode
+    day_level_strength_target_mode: str = "legacy_ratio"  # Options: "legacy_ratio", "heaviest_quality_set_perf_y", "fixed_load_first_rep_velocity", "quality_set_composite"
+    
     # Strava OAuth settings
     strava_client_id: str = ""
     strava_client_secret: str = ""

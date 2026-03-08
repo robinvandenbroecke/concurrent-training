@@ -1,0 +1,50 @@
+{
+  "legacy_rep2_rep1_ratio": {
+    "description": "Legacy (rep2/rep1)",
+    "n_samples": 63,
+    "mae": 0.8211,
+    "target_stats": {
+      "mean": 1.840776,
+      "std": 0.899856,
+      "min": 0.790177,
+      "max": 4.685944,
+      "p10": 1.0,
+      "p50": 1.689847,
+      "p90": 2.823865,
+      "n": 63
+    },
+    "scale_alignment": {
+      "in_bounds": 15,
+      "total": 63,
+      "fraction_in_bounds": 0.2381,
+      "mapping_bounds": [
+        0.6,
+        1.1
+      ]
+    }
+  },
+  "heaviest_quality_set_perf_y": {
+    "description": "Heaviest quality set perf_y",
+    "n_samples": 62,
+    "mae": 0.2143,
+    "target_stats": {
+      "mean": 0.892833,
+      "std": 0.216412,
+      "min": 0.6,
+      "max": 1.1,
+      "p10": 0.6,
+      "p50": 0.93035,
+      "p90": 1.1,
+      "n": 62
+    },
+    "scale_alignment": {
+      "in_bounds": 62,
+      "total": 62,
+      "fraction_in_bounds": 1.0,
+      "mapping_bounds": [
+        0.6,
+        1.1
+      ]
+    }
+  }
+}
