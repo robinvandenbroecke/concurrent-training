@@ -1,0 +1,96 @@
+{
+  "ablations": [
+    {
+      "features": "T_legs_only",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 0.8999999999999999,
+        "b_t": 0.3,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    {
+      "features": "D_l_only",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 1.2,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    {
+      "features": "D_sys_only",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 1.2,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    {
+      "features": "D_l_plus_D_sys",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 1.2,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    {
+      "features": "D_l_plus_T_legs",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 0.8999999999999999,
+        "b_t": 0.3,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    {
+      "features": "D_sys_plus_T_legs",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.8999999999999999,
+        "b_sys": 0.0,
+        "b_t": 0.3,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    },
+    {
+      "features": "D_l_plus_D_sys_plus_T_legs",
+      "mae": 0.8211,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      }
+    }
+  ],
+  "additive_improvement": -0.0164
+}

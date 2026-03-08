@@ -1,0 +1,30 @@
+{
+  "variants": [
+    {
+      "variant": "A_raw_one_minus",
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 1.2,
+        "b_t": 1.5,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      },
+      "mae": 0.8047
+    },
+    {
+      "variant": "B_zscored",
+      "params": {
+        "a": 1.0,
+        "b_l": 0.3,
+        "b_sys": 1.2,
+        "b_t": 0.0,
+        "y_min": 0.6,
+        "y_max": 1.1,
+        "per_lift_a": null
+      },
+      "mae": 0.8079
+    }
+  ]
+}

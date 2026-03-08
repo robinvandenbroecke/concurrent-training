@@ -1,0 +1,21 @@
+{
+  "pairwise_correlations": {
+    "D_l_vs_D_sys": {
+      "pearson": 0.9482,
+      "spearman": 0.8756
+    },
+    "D_l_vs_T_legs": {
+      "pearson": 0.3845,
+      "spearman": 0.4597
+    },
+    "D_sys_vs_T_legs": {
+      "pearson": 0.4733,
+      "spearman": 0.6436
+    }
+  },
+  "vif_proxy": {
+    "D_l": 2.0986,
+    "D_sys": 2.2807,
+    "T_legs": 1.2284
+  }
+}

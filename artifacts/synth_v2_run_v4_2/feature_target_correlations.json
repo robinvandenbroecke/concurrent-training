@@ -1,0 +1,28 @@
+{
+  "global": {
+    "D_l": {
+      "pearson": -0.1325,
+      "spearman": -0.0022
+    },
+    "D_sys": {
+      "pearson": -0.2585,
+      "spearman": -0.2386
+    },
+    "T_legs": {
+      "pearson": -0.4318,
+      "spearman": -0.3951
+    },
+    "(1 - D_l)": {
+      "pearson": 0.1325,
+      "spearman": 0.0022
+    },
+    "(1 - D_sys)": {
+      "pearson": 0.2585,
+      "spearman": 0.2386
+    },
+    "(1 - T_legs)": {
+      "pearson": 0.4318,
+      "spearman": 0.3951
+    }
+  }
+}
