@@ -17,6 +17,8 @@
       "in_bounds": 15,
       "total": 63,
       "fraction_in_bounds": 0.2381,
+      "clipping_count": 48,
+      "clipping_rate": 0.7619,
       "mapping_bounds": [
         0.6,
         1.1
@@ -32,33 +34,35 @@
   },
   "heaviest_quality_set_perf_y": {
     "description": "Heaviest quality set perf_y",
-    "n_samples": 31,
-    "n_missing": 36,
+    "n_samples": 62,
+    "n_missing": 5,
     "target_stats": {
-      "mean": 1.049186,
-      "std": 0.122688,
-      "min": 0.687541,
+      "mean": 0.892833,
+      "std": 0.216412,
+      "min": 0.6,
       "max": 1.1,
-      "p10": 0.930233,
-      "p50": 1.1,
+      "p10": 0.6,
+      "p50": 0.93035,
       "p90": 1.1,
-      "n": 31
+      "n": 62
     },
     "scale_alignment": {
-      "in_bounds": 31,
-      "total": 31,
+      "in_bounds": 62,
+      "total": 62,
       "fraction_in_bounds": 1.0,
+      "clipping_count": 0,
+      "clipping_rate": 0.0,
       "mapping_bounds": [
         0.6,
         1.1
       ]
     },
     "per_lift_availability": {
-      "bench": 7,
-      "deadlift": 10,
-      "press": 9,
-      "power_clean": 3,
-      "squat": 2
+      "power_clean": 11,
+      "bench": 13,
+      "deadlift": 13,
+      "press": 19,
+      "squat": 6
     }
   },
   "fixed_load_first_rep_velocity": {
@@ -79,6 +83,8 @@
       "in_bounds": 67,
       "total": 67,
       "fraction_in_bounds": 1.0,
+      "clipping_count": 0,
+      "clipping_rate": 0.0,
       "mapping_bounds": [
         0.6,
         1.1

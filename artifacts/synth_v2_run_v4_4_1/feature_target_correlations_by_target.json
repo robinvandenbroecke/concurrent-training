@@ -15,14 +15,14 @@
   "heaviest_quality_set_perf_y": {
     "description": "Heaviest quality set perf_y",
     "feature_correlations": {
-      "D_l": 0.2552,
-      "D_sys": 0.0883,
-      "T_legs": -0.0903
+      "D_l": -0.0014,
+      "D_sys": -0.1355,
+      "T_legs": -0.0913
     },
     "feature_collinearity": {
-      "D_l_vs_D_sys": 0.9488,
-      "D_l_vs_T_legs": 0.247,
-      "D_sys_vs_T_legs": 0.3911
+      "D_l_vs_D_sys": 0.9568,
+      "D_l_vs_T_legs": 0.3443,
+      "D_sys_vs_T_legs": 0.4298
     }
   },
   "fixed_load_first_rep_velocity": {

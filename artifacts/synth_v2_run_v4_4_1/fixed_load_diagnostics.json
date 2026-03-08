@@ -1,0 +1,41 @@
+{
+  "total_sessions": 67,
+  "total_candidate_sets": 658,
+  "sets_selected": 67,
+  "sets_rejected_no_velocity": 156,
+  "sets_rejected_load_range": 467,
+  "sets_rejected_no_capacity": 0,
+  "per_lift_breakdown": {
+    "power_clean": {
+      "candidate_sets": 111,
+      "selected": 13,
+      "rejected_no_velocity": 28,
+      "rejected_load_range": 76
+    },
+    "bench": {
+      "candidate_sets": 132,
+      "selected": 15,
+      "rejected_no_velocity": 32,
+      "rejected_load_range": 92
+    },
+    "deadlift": {
+      "candidate_sets": 136,
+      "selected": 14,
+      "rejected_no_velocity": 39,
+      "rejected_load_range": 85
+    },
+    "press": {
+      "candidate_sets": 213,
+      "selected": 19,
+      "rejected_no_velocity": 37,
+      "rejected_load_range": 176
+    },
+    "squat": {
+      "candidate_sets": 66,
+      "selected": 6,
+      "rejected_no_velocity": 20,
+      "rejected_load_range": 38
+    }
+  },
+  "selection_rate": 1.0
+}

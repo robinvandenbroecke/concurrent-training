@@ -7,9 +7,9 @@
   },
   "heaviest_quality_set_perf_y": {
     "description": "Heaviest quality set perf_y",
-    "mae_model": 0.0863,
-    "mae_baseline_a": 0.1498,
-    "mae_baseline_b": 0.2194
+    "mae_model": 0.2143,
+    "mae_baseline_a": 0.1968,
+    "mae_baseline_b": 0.2278
   },
   "fixed_load_first_rep_velocity": {
     "description": "Fixed-load first-rep velocity",
