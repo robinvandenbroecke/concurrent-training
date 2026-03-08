@@ -1,0 +1,41 @@
+{
+  "legacy_ratio": {
+    "description": "Legacy ratio (rep2/rep1)",
+    "feature_correlations": {
+      "D_l": -0.1325,
+      "D_sys": -0.2585,
+      "T_legs": -0.4318
+    },
+    "feature_collinearity": {
+      "D_l_vs_D_sys": 0.9482,
+      "D_l_vs_T_legs": 0.3845,
+      "D_sys_vs_T_legs": 0.4733
+    }
+  },
+  "heaviest_quality_set_perf_y": {
+    "description": "Heaviest quality set perf_y",
+    "feature_correlations": {
+      "D_l": 0.2552,
+      "D_sys": 0.0883,
+      "T_legs": -0.0903
+    },
+    "feature_collinearity": {
+      "D_l_vs_D_sys": 0.9488,
+      "D_l_vs_T_legs": 0.247,
+      "D_sys_vs_T_legs": 0.3911
+    }
+  },
+  "fixed_load_first_rep_velocity": {
+    "description": "Fixed-load first-rep velocity",
+    "feature_correlations": {
+      "D_l": 0.3036,
+      "D_sys": 0.1609,
+      "T_legs": -0.0897
+    },
+    "feature_collinearity": {
+      "D_l_vs_D_sys": 0.9499,
+      "D_l_vs_T_legs": 0.3242,
+      "D_sys_vs_T_legs": 0.4152
+    }
+  }
+}

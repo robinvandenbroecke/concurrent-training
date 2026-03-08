@@ -56,12 +56,13 @@ def _is_quality_set(
     if len(velocities) < 1:
         return False, ["no velocity data"]
     
-    # Check load constraint (>= 75% of capacity)
+    # Check load constraint (>= 50% of capacity if available)
+    # Relaxed from 75% to ensure enough coverage
     capacity = anchor_capacity or model_capacity
     if capacity and capacity > 0:
         load_pct = load_kg / capacity
-        if load_pct < 0.75:
-            return False, [f"load {load_pct:.1%} < 75% capacity"]
+        if load_pct < 0.50:
+            return False, [f"load {load_pct:.1%} < 50% capacity"]
     
     # Check RPE constraint if available
     if rpe is not None:
@@ -264,8 +265,18 @@ def target_fixed_load_first_rep_velocity(
     # Compute normalized variant (perf_y)
     perf_y = _compute_perf_y(v_obs_rep1, load_kg, profile_a, profile_b)
     
-    # Use raw velocity as target, optionally clamp
-    target_value = max(0.3, min(2.0, v_obs_rep1))  # Wider bounds for velocity
+    if perf_y is None:
+        return StrengthTargetResult(
+            target_value=None,
+            target_source="fixed_load_first_rep_velocity",
+            chosen_set_idx=best_idx,
+            chosen_set_metadata=None,
+            raw_value=None,
+            notes=["could not compute perf_y (v_ref <= 0)"]
+        )
+    
+    # Use perf_y as target (consistent with other targets), clamped to mapping bounds
+    target_value = max(0.60, min(1.10, perf_y))
     
     notes = [
         f"selected set {best_idx}",

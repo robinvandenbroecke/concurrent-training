@@ -1,0 +1,6 @@
+{
+  "run_id": "synth_v2_run_v4_4_1_heaviest_quality_set_perf_y",
+  "target_mode": "heaviest_quality_set_perf_y",
+  "n_samples": 31,
+  "predictions_distinct": true
+}

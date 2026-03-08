@@ -206,5 +206,30 @@ class TestAllTargetModes:
             assert result.target_source == mode
 
 
+class TestFixedLoadTarget:
+    """Test fixed-load target returns perf_y within bounds."""
+    
+    def test_fixed_load_returns_perf_y_in_bounds(self):
+        """Fixed-load target should return perf_y (not raw velocity) within mapping bounds."""
+        sets_data = [
+            {'velocities': [0.50], 'load_kg': 100, 'reps': 1},  # 71% of 140
+        ]
+        
+        result = target_fixed_load_first_rep_velocity(
+            sets_data=sets_data,
+            profile_a=0.55,
+            profile_b=0.003,
+            anchor_capacity=None,
+            model_capacity=140,
+            lift="squat"
+        )
+        
+        # Should return perf_y in [0.6, 1.1], not raw velocity (0.5)
+        assert result.target_value is not None
+        assert 0.6 <= result.target_value <= 1.1
+        assert result.chosen_set_metadata is not None
+        assert 'perf_y' in result.chosen_set_metadata
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -1,0 +1,6 @@
+{
+  "run_id": "synth_v2_run_v4_4_1_legacy_ratio",
+  "target_mode": "legacy_ratio",
+  "n_samples": 63,
+  "predictions_distinct": true
+}

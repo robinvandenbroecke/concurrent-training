@@ -1,0 +1,95 @@
+{
+  "legacy_ratio": {
+    "description": "Legacy ratio (rep2/rep1)",
+    "n_samples": 63,
+    "n_missing": 4,
+    "target_stats": {
+      "mean": 1.840776,
+      "std": 0.899856,
+      "min": 0.790177,
+      "max": 4.685944,
+      "p10": 1.0,
+      "p50": 1.689847,
+      "p90": 2.823865,
+      "n": 63
+    },
+    "scale_alignment": {
+      "in_bounds": 15,
+      "total": 63,
+      "fraction_in_bounds": 0.2381,
+      "mapping_bounds": [
+        0.6,
+        1.1
+      ]
+    },
+    "per_lift_availability": {
+      "power_clean": 9,
+      "bench": 15,
+      "deadlift": 14,
+      "press": 19,
+      "squat": 6
+    }
+  },
+  "heaviest_quality_set_perf_y": {
+    "description": "Heaviest quality set perf_y",
+    "n_samples": 31,
+    "n_missing": 36,
+    "target_stats": {
+      "mean": 1.049186,
+      "std": 0.122688,
+      "min": 0.687541,
+      "max": 1.1,
+      "p10": 0.930233,
+      "p50": 1.1,
+      "p90": 1.1,
+      "n": 31
+    },
+    "scale_alignment": {
+      "in_bounds": 31,
+      "total": 31,
+      "fraction_in_bounds": 1.0,
+      "mapping_bounds": [
+        0.6,
+        1.1
+      ]
+    },
+    "per_lift_availability": {
+      "bench": 7,
+      "deadlift": 10,
+      "press": 9,
+      "power_clean": 3,
+      "squat": 2
+    }
+  },
+  "fixed_load_first_rep_velocity": {
+    "description": "Fixed-load first-rep velocity",
+    "n_samples": 67,
+    "n_missing": 0,
+    "target_stats": {
+      "mean": 0.884632,
+      "std": 0.202378,
+      "min": 0.6,
+      "max": 1.1,
+      "p10": 0.6,
+      "p50": 0.925227,
+      "p90": 1.1,
+      "n": 67
+    },
+    "scale_alignment": {
+      "in_bounds": 67,
+      "total": 67,
+      "fraction_in_bounds": 1.0,
+      "mapping_bounds": [
+        0.6,
+        1.1
+      ]
+    },
+    "per_lift_availability": {
+      "power_clean": 13,
+      "bench": 15,
+      "deadlift": 14,
+      "press": 19,
+      "squat": 6
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "run_id": "synth_v2_run_v4_4_1_fixed_load_first_rep_velocity",
+  "target_mode": "fixed_load_first_rep_velocity",
+  "n_samples": 67,
+  "predictions_distinct": true
+}
