@@ -1,0 +1,38 @@
+{
+  "metrics_summary": {
+    "correlations": {
+      "T_legs": 0.4318,
+      "D_l": 0.1325,
+      "D_sys": 0.2585,
+      "strongest": "T_legs"
+    },
+    "clipping": {
+      "fraction": 0.3651,
+      "severe": true
+    },
+    "scale": {
+      "target_mean": 1.8408,
+      "mapping_bounds": {
+        "y_min": 0.6,
+        "y_max": 1.1
+      },
+      "mismatch": true
+    },
+    "ablation": {
+      "T_legs_only_mae": 0.8211,
+      "D_l_only_mae": 0.8569,
+      "D_sys_only_mae": 0.8423,
+      "full_model_mae": 0.8211,
+      "additive_improvement": 0.0
+    }
+  },
+  "conclusions": {
+    "T_legs_is_strongest_predictor": true,
+    "T_legs_is_dominant": true,
+    "clipping_is_severe": true,
+    "scale_mismatch_exists": true,
+    "ablation_masking_valid": true,
+    "D_l_D_sys_add_value": false
+  },
+  "recommendation": "FIX_SCALE_MISMATCH_FIRST"
+}

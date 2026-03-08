@@ -1,0 +1,11 @@
+{
+  "D_l_vs_D_sys": {
+    "pearson": 0.9482
+  },
+  "D_l_vs_T_legs": {
+    "pearson": 0.3845
+  },
+  "D_sys_vs_T_legs": {
+    "pearson": 0.4733
+  }
+}

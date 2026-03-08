@@ -1,0 +1,38 @@
+{
+  "variants": [
+    {
+      "variant": "raw_features",
+      "description": "Using raw D_l, D_sys, T_legs values",
+      "mae": 0.8211,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6
+      }
+    },
+    {
+      "variant": "zscore_normalized",
+      "description": "Using z-scored (1 - D_l), (1 - D_sys), (1 - T_legs)",
+      "mae": 0.8079,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.3,
+        "b_sys": 0.5,
+        "b_t": 0.5
+      }
+    },
+    {
+      "variant": "rescaled_to_match_T_legs",
+      "description": "D_l and D_sys rescaled to match T_legs variance",
+      "mae": 0.8047,
+      "params": {
+        "a": 0.2,
+        "b_l": 0.0,
+        "b_sys": 1.0,
+        "b_t": 0.5
+      }
+    }
+  ],
+  "conclusion": "Normalization improves coefficient distribution but MAE remains similar due to target-scale mismatch"
+}

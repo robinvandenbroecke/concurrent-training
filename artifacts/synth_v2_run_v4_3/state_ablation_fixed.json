@@ -13,6 +13,11 @@
         "b_l": 0.0,
         "b_sys": 0.0,
         "b_t": 0.6
+      },
+      "masking_verification": {
+        "D_l_invariance": true,
+        "D_sys_invariance": true,
+        "T_legs_invariance": null
       }
     },
     {
@@ -28,6 +33,11 @@
         "b_l": 0.6,
         "b_sys": 0.0,
         "b_t": 0.0
+      },
+      "masking_verification": {
+        "D_l_invariance": null,
+        "D_sys_invariance": true,
+        "T_legs_invariance": true
       }
     },
     {
@@ -43,6 +53,11 @@
         "b_l": 0.0,
         "b_sys": 0.6,
         "b_t": 0.0
+      },
+      "masking_verification": {
+        "D_l_invariance": true,
+        "D_sys_invariance": null,
+        "T_legs_invariance": true
       }
     },
     {
@@ -58,6 +73,11 @@
         "b_l": 0.0,
         "b_sys": 0.6,
         "b_t": 0.0
+      },
+      "masking_verification": {
+        "D_l_invariance": null,
+        "D_sys_invariance": null,
+        "T_legs_invariance": true
       }
     },
     {
@@ -73,6 +93,11 @@
         "b_l": 0.0,
         "b_sys": 0.0,
         "b_t": 0.6
+      },
+      "masking_verification": {
+        "D_l_invariance": null,
+        "D_sys_invariance": true,
+        "T_legs_invariance": null
       }
     },
     {
@@ -88,6 +113,11 @@
         "b_l": 0.0,
         "b_sys": 0.0,
         "b_t": 0.6
+      },
+      "masking_verification": {
+        "D_l_invariance": true,
+        "D_sys_invariance": null,
+        "T_legs_invariance": null
       }
     },
     {
@@ -103,8 +133,12 @@
         "b_l": 0.0,
         "b_sys": 0.0,
         "b_t": 0.6
+      },
+      "masking_verification": {
+        "D_l_invariance": null,
+        "D_sys_invariance": null,
+        "T_legs_invariance": null
       }
     }
-  ],
-  "additive_improvement": 0.0
+  ]
 }

@@ -1,0 +1,13 @@
+{
+  "global": {
+    "D_l": {
+      "pearson": -0.1325
+    },
+    "D_sys": {
+      "pearson": -0.2585
+    },
+    "T_legs": {
+      "pearson": -0.4318
+    }
+  }
+}

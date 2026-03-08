@@ -27,16 +27,6 @@
     "p90": 2.823865,
     "n": 63
   },
-  "predicted_unclamped_distribution": {
-    "mean": 0.657435,
-    "std": 0.084973,
-    "min": 0.6,
-    "max": 0.977136,
-    "p10": 0.6,
-    "p50": 0.617343,
-    "p90": 0.739164,
-    "n": 63
-  },
   "predicted_clamped_distribution": {
     "mean": 0.657435,
     "std": 0.084973,
@@ -46,14 +36,5 @@
     "p50": 0.617343,
     "p90": 0.739164,
     "n": 63
-  },
-  "mae_comparisons": {
-    "unclamped_vs_observed": 1.1833,
-    "clamped_vs_observed": 1.1833
-  },
-  "scale_compatibility_assessment": {
-    "observed_mean_in_bounds": false,
-    "observed_range_fits_bounds": false,
-    "clipping_dominates": false
   }
 }
