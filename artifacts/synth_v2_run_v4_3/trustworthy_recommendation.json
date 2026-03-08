@@ -1,0 +1,14 @@
+{
+  "critical_issue": "none",
+  "clipping_fraction": 0.3651,
+  "T_legs_dominant": true,
+  "T_legs_correlation": 0.4318,
+  "D_l_correlation": 0.1325,
+  "D_sys_correlation": 0.2585,
+  "recommendation": "proceed_with_rescaling",
+  "target_mean": 1.8408,
+  "mapping_bounds": {
+    "y_min": 0.6,
+    "y_max": 1.1
+  }
+}

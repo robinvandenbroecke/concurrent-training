@@ -1,0 +1,110 @@
+{
+  "ablations": [
+    {
+      "features": "T_legs_only",
+      "active_mask": [
+        false,
+        false,
+        true
+      ],
+      "mae": 0.8211,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6
+      }
+    },
+    {
+      "features": "D_l_only",
+      "active_mask": [
+        true,
+        false,
+        false
+      ],
+      "mae": 0.8569,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.6,
+        "b_sys": 0.0,
+        "b_t": 0.0
+      }
+    },
+    {
+      "features": "D_sys_only",
+      "active_mask": [
+        false,
+        true,
+        false
+      ],
+      "mae": 0.8423,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.6,
+        "b_t": 0.0
+      }
+    },
+    {
+      "features": "D_l_plus_D_sys",
+      "active_mask": [
+        true,
+        true,
+        false
+      ],
+      "mae": 0.8423,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.6,
+        "b_t": 0.0
+      }
+    },
+    {
+      "features": "D_l_plus_T_legs",
+      "active_mask": [
+        true,
+        false,
+        true
+      ],
+      "mae": 0.8211,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6
+      }
+    },
+    {
+      "features": "D_sys_plus_T_legs",
+      "active_mask": [
+        false,
+        true,
+        true
+      ],
+      "mae": 0.8211,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6
+      }
+    },
+    {
+      "features": "D_l_plus_D_sys_plus_T_legs",
+      "active_mask": [
+        true,
+        true,
+        true
+      ],
+      "mae": 0.8211,
+      "params": {
+        "a": 1.0,
+        "b_l": 0.0,
+        "b_sys": 0.0,
+        "b_t": 0.6
+      }
+    }
+  ],
+  "additive_improvement": 0.0
+}

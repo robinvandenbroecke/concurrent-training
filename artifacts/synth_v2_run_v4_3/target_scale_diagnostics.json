@@ -1,0 +1,59 @@
+{
+  "constrained_mapping_bounds": {
+    "y_min": 0.6,
+    "y_max": 1.1
+  },
+  "clipping_frequency": {
+    "lower_bound": {
+      "count": 23,
+      "fraction": 0.3651
+    },
+    "upper_bound": {
+      "count": 0,
+      "fraction": 0.0
+    },
+    "total_clipped": {
+      "count": 23,
+      "fraction": 0.3651
+    }
+  },
+  "observed_target_distribution": {
+    "mean": 1.840776,
+    "std": 0.899856,
+    "min": 0.790177,
+    "max": 4.685944,
+    "p10": 1.0,
+    "p50": 1.689847,
+    "p90": 2.823865,
+    "n": 63
+  },
+  "predicted_unclamped_distribution": {
+    "mean": 0.657435,
+    "std": 0.084973,
+    "min": 0.6,
+    "max": 0.977136,
+    "p10": 0.6,
+    "p50": 0.617343,
+    "p90": 0.739164,
+    "n": 63
+  },
+  "predicted_clamped_distribution": {
+    "mean": 0.657435,
+    "std": 0.084973,
+    "min": 0.6,
+    "max": 0.977136,
+    "p10": 0.6,
+    "p50": 0.617343,
+    "p90": 0.739164,
+    "n": 63
+  },
+  "mae_comparisons": {
+    "unclamped_vs_observed": 1.1833,
+    "clamped_vs_observed": 1.1833
+  },
+  "scale_compatibility_assessment": {
+    "observed_mean_in_bounds": false,
+    "observed_range_fits_bounds": false,
+    "clipping_dominates": false
+  }
+}

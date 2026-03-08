@@ -1,0 +1,20 @@
+{
+  "code_path": "app/eval/replay.py::_extract_observed_perf_y",
+  "formula": "perf_y = velocity_rep2 / velocity_rep1",
+  "description": "Ratio of observed velocity at rep 2 to rep 1. Represents performance degradation between first two reps.",
+  "expected_range": {
+    "min": 0.5,
+    "max": 1.2,
+    "description": "Velocity typically drops 0-50% between reps, so ratio should be 0.5-1.0, occasionally slightly above 1.0 if athlete warms up into the set."
+  },
+  "actual_observed_range": {
+    "min": 0.790177,
+    "max": 4.685944,
+    "mean": 1.840776,
+    "std": 0.899856,
+    "p10": 1.0,
+    "p50": 1.689847,
+    "p90": 2.823865
+  },
+  "scale_mismatch_warning": true
+}
