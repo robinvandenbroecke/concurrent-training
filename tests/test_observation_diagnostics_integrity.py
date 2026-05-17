@@ -10,7 +10,10 @@ Required tests:
 """
 import sys
 import os
-sys.path.insert(0, '/root/clawd/projects/concurrent-training')
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 import json
 import math

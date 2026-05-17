@@ -2,8 +2,10 @@
 import pytest
 import sys
 import os
+from pathlib import Path
 
-sys.path.insert(0, '/root/clawd/projects/concurrent-training')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from app.eval.strength_targets import (
     get_day_level_strength_target,

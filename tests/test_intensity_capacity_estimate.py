@@ -6,6 +6,9 @@ for different lifts, athletes, and fallback scenarios.
 """
 import pytest
 from datetime import date, timedelta
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 from app.types import LiftType
 from app.services.capacity_service import (
@@ -254,8 +257,7 @@ class TestProductionPathNoLongerUses200kg:
         import os
         import re
         
-        project_root = "/root/clawd/projects/concurrent-training"
-        production_file = os.path.join(project_root, "app/services/engine_orchestrator.py")
+        production_file = REPO_ROOT / "app" / "services" / "engine_orchestrator.py"
         
         with open(production_file, 'r') as f:
             content = f.read()

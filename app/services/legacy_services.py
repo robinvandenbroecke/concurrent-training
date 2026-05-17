@@ -11,7 +11,7 @@ from typing import Optional, Dict, List
 from sqlalchemy.orm import Session
 
 from app.types import LiftType, EnduranceSport
-from app.domain.model import (
+from app.domain.legacy_model import (
     ConcurrentTrainingModel, Autoregulator,
     DayLevelState, RepLevelState, SystemParameters as DomainParams
 )

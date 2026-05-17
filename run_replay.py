@@ -10,7 +10,8 @@ from collections import defaultdict
 import statistics
 
 import sys
-sys.path.insert(0, '/root/clawd/projects/concurrent-training')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.resolve()))
 
 from app.database import SessionLocal
 from app import models

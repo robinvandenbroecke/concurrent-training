@@ -1056,7 +1056,7 @@ def create_strength_session_legacy(
         )
     
     # Import legacy service
-    from app.domain.model import ConcurrentTrainingModel
+    from app.domain.legacy_model import ConcurrentTrainingModel
     
     # Run legacy model (results not stored to primary state)
     model = ConcurrentTrainingModel()

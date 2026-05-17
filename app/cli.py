@@ -13,7 +13,7 @@ from app.models import (
     Athlete, StrengthSession, EnduranceSession, LiftProfile,
     DayState, LiftDayState, LiftType, EnduranceSport
 )
-from app.domain.model import (
+from app.domain.legacy_model import (
     ConcurrentTrainingModel, LiftProfile as DomainProfile,
     Autoregulator, RepLevelState
 )

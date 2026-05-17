@@ -5,7 +5,8 @@ import os
 import json
 from pathlib import Path
 
-sys.path.insert(0, '/root/clawd/projects/concurrent-training')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from app.domain.enhanced_observation_mapping import (
     EnhancedMappingParams,
@@ -196,7 +197,7 @@ class TestCalibrationProducesValidParams:
 class TestArtifactsGenerated:
     """Test that variant comparison artifacts are generated."""
     
-    ARTIFACTS_DIR = Path("/root/clawd/projects/concurrent-training/artifacts/synth_v2_run_v5")
+    ARTIFACTS_DIR = REPO_ROOT / "artifacts" / "synth_v2_run_v5"
     
     def test_model_vs_baselines_summary_artifact_generated(self):
         """model_vs_baselines_summary.json exists with required fields."""

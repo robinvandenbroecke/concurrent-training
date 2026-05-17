@@ -1,8 +1,10 @@
 """
-Concurrent Training Domain Model
+Deprecated legacy model. Current model path is rep_engine + day_engine +
+coach_engine + program_engine + performance_engine + goal_engine.
 
-Implements the mathematical model for fatigue, fitness, and autoregulation
-in concurrent strength and endurance training.
+This file is retained for backward compatibility and comparison only.
+Production ingestion/orchestration must use the hardened engines via
+EngineOrchestrator. Do not add new features here.
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple

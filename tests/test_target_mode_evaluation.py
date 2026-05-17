@@ -5,7 +5,8 @@ import os
 import json
 from pathlib import Path
 
-sys.path.insert(0, '/root/clawd/projects/concurrent-training')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from app.eval.baselines import BaselineVelocityThreshold, BaselineBanister
 
@@ -41,7 +42,7 @@ class TestBaselineSeparation:
 class TestArtifactsGenerated:
     """Test that required artifacts are generated."""
     
-    ARTIFACTS_DIR = Path("/root/clawd/projects/concurrent-training/artifacts/synth_v2_run_v4_4_1")
+    ARTIFACTS_DIR = REPO_ROOT / "artifacts" / "synth_v2_run_v4_4_1"
     
     def test_target_mode_results_artifact_generated(self):
         """target_mode_results.json exists and contains all required target modes."""

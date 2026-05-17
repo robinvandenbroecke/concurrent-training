@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, date
 import math
 
-from app.domain.model import (
+from app.domain.legacy_model import (
     ConcurrentTrainingModel, Autoregulator, LiftProfile, LiftType,
     DayLevelState, RepLevelState, SystemParameters, EnduranceSport
 )

@@ -2,7 +2,8 @@
 
 from app.types import LiftType, EnduranceSport, EnduranceIntensity
 
-from .model import (
+# Deprecated legacy model imports — retained for backward compatibility
+from .legacy_model import (
     ConcurrentTrainingModel,
     Autoregulator,
     LiftProfile,

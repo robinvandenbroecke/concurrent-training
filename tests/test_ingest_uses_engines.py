@@ -165,7 +165,7 @@ class TestEnduranceIngestUsesDayEngine:
 class TestLegacyModelNotCalledByDefault:
     """Test that legacy ConcurrentTrainingModel is NOT called by default"""
     
-    @patch("app.domain.model.ConcurrentTrainingModel")
+    @patch("app.domain.legacy_model.ConcurrentTrainingModel")
     def test_legacy_model_not_instantiated_by_default(
         self, mock_legacy_model, db_session, sample_athlete
     ):

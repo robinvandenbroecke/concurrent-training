@@ -74,7 +74,22 @@ pytest -q
 pytest --cov=app --cov-report=html
 ```
 
-### 5. Demo Data
+### 5. Validation
+
+```bash
+# Run full validation (synthetic data)
+python run_validation.py --source synthetic --athletes 10 --days 90
+
+# Run validation on real database
+python run_validation.py --source db --athlete-id 1 --days 90
+
+# Replay stored sessions
+python run_replay.py
+```
+
+Artifacts are written to `artifacts/latest/validation_report.json`.
+
+### 6. Demo Data
 
 ```bash
 # Initialize database
@@ -185,55 +200,85 @@ GET /trends/endurance?athlete_id=1&days=30
 
 ## Conceptual Model
 
-### Fatigue Components
+The current architecture is implemented by six hardened engines (not the deprecated `ConcurrentTrainingModel`). Production ingestion flows through `EngineOrchestrator`, which coordinates `rep_engine → day_engine → performance_engine`.
 
-1. **Local Availability (A_l)**: Per-lift, rep-level
-   - Decreases with each rep
-   - Recovers during rest
-   - Tracked as x_l = ln(A_l)
+### Rep-Level Engine (`rep_engine`)
 
-2. **System Availability (A_sys)**: Global, rep-level
-   - Spills over across all lifts
-   - Recovers slower than local
+State is tracked in **log-availability** space for numerical stability:
+- `x_l = ln(A_l)` — local availability (per-lift)
+- `x_sys = ln(A_sys)` — system availability (global)
+- `x_M = ln(A_M)` — metabolic availability (formerly dimensionless M)
 
-3. **Metabolic Limitation (M)**: Metabolic cost
-   - Accumulates with rep volume
-   - Decays during rest
-   - Reduces velocity via exp(-kM*M)
+**Velocity prediction** (single equation):
+```
+v_pred = v_ref * exp(x_l + x_sys + x_M)
+```
 
-### Day-Level States
+**Fatigue driver**: `y_phi = min(y, 1.0)` where `y = v_ref / v_obs`. The `min` prevents the anti-fatigue artefact when observed velocity is higher than expected.
 
-- **D_l**: Per-lift fatigue (decays over days)
-- **F_l**: Fitness/adaptation (slow buildup)
-- **C_l**: Capacity ceiling (e1RM-like)
-- **D_sys**: System fatigue
-- **R_mito**: Recovery capacity (built by Z2)
-- **E_fat**: Endurance fatigue (from HIIT)
+**Catastrophe term**: when velocity loss exceeds ~40 %, an additional nonlinear penalty accelerates the drop in `x_l` and `x_sys`, matching the empirical "rep-grinding" region.
 
-### Interference & Synergy
+**Central driver**: the central/systemic component now includes a density factor (reps per minute / average rest) and an optional `set_end_rpe` term. This separates local muscular fatigue from global/neural fatigue and improves identifiability.
 
-**Interference (HIIT → Strength)**:
-- Running > Cycling > Swimming for legs impact
-- Peak effect <24h before strength
-- Adds to D_l and D_sys
+### Day-Level Engine (`day_engine`)
 
-**Synergy (Z2 → Recovery)**:
-- Builds R_mito
-- Faster fatigue decay: tau_eff = tau / (1 + beta*R_mito)
-- Faster metabolic clearance
+**Capacity (`C_l`) with saturation**: `C_l` updates include a `(1 - C_l / C_max_l)` term so that progress slows as the athlete approaches their genetic/training-age ceiling. Floor `C_min` prevents collapse to zero.
+
+**Bounded recovery capacity (`R_mito`)**: `R_mito` is kept in `[0, 1]`. It is raised by Z2 volume (HIIT and strength history also modulate it through overload penalties and cross-signals), decays with `tau_mito ≈ 45` days, and bounded to avoid runaway values.
+
+**Explicit interference**: all HIIT → strength interference terms are explicit functions of sport mode, timing, and intensity. There are no placeholder constants.
+
+**Structural/connective tissue (`T_legs`)**: a slow-recovering state (`tau_T_legs ≈ 21` days) guards heavy lower-body work. When `T_legs` exceeds its guardrail threshold, readiness for squat/deadlift is reduced independently of muscular fatigue.
+
+### Other Engines
+
+- **Coach engine** (`coach_engine`) — generates prescriptions, adaptations, and next-set adjustments.
+- **Program engine** (`program_engine`) — microcycle templates, deload logic, missed-session replanning.
+- **Performance engine** (`performance_engine`) — trend detection, EWMA smoothing, e1RM estimation, progress/stagnation/regression classification.
+- **Goal engine** (`goal_engine`) — macrocycle phasing, target dates, priority-aware scheduling.
+
+### Architecture Diagram (Current)
+
+```
+┌─────────────────┐
+│  FastAPI / CLI  │
+└────────┬────────┘
+         │
+┌────────▼────────┐     ┌──────────────────────────────┐
+│ EngineOrchestrator│───▶│ rep_engine  (per-rep VBT)   │
+│ (single source)  │     ├──────────────────────────────┤
+└────────┬────────┘     │ day_engine  (daily state)    │
+         │              ├──────────────────────────────┤
+         │              │ performance_engine (trends)  │
+         │              ├──────────────────────────────┤
+         │              │ coach_engine  (prescriptions)│
+         │              ├──────────────────────────────┤
+         │              │ program_engine (planning)    │
+         │              ├──────────────────────────────┤
+         │              │ goal_engine   (macrocycles)  │
+         │              └──────────────────────────────┘
+    ┌────▼────┐
+    │  PostgreSQL │
+    └─────────┘
+```
 
 ## Configuration
 
-System parameters are configurable per athlete via `SystemParameters`:
+System parameters are configurable per athlete via `DayEngineParams` and `RepEngineParams`:
 
 ```python
-params = SystemParameters(
-    alpha_l=0.05,      # Local fatigue rate
-    alpha_sys=0.03,    # System fatigue rate
-    tau_Dl=3.0,        # Days fatigue decay
-    tau_mito=7.0,      # Days R_mito decay
-    k_ES_squat=0.002,  # HIIT to squat interference
-    # ... see app/domain/model.py for all params
+from app.domain.rep_engine import RepEngineParams
+from app.domain.day_engine import DayEngineParams
+
+rep_params = RepEngineParams(
+    alpha_l=0.05,    # Local fatigue rate
+    alpha_sys=0.03,  # System fatigue rate
+)
+
+day_params = DayEngineParams(
+    tau_Dl={'squat': 4.0, 'bench': 2.5},  # Per-lift fatigue decay (days)
+    tau_mito=45.0,   # R_mito decay (days)
+    C_max=200.0,     # Capacity ceiling (saturation)
 )
 ```
 
