@@ -28,9 +28,9 @@ class VelocityProfileService:
     ) -> Dict:
         """Fit `v = a - b*load` from first-rep velocities.
 
-        Requires at least three distinct loads and six observations in a
-        submaximal range. New coefficients are blended into the existing
-        profile to avoid unstable jumps from noisy VBT measurements.
+        Requires at least three distinct loads and six observations between 25%
+        and 92% of current capacity. New coefficients are blended into the
+        existing profile to avoid unstable jumps from noisy VBT measurements.
         """
         reference_date = reference_date or date.today()
         profile = self.db.query(models.LiftProfile).filter(
@@ -62,7 +62,7 @@ class VelocityProfileService:
                 except (TypeError, ValueError, IndexError):
                     continue
                 relative = load / max(capacity, 1.0)
-                if not 0.30 <= relative <= 0.92:
+                if not 0.25 <= relative <= 0.92:
                     continue
                 if not 0.05 <= first_velocity <= 2.0:
                     continue
@@ -78,8 +78,6 @@ class VelocityProfileService:
                 "capacity_source": source,
             }
 
-        # Median per load prevents frequently repeated warm-up loads from
-        # dominating the regression.
         pairs = sorted((load, statistics.median(values)) for load, values in by_load.items())
         loads = [load for load, _ in pairs]
         velocities = [velocity for _, velocity in pairs]
