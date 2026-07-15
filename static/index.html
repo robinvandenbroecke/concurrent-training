@@ -1,746 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Concurrent Training - Dashboard</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1 { color: #2c3e50; margin-bottom: 10px; }
-        h2 { color: #34495e; margin: 30px 0 15px; font-size: 1.3em; }
-        
-        .nav {
-            background: #2c3e50;
-            padding: 15px 20px;
-            margin: -20px -20px 30px;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .nav a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-        .nav a:hover, .nav a.active { background: #34495e; }
-        
-        .card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        
-        @media (max-width: 768px) {
-            .grid-2, .grid-3 { grid-template-columns: 1fr; }
-        }
-        
-        label {
-            display: block;
-            margin: 15px 0 5px;
-            font-weight: 600;
-            color: #555;
-        }
-        
-        input, select, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-        
-        button {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-top: 15px;
-            transition: background 0.2s;
-        }
-        
-        button:hover { background: #2980b9; }
-        button.secondary { background: #95a5a6; }
-        button.secondary:hover { background: #7f8c8d; }
-        button.success { background: #27ae60; }
-        button.success:hover { background: #229954; }
-        button.danger { background: #e74c3c; }
-        button.danger:hover { background: #c0392b; }
-        
-        .readiness-score {
-            text-align: center;
-            padding: 20px;
-        }
-        .readiness-score .value {
-            font-size: 48px;
-            font-weight: bold;
-            color: #27ae60;
-        }
-        .readiness-score .label {
-            color: #7f8c8d;
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-        
-        .lift-score {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #ecf0f1;
-        }
-        .lift-score:last-child { border-bottom: none; }
-        .lift-score .name { font-weight: 600; text-transform: capitalize; }
-        .lift-score .score {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        .score-high { background: #d5f4e6; color: #27ae60; }
-        .score-medium { background: #fef9e7; color: #f39c12; }
-        .score-low { background: #fadbd8; color: #e74c3c; }
-        
-        .explanation {
-            background: #eaf2f8;
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin: 5px 0;
-            font-size: 14px;
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-        }
-        .alert-success { background: #d5f4e6; color: #27ae60; border-left: 4px solid #27ae60; }
-        .alert-error { background: #fadbd8; color: #e74c3c; border-left: 4px solid #e74c3c; }
-        .alert-info { background: #eaf2f8; color: #3498db; border-left: 4px solid #3498db; }
-        
-        .hidden { display: none !important; }
-        
-        .rep-input {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr) auto;
-            gap: 10px;
-            align-items: end;
-            margin-bottom: 10px;
-        }
-        
-        .set-container {
-            border: 1px solid #ecf0f1;
-            border-radius: 4px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .json-output {
-            background: #2c3e50;
-            color: #ecf0f1;
-            padding: 15px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .api-status {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .api-status.online { background: #d5f4e6; color: #27ae60; }
-        .api-status.offline { background: #fadbd8; color: #e74c3c; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Concurrent Training Shadow Console</title>
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#17202a;background:#f4f6f8}*{box-sizing:border-box}
+    body{margin:0}.wrap{max-width:1100px;margin:auto;padding:24px}.top{display:flex;gap:16px;align-items:end;flex-wrap:wrap}
+    h1{margin:0 0 8px}h2{font-size:1.05rem;margin:0 0 14px}.muted{color:#65717e}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:20px}
+    .card{background:white;border:1px solid #dfe5eb;border-radius:12px;padding:18px;box-shadow:0 2px 8px #17202a0d}.wide{grid-column:1/-1}
+    label{display:block;font-size:.85rem;font-weight:650;margin:10px 0 4px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:9px;border:1px solid #cbd4dc;border-radius:7px}textarea{min-height:170px;font-family:ui-monospace,monospace;font-size:.83rem}
+    button{border:0;border-radius:7px;padding:9px 14px;background:#175cd3;color:white;cursor:pointer;margin-top:10px}button.secondary{background:#344054}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    pre{background:#101828;color:#d0d5dd;padding:14px;border-radius:8px;overflow:auto;max-height:360px;white-space:pre-wrap}.score{font-size:2.4rem;font-weight:750}.ok{color:#067647}.warn{color:#b54708}.error{color:#b42318}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.row{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="nav">
-            <a href="#" class="active" onclick="showTab('dashboard')">Dashboard</a>
-            <a href="#" onclick="showTab('athletes')">Athletes</a>
-            <a href="#" onclick="showTab('strength')">Strength</a>
-            <a href="#" onclick="showTab('endurance')">Endurance</a>
-            <a href="#" onclick="showTab('autoreg')">Autoregulate</a>
-        </div>
+<div class="wrap">
+  <div class="top">
+    <div style="flex:1"><h1>Concurrent Training</h1><div class="muted">Real-world shadow-testing console</div></div>
+    <div style="min-width:300px"><label>API key</label><input id="apiKey" type="password" placeholder="Only required in protected deployments"></div>
+    <button class="secondary" onclick="saveKey()">Save key</button>
+  </div>
 
-        <h1>Concurrent Training Dashboard</h1>
-        
-        <div id="apiStatus" class="api-status offline">API: Checking...</div>
+  <div class="grid">
+    <section class="card">
+      <h2>Athlete</h2>
+      <label>Active athlete</label><select id="athlete"></select>
+      <div class="row"><div><label>New athlete name</label><input id="newName"></div><div style="align-self:end"><button onclick="createAthlete()">Create</button></div></div>
+      <button class="secondary" onclick="loadAthletes()">Refresh athletes</button>
+    </section>
 
-        <!-- Dashboard Tab -->
-        <div id="tab-dashboard" class="tab-content">
-            <div class="grid-2">
-                <div class="card">
-                    <h2>Select Athlete</h2>
-                    <label>Athlete</label>
-                    <select id="dashboardAthlete" onchange="loadReadiness()">
-                        <option value="">-- Select --</option>
-                    </select>
-                    <button onclick="loadReadiness()">Refresh Readiness</button>
-                </div>
-                
-                <div class="card" id="overallReadinessCard" style="display:none;">
-                    <div class="readiness-score">
-                        <div class="value" id="overallScore">--</div>
-                        <div class="label">Overall Readiness</div>
-                    </div>
-                </div>
-            </div>
+    <section class="card">
+      <h2>Readiness</h2>
+      <div id="overall" class="score">—</div><div id="readinessNote" class="muted">Select an athlete</div>
+      <button onclick="loadReadiness()">Refresh readiness</button>
+    </section>
 
-            <div class="grid-2" id="readinessDetails" style="display:none;">
-                <div class="card">
-                    <h2>Per-Lift Readiness</h2>
-                    <div id="liftScores"></div>
-                </div>
-                
-                <div class="card">
-                    <h2>Endurance Readiness</h2>
-                    <div class="readiness-score">
-                        <div class="value" id="enduranceScore">--</div>
-                        <div class="label">Endurance</div>
-                    </div>
-                    <h3 style="margin-top:20px;">Explanations</h3>
-                    <div id="explanations"></div>
-                </div>
-            </div>
-        </div>
+    <section class="card">
+      <h2>Capacity onboarding</h2>
+      <div class="row"><div><label>Lift</label><select id="capacityLift"><option>squat</option><option>bench</option><option>deadlift</option><option>press</option><option value="power_clean">power clean</option></select></div><div><label>Input</label><select id="capacityType"><option value="1rm">1RM</option><option value="best_set">Best set</option><option value="unknown">Unknown</option></select></div></div>
+      <div class="row"><div><label>Load kg</label><input id="capacityLoad" type="number" value="100"></div><div><label>Reps</label><input id="capacityReps" type="number" value="1"></div></div>
+      <label>RPE</label><input id="capacityRpe" type="number" step="0.5" value="9">
+      <button onclick="initializeCapacity()">Initialize capacity</button>
+    </section>
 
-        <!-- Athletes Tab -->
-        <div id="tab-athletes" class="tab-content hidden">
-            <div class="grid-2">
-                <div class="card">
-                    <h2>Create Athlete</h2>
-                    <label>Name</label>
-                    <input type="text" id="athleteName" placeholder="Enter athlete name">
-                    <button onclick="createAthlete()">Create Athlete</button>
-                    <div id="createAthleteResult"></div>
-                </div>
-                
-                <div class="card">
-                    <h2>Existing Athletes</h2>
-                    <div id="athletesList"></div>
-                    <button onclick="loadAthletes()">Refresh List</button>
-                </div>
-            </div>
-        </div>
+    <section class="card">
+      <h2>Endurance profile</h2>
+      <label>Sport</label><select id="profileSport"><option value="cycling">Cycling</option><option value="running">Running</option></select>
+      <label>Threshold power W</label><input id="thresholdPower" type="number" value="250">
+      <button onclick="saveEnduranceProfile()">Save profile</button>
+      <div class="muted">Power is primary when threshold-relative data is available.</div>
+    </section>
 
-        <!-- Strength Session Tab -->
-        <div id="tab-strength" class="tab-content hidden">
-            <div class="card">
-                <h2>Log Strength Session</h2>
-                <div class="grid-2">
-                    <div>
-                        <label>Athlete</label>
-                        <select id="strengthAthlete"></select>
-                    </div>
-                    <div>
-                        <label>Lift</label>
-                        <select id="strengthLift">
-                            <option value="squat">Squat</option>
-                            <option value="bench">Bench</option>
-                            <option value="deadlift">Deadlift</option>
-                            <option value="press">Press</option>
-                            <option value="power_clean">Power Clean</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div id="setsContainer"></div>
-                
-                <button onclick="addSet()" class="secondary">+ Add Set</button>
-                <button onclick="submitStrengthSession()" class="success">Submit Session</button>
-                
-                <div id="strengthResult"></div>
-            </div>
-        </div>
+    <section class="card wide">
+      <h2>Multi-lift strength workout</h2>
+      <textarea id="workoutJson">{
+  "exercises": [
+    {"lift":"squat","sets":[{"weight":100,"target_reps":3,"rest_before_sec":180,"set_end_rpe":8,"reps":[{"weight":100,"velocity":0.52,"rep_num":1},{"weight":100,"velocity":0.48,"rep_num":2},{"weight":100,"velocity":0.44,"rep_num":3}]}]},
+    {"lift":"bench","sets":[{"weight":75,"target_reps":5,"rest_before_sec":180,"set_end_rpe":8,"reps":[{"weight":75,"velocity":0.48,"rep_num":1},{"weight":75,"velocity":0.43,"rep_num":2},{"weight":75,"velocity":0.39,"rep_num":3}]}]}
+  ]
+}</textarea>
+      <button onclick="submitWorkout()">Log complete workout</button>
+    </section>
 
-        <!-- Endurance Session Tab -->
-        <div id="tab-endurance" class="tab-content hidden">
-            <div class="card">
-                <h2>Log Endurance Session</h2>
-                <div class="grid-2">
-                    <div>
-                        <label>Athlete</label>
-                        <select id="enduranceAthlete"></select>
-                    </div>
-                    <div>
-                        <label>Sport</label>
-                        <select id="enduranceSport">
-                            <option value="running">Running</option>
-                            <option value="cycling">Cycling</option>
-                            <option value="swimming">Swimming</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="grid-2">
-                    <div>
-                        <label>Duration (minutes)</label>
-                        <input type="number" id="enduranceDuration" value="45" min="1">
-                    </div>
-                    <div>
-                        <label>Intensity Type</label>
-                        <select id="enduranceIntensity">
-                            <option value="z2">Zone 2 (Aerobic)</option>
-                            <option value="hiit">HIIT</option>
-                            <option value="mixed">Mixed</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <button onclick="submitEnduranceSession()" class="success">Submit Session</button>
-                <div id="enduranceResult"></div>
-            </div>
-        </div>
+    <section class="card">
+      <h2>Power-first endurance session</h2>
+      <div class="row"><div><label>Sport</label><select id="sport"><option value="cycling">Cycling</option><option value="running">Running</option><option value="swimming">Swimming</option></select></div><div><label>Duration min</label><input id="duration" type="number" value="60"></div></div>
+      <div class="row"><div><label>Average power W</label><input id="avgPower" type="number" value="180"></div><div><label>Normalized power W</label><input id="npPower" type="number" value="190"></div></div>
+      <label>Fallback label</label><select id="intensity"><option value="z2">Z2</option><option value="mixed">Mixed</option><option value="hiit">HIIT</option></select>
+      <button onclick="submitEndurance()">Log endurance</button>
+    </section>
 
-        <!-- Autoregulation Tab -->
-        <div id="tab-autoreg" class="tab-content hidden">
-            <div class="card">
-                <h2>Autoregulation Assistant</h2>
-                <div class="grid-2">
-                    <div>
-                        <label>Athlete</label>
-                        <select id="autoregAthlete"></select>
-                    </div>
-                    <div>
-                        <label>Lift</label>
-                        <select id="autoregLift">
-                            <option value="squat">Squat</option>
-                            <option value="bench">Bench</option>
-                            <option value="deadlift">Deadlift</option>
-                            <option value="press">Press</option>
-                            <option value="power_clean">Power Clean</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="grid-3">
-                    <div>
-                        <label>Current Weight (kg)</label>
-                        <input type="number" id="autoregWeight" value="100" step="2.5">
-                    </div>
-                    <div>
-                        <label>Planned Reps</label>
-                        <input type="number" id="autoregPlanned" value="5" min="1">
-                    </div>
-                    <div>
-                        <label>Reps Done</label>
-                        <input type="number" id="autoregDone" value="0" min="0">
-                    </div>
-                </div>
-                
-                <div class="grid-3">
-                    <div>
-                        <label>Target V Low (m/s)</label>
-                        <input type="number" id="autoregVLow" value="0.35" step="0.05">
-                    </div>
-                    <div>
-                        <label>Target V High (m/s)</label>
-                        <input type="number" id="autoregVHigh" value="0.45" step="0.05">
-                    </div>
-                    <div>
-                        <label>VL Max (%)</label>
-                        <input type="number" id="autoregVLMax" value="20" min="5" max="50">
-                    </div>
-                </div>
-                
-                <button onclick="getAutoregSuggestion()" class="success">Get Suggestion</button>
-                
-                <div id="autoregResult" style="margin-top:20px;"></div>
-            </div>
-        </div>
-    </div>
+    <section class="card">
+      <h2>Strava</h2><div class="muted">OAuth state is signed; tokens are encrypted when configured.</div>
+      <button onclick="openStrava()">Open Strava connection</button>
+      <button class="secondary" onclick="syncStrava()">Sync last 30 days</button>
+    </section>
 
-    <script>
-        const API_BASE = 'http://localhost:8000';
-        let currentAthletes = [];
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            checkAPIStatus();
-            loadAthletes();
-            addSet();
-        });
-
-        async function checkAPIStatus() {
-            try {
-                const response = await fetch(`${API_BASE}/health`);
-                const statusEl = document.getElementById('apiStatus');
-                if (response.ok) {
-                    statusEl.textContent = 'API: Online';
-                    statusEl.className = 'api-status online';
-                } else {
-                    throw new Error('Not OK');
-                }
-            } catch (e) {
-                const statusEl = document.getElementById('apiStatus');
-                statusEl.textContent = 'API: Offline - Start: uvicorn app.main:app --reload';
-                statusEl.className = 'api-status offline';
-            }
-        }
-
-        function showTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
-            document.querySelectorAll('.nav a').forEach(el => el.classList.remove('active'));
-            event.target.classList.add('active');
-        }
-
-        function updateAthleteSelects() {
-            const options = currentAthletes.map(a => `<option value="${a.id}">${a.name} (ID: ${a.id})</option>`).join('');
-            const defaultOption = '<option value="">-- Select --</option>';
-            
-            ['dashboardAthlete', 'strengthAthlete', 'enduranceAthlete', 'autoregAthlete'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerHTML = defaultOption + options;
-            });
-        }
-
-        async function loadAthletes() {
-            const listEl = document.getElementById('athletesList');
-            if (currentAthletes.length === 0) {
-                listEl.innerHTML = '<p class="alert alert-info">No athletes yet. Create one!</p>';
-            } else {
-                listEl.innerHTML = currentAthletes.map(a => `
-                    <div class="lift-score">
-                        <span class="name">${a.name}</span>
-                        <span>ID: ${a.id}</span>
-                    </div>
-                `).join('');
-            }
-        }
-
-        async function createAthlete() {
-            const name = document.getElementById('athleteName').value;
-            if (!name) {
-                showResult('createAthleteResult', 'Please enter a name', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/athletes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    currentAthletes.push(data);
-                    updateAthleteSelects();
-                    showResult('createAthleteResult', `Created: ${data.name} (ID: ${data.id})`, 'success');
-                    document.getElementById('athleteName').value = '';
-                    loadAthletes();
-                } else {
-                    showResult('createAthleteResult', data.detail || 'Error', 'error');
-                }
-            } catch (e) {
-                showResult('createAthleteResult', 'API Error: ' + e.message, 'error');
-            }
-        }
-
-        async function loadReadiness() {
-            const athleteId = document.getElementById('dashboardAthlete').value;
-            if (!athleteId) {
-                alert('Please select an athlete');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/readiness/today?athlete_id=${athleteId}`);
-                const data = await response.json();
-                
-                if (response.ok) {
-                    document.getElementById('overallReadinessCard').style.display = 'block';
-                    document.getElementById('readinessDetails').style.display = 'grid';
-                    
-                    document.getElementById('overallScore').textContent = data.overall.toFixed(1) + '%';
-                    document.getElementById('enduranceScore').textContent = data.endurance.toFixed(1) + '%';
-                    
-                    colorizeScore('overallScore', data.overall);
-                    colorizeScore('enduranceScore', data.endurance);
-                    
-                    const liftsHtml = Object.entries(data.per_lift).map(([lift, score]) => {
-                        let scoreClass = score >= 80 ? 'score-high' : score >= 60 ? 'score-medium' : 'score-low';
-                        return `
-                            <div class="lift-score">
-                                <span class="name">${lift}</span>
-                                <span class="score ${scoreClass}">${score.toFixed(1)}%</span>
-                            </div>
-                        `;
-                    }).join('');
-                    document.getElementById('liftScores').innerHTML = liftsHtml;
-                    
-                    const expHtml = data.explanations.map(e => `<div class="explanation">${e}</div>`).join('');
-                    document.getElementById('explanations').innerHTML = expHtml || '<p>No specific factors</p>';
-                } else {
-                    alert(data.detail || 'Error loading readiness');
-                }
-            } catch (e) {
-                alert('API Error: ' + e.message);
-            }
-        }
-
-        function colorizeScore(elementId, score) {
-            const el = document.getElementById(elementId);
-            el.style.color = score >= 80 ? '#27ae60' : score >= 60 ? '#f39c12' : '#e74c3c';
-        }
-
-        function addSet() {
-            const container = document.getElementById('setsContainer');
-            const setNum = container.children.length + 1;
-            
-            const setDiv = document.createElement('div');
-            setDiv.className = 'set-container';
-            setDiv.innerHTML = `
-                <h3>Set ${setNum}</h3>
-                <div class="grid-2">
-                    <div>
-                        <label>Weight (kg)</label>
-                        <input type="number" class="set-weight" value="100" step="2.5">
-                    </div>
-                    <div>
-                        <label>Target Reps</label>
-                        <input type="number" class="set-target" value="5" min="1">
-                    </div>
-                </div>
-                <h4 style="margin-top:15px;">Reps</h4>
-                <div class="reps-container"></div>
-                <button onclick="addRep(this)" class="secondary">+ Add Rep</button>
-            `;
-            container.appendChild(setDiv);
-            addRep(setDiv.querySelector('button'));
-        }
-
-        function addRep(btn) {
-            const repsContainer = btn.previousElementSibling;
-            const repNum = repsContainer.children.length + 1;
-            
-            const repDiv = document.createElement('div');
-            repDiv.className = 'rep-input';
-            repDiv.innerHTML = `
-                <input type="number" class="rep-weight" placeholder="Weight" value="100" step="2.5">
-                <input type="number" class="rep-velocity" placeholder="Velocity (m/s)" value="0.4" step="0.01">
-                <input type="number" class="rep-num" value="${repNum}" readonly>
-                <input type="number" class="rep-rest" placeholder="Rest (s)" value="3" min="0">
-                <button onclick="this.parentElement.remove()" class="danger" style="margin-top:0;">×</button>
-            `;
-            repsContainer.appendChild(repDiv);
-        }
-
-        async function submitStrengthSession() {
-            const athleteId = document.getElementById('strengthAthlete').value;
-            const lift = document.getElementById('strengthLift').value;
-            
-            if (!athleteId) {
-                showResult('strengthResult', 'Please select an athlete', 'error');
-                return;
-            }
-
-            const sets = [];
-            document.querySelectorAll('.set-container').forEach(setEl => {
-                const weight = parseFloat(setEl.querySelector('.set-weight').value);
-                const targetReps = parseInt(setEl.querySelector('.set-target').value);
-                
-                const reps = [];
-                setEl.querySelectorAll('.rep-input').forEach(repEl => {
-                    reps.push({
-                        weight: parseFloat(repEl.querySelector('.rep-weight').value),
-                        velocity: parseFloat(repEl.querySelector('.rep-velocity').value),
-                        rep_num: parseInt(repEl.querySelector('.rep-num').value),
-                        rest_before: parseFloat(repEl.querySelector('.rep-rest').value)
-                    });
-                });
-                
-                sets.push({ weight, target_reps: targetReps, reps });
-            });
-
-            const payload = {
-                athlete_id: parseInt(athleteId),
-                lift: lift,
-                start_time: new Date().toISOString(),
-                sets: sets
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/sessions/strength`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showResult('strengthResult', `
-                        <div class="alert alert-success">Session logged! Tonnage: ${data.tonnage.toFixed(0)}kg</div>
-                        <div class="json-output">${JSON.stringify(data, null, 2)}</div>
-                    `, '');
-                } else {
-                    showResult('strengthResult', data.detail || 'Error', 'error');
-                }
-            } catch (e) {
-                showResult('strengthResult', 'API Error: ' + e.message, 'error');
-            }
-        }
-
-        async function submitEnduranceSession() {
-            const athleteId = document.getElementById('enduranceAthlete').value;
-            if (!athleteId) {
-                showResult('enduranceResult', 'Please select an athlete', 'error');
-                return;
-            }
-
-            const payload = {
-                athlete_id: parseInt(athleteId),
-                sport: document.getElementById('enduranceSport').value,
-                start_time: new Date().toISOString(),
-                duration_minutes: parseFloat(document.getElementById('enduranceDuration').value),
-                intensity_type: document.getElementById('enduranceIntensity').value
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/sessions/endurance`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showResult('enduranceResult', `
-                        <div class="alert alert-success">Session logged! Z2: ${data.u_E_Z2.toFixed(1)}min, HIIT: ${data.u_E_HIIT.toFixed(1)}min</div>
-                        <div class="json-output">${JSON.stringify(data, null, 2)}</div>
-                    `, '');
-                } else {
-                    showResult('enduranceResult', data.detail || 'Error', 'error');
-                }
-            } catch (e) {
-                showResult('enduranceResult', 'API Error: ' + e.message, 'error');
-            }
-        }
-
-        async function getAutoregSuggestion() {
-            const athleteId = document.getElementById('autoregAthlete').value;
-            if (!athleteId) {
-                showResult('autoregResult', 'Please select an athlete', 'error');
-                return;
-            }
-
-            const payload = {
-                athlete_id: parseInt(athleteId),
-                lift: document.getElementById('autoregLift').value,
-                current_weight: parseFloat(document.getElementById('autoregWeight').value),
-                target_v_low: parseFloat(document.getElementById('autoregVLow').value),
-                target_v_high: parseFloat(document.getElementById('autoregVHigh').value),
-                vl_max: parseFloat(document.getElementById('autoregVLMax').value),
-                planned_reps: parseInt(document.getElementById('autoregPlanned').value),
-                current_reps_done: parseInt(document.getElementById('autoregDone').value)
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/strength/autoregulate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    let html = '<div class="grid-2">';
-                    
-                    html += `
-                        <div>
-                            <div class="readiness-score">
-                                <div class="value" style="font-size:32px;">${data.predicted_velocity.toFixed(3)}</div>
-                                <div class="label">Predicted Velocity (m/s)</div>
-                            </div>
-                            <div class="readiness-score" style="margin-top:15px;">
-                                <div class="value" style="font-size:32px; color:${data.current_vl > 15 ? '#e74c3c' : '#27ae60'}">${data.current_vl.toFixed(1)}%</div>
-                                <div class="label">Current VL</div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    html += '<div>';
-                    
-                    if (!data.continue_set) {
-                        html += '<div class="alert alert-error"><strong>STOP SET</strong></div>';
-                    } else {
-                        html += '<div class="alert alert-success"><strong>Continue</strong></div>';
-                    }
-                    
-                    if (data.load_change !== 0) {
-                        const changeText = data.load_change > 0 ? `+${(data.load_change*100).toFixed(1)}%` : `${(data.load_change*100).toFixed(1)}%`;
-                        const changeClass = data.load_change > 0 ? 'alert-success' : 'alert-info';
-                        html += `<div class="alert ${changeClass}"><strong>Load Change: ${changeText}</strong></div>`;
-                    }
-                    
-                    if (data.rest_suggestion) {
-                        html += `<div class="alert alert-info">${data.rest_suggestion}</div>`;
-                    }
-                    
-                    if (data.exercise_switch) {
-                        html += `<div class="alert alert-error">${data.exercise_switch}</div>`;
-                    }
-                    
-                    if (data.messages && data.messages.length > 0) {
-                        html += '<h4>Messages:</h4>';
-                        data.messages.forEach(m => html += `<div class="explanation">${m}</div>`);
-                    }
-                    
-                    html += '</div></div>';
-                    html += `<div class="json-output" style="margin-top:15px;">${JSON.stringify(data, null, 2)}</div>`;
-                    
-                    showResult('autoregResult', html, '');
-                } else {
-                    showResult('autoregResult', data.detail || 'Error', 'error');
-                }
-            } catch (e) {
-                showResult('autoregResult', 'API Error: ' + e.message, 'error');
-            }
-        }
-
-        function showResult(elementId, message, type) {
-            const el = document.getElementById(elementId);
-            if (type) {
-                el.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-            } else {
-                el.innerHTML = message;
-            }
-        }
-    </script>
+    <section class="card wide"><h2>Result</h2><pre id="output">Ready.</pre></section>
+  </div>
+</div>
+<script>
+const q=id=>document.getElementById(id); q('apiKey').value=localStorage.getItem('ct_api_key')||'';
+function saveKey(){localStorage.setItem('ct_api_key',q('apiKey').value);show({saved:true})}
+function headers(json=true){const h={};if(json)h['Content-Type']='application/json';const key=q('apiKey').value;if(key)h['X-API-Key']=key;return h}
+async function api(path,options={}){options.headers={...headers(options.body!==undefined),...(options.headers||{})};const response=await fetch(path,options);let data;try{data=await response.json()}catch{data=await response.text()}if(!response.ok)throw new Error(typeof data==='string'?data:(data.detail||JSON.stringify(data)));return data}
+function show(value){q('output').textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
+function athleteId(){const value=Number(q('athlete').value);if(!value)throw new Error('Select an athlete');return value}
+async function run(fn){try{show(await fn())}catch(e){show('Error: '+e.message)}}
+async function loadAthletes(){return run(async()=>{const rows=await api('/athletes');q('athlete').replaceChildren(...rows.map(row=>{const option=document.createElement('option');option.value=row.id;option.textContent=`${row.name} (#${row.id})`;return option}));return rows})}
+async function createAthlete(){return run(async()=>{const row=await api('/athletes',{method:'POST',body:JSON.stringify({name:q('newName').value})});await loadAthletes();q('athlete').value=row.id;return row})}
+async function loadReadiness(){return run(async()=>{const data=await api(`/readiness/today?athlete_id=${athleteId()}`);q('overall').textContent=data.overall.toFixed(1)+'%';q('overall').className='score '+(data.overall>=80?'ok':data.overall>=60?'warn':'error');q('readinessNote').textContent=data.explanations.join(' · ');return data})}
+async function initializeCapacity(){return run(()=>api('/strength/capacity/init',{method:'POST',body:JSON.stringify({athlete_id:athleteId(),lift:q('capacityLift').value,input_type:q('capacityType').value,input_load_kg:Number(q('capacityLoad').value),input_reps:Number(q('capacityReps').value),input_rpe:Number(q('capacityRpe').value)})}))}
+async function saveEnduranceProfile(){return run(()=>api(`/endurance/profile/${athleteId()}/${q('profileSport').value}`,{method:'PUT',body:JSON.stringify({threshold_power_w:Number(q('thresholdPower').value)})}))}
+async function submitWorkout(){return run(()=>{const body=JSON.parse(q('workoutJson').value);body.athlete_id=athleteId();body.start_time=new Date().toISOString();return api('/sessions/strength-workout',{method:'POST',body:JSON.stringify(body)})})}
+async function submitEndurance(){return run(()=>api('/sessions/endurance',{method:'POST',body:JSON.stringify({athlete_id:athleteId(),sport:q('sport').value,start_time:new Date().toISOString(),duration_minutes:Number(q('duration').value),intensity_type:q('intensity').value,average_power_w:Number(q('avgPower').value)||null,normalized_power_w:Number(q('npPower').value)||null,threshold_power_w:Number(q('thresholdPower').value)||null})}))}
+function openStrava(){window.open(`/integrations/strava?athlete_id=${athleteId()}`,'_blank')}
+async function syncStrava(){return run(()=>api(`/integrations/strava/sync?athlete_id=${athleteId()}&days_back=30`,{method:'POST'}))}
+loadAthletes();
+</script>
 </body>
 </html>
