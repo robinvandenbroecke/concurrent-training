@@ -50,10 +50,7 @@ async def verify_api_key(api_key: Optional[str] = Security(api_key_header)):
 
 
 async def verify_admin_api_key(api_key: Optional[str] = Security(api_key_header)):
-    # Development and tests remain frictionless; production validation forces
-    # require_api_key=True, so admin routes cannot be left open in production.
-    if not settings.require_api_key:
-        return api_key
+    """Admin mutations always require the configured key in every environment."""
     if not api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin API key required")
     if not hmac.compare_digest(api_key, settings.admin_api_key):
@@ -470,8 +467,10 @@ def strava_status(athlete_id: int, db: Session = Depends(get_db)):
         last_sync = escape(connection.last_sync_at.isoformat() if connection.last_sync_at else "Never")
         error = escape(connection.last_sync_error or "")
         return HTMLResponse(
-            f"<h1>✅ Connected</h1><p>{name}</p><p>Last sync: {last_sync}</p>"
-            f"<p>{error}</p><a href='/integrations/strava/login?athlete_id={athlete_id}'>Reconnect</a>"
+            f"<h1>✅ Connected</h1><p>{name}</p><p>Last sync: {last_sync}</p><p>{error}</p>"
+            f"<a href='/integrations/strava/login?athlete_id={athlete_id}'>Reconnect</a>"
+            f"<form method='post' action='/integrations/strava/disconnect?athlete_id={athlete_id}'>"
+            "<button type='submit'>Disconnect</button></form>"
         )
     return HTMLResponse(
         f"<h1>❌ Not Connected</h1><a href='/integrations/strava/login?athlete_id={athlete_id}'>Connect with Strava</a>"
