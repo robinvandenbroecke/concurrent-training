@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from app.config import settings
 from app.domain.endurance_engine import compute_endurance_load
 from app.integrations.secure_strava import StravaService
@@ -30,7 +32,7 @@ def test_cycling_power_with_threshold_is_primary_signal():
     )
     assert load.signal_source == "power"
     assert load.intensity_type == "z2"
-    assert load.intensity_factor == 0.76
+    assert load.intensity_factor == pytest.approx(0.76)
     assert load.u_z2 > 0
     assert load.u_hiit == 0
 
@@ -43,8 +45,8 @@ def test_power_without_threshold_is_explicit_fallback():
         average_power_w=210,
     )
     assert load.signal_source == "power_unscaled"
-    assert load.u_z2 == 13.5
-    assert load.u_hiit == 31.5
+    assert load.u_z2 == pytest.approx(13.5)
+    assert load.u_hiit == pytest.approx(31.5)
 
 
 def test_multi_lift_workout_schema_preserves_order_and_rpe():
@@ -81,9 +83,5 @@ def test_strava_oauth_state_is_signed_and_expires():
     assert service.verify_state_token(state) == 42
     athlete, timestamp, signature = state.split(":", 2)
     tampered = f"43:{timestamp}:{signature}"
-    try:
+    with pytest.raises(Exception):
         service.verify_state_token(tampered)
-    except Exception:
-        pass
-    else:
-        raise AssertionError("tampered OAuth state must be rejected")
