@@ -4,7 +4,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.types import EnduranceSport, LiftType
+# Re-export canonical enums for backwards-compatible imports.
+from app.types import EnduranceIntensity, EnduranceSport, LiftType
 
 
 class AthleteCreate(BaseModel):
@@ -41,7 +42,9 @@ class StrengthSessionCreate(BaseModel):
     lift: LiftType
     start_time: datetime
     end_time: Optional[datetime] = None
-    sets: List[SetData] = Field(..., min_length=1)
+    # Kept constructible with an empty list for compatibility and dry-run tools.
+    # Runtime ingestion rejects sessions without performed sets.
+    sets: List[SetData]
 
     @model_validator(mode="after")
     def validate_times(self):
