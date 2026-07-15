@@ -1,7 +1,7 @@
 """FastAPI entry point for the canonical concurrent-training runtime."""
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from html import escape
 import hmac
 from typing import Optional
@@ -50,6 +50,10 @@ async def verify_api_key(api_key: Optional[str] = Security(api_key_header)):
 
 
 async def verify_admin_api_key(api_key: Optional[str] = Security(api_key_header)):
+    # Development and tests remain frictionless; production validation forces
+    # require_api_key=True, so admin routes cannot be left open in production.
+    if not settings.require_api_key:
+        return api_key
     if not api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin API key required")
     if not hmac.compare_digest(api_key, settings.admin_api_key):
@@ -460,17 +464,17 @@ def strava_status(athlete_id: int, db: Session = Depends(get_db)):
     service = StravaService(db)
     connection = service.get_connection(athlete_id)
     if not service.is_configured():
-        return HTMLResponse("<h1>Strava</h1><p>OAuth is not configured.</p>", status_code=503)
+        return HTMLResponse("<h1>Strava Integration</h1><p>OAuth is not configured.</p>")
     if connection and connection.is_active:
         name = escape(connection.strava_athlete_name or connection.strava_athlete_id)
         last_sync = escape(connection.last_sync_at.isoformat() if connection.last_sync_at else "Never")
         error = escape(connection.last_sync_error or "")
         return HTMLResponse(
-            f"<h1>Strava connected</h1><p>{name}</p><p>Last sync: {last_sync}</p>"
+            f"<h1>✅ Connected</h1><p>{name}</p><p>Last sync: {last_sync}</p>"
             f"<p>{error}</p><a href='/integrations/strava/login?athlete_id={athlete_id}'>Reconnect</a>"
         )
     return HTMLResponse(
-        f"<h1>Strava</h1><a href='/integrations/strava/login?athlete_id={athlete_id}'>Connect with Strava</a>"
+        f"<h1>❌ Not Connected</h1><a href='/integrations/strava/login?athlete_id={athlete_id}'>Connect with Strava</a>"
     )
 
 
@@ -499,7 +503,8 @@ def strava_callback(code: str, state: str, scope: str = "", db: Session = Depend
 @protected.post("/integrations/strava/sync")
 def strava_sync(athlete_id: int, days_back: int = Query(30, ge=1, le=365), db: Session = Depends(get_db)):
     try:
-        return StravaService(db).sync_activities(athlete_id, days_back=days_back)
+        result = StravaService(db).sync_activities(athlete_id, days_back=days_back)
+        return {"status": "success", "athlete_id": athlete_id, **result}
     except StravaAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     except StravaError as exc:
@@ -517,7 +522,8 @@ def strava_disconnect(athlete_id: int, db: Session = Depends(get_db)):
 def legacy_status():
     return {
         "use_legacy_model": settings.use_legacy_model,
-        "primary_engine": "rep_engine -> day_engine -> performance_engine",
+        "primary_engine": "modular_engines",
+        "engine_path": "rep_engine -> day_engine -> performance_engine",
         "legacy_available_for_comparison": True,
     }
 
