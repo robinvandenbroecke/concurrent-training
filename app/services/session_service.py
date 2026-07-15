@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import models as db_models
@@ -18,18 +19,19 @@ from app.domain.day_engine import (
     update_day_state,
 )
 from app.domain.endurance_engine import compute_endurance_load
+from app.domain.rep_engine import LiftVelocityProfile, SessionInput, SetInput, simulate_strength_session
+from app.services.capacity_profile_service import CapacityProfileService
 from app.services.capacity_service import get_lift_capacity_estimate
 from app.services.engine_orchestrator import EngineOrchestrator
 from app.types import EnduranceSport, LiftType
 
 
 class SessionService:
-    """Persist sessions through the orchestrator and rebuild each day once.
+    """Canonical strength/endurance ingestion service.
 
-    The original orchestrator updates state immediately for backward
-    compatibility. This service then deterministically rebuilds the entire day
-    from the preceding state and all sessions on that date, preventing repeated
-    application of one-day decay when multiple sessions occur on the same day.
+    State for a calendar day is rebuilt from the preceding day and all stored
+    sessions exactly once, preventing repeated daily decay when multiple
+    sessions occur on the same date.
     """
 
     def __init__(self, db: Session):
@@ -59,43 +61,139 @@ class SessionService:
         end_time: Optional[datetime] = None,
     ) -> db_models.StrengthSession:
         payload = [self._set_to_dict(item) for item in sets_data]
-        rpes = [item.set_end_rpe for item in sets_data if item.set_end_rpe is not None]
-        session, _, _ = self.orchestrator.ingest_strength_session(
+        rpes = [item["set_end_rpe"] for item in payload if item.get("set_end_rpe") is not None]
+        optional_rpe = max(rpes) if rpes else None
+        content_hash = self.orchestrator._compute_strength_content_hash(
+            athlete_id, start_time.date(), lift.value, payload, optional_rpe
+        )
+        existing = self.orchestrator._check_existing_strength_session(athlete_id, content_hash)
+        if existing is not None:
+            return existing
+
+        profile_db = self.db.query(db_models.LiftProfile).filter(
+            db_models.LiftProfile.athlete_id == athlete_id,
+            db_models.LiftProfile.lift == lift,
+        ).first()
+        if profile_db is None:
+            raise ValueError(f"No profile found for {lift.value}")
+        try:
+            profile = LiftVelocityProfile(lift=lift.value, a=float(profile_db.a), b=abs(float(profile_db.b)))
+        except ValueError:
+            profile = LiftVelocityProfile.calibrated_profile(lift.value)
+            profile_db.a, profile_db.b = profile.a, profile.b
+
+        day_state = self.orchestrator._get_or_create_day_state(athlete_id, start_time.date())
+        lift_state = day_state.get_lift(lift.value)
+        capacity, capacity_source = get_lift_capacity_estimate(
+            self.db, athlete_id, lift, start_time.date()
+        )
+        set_inputs = [
+            SetInput(
+                lift=lift.value,
+                load_kg=item["load_kg"],
+                velocities=item["velocities"],
+                rest_before_sec=item.get("rest_sec") if index > 0 else None,
+                set_end_rpe=item.get("set_end_rpe"),
+            )
+            for index, item in enumerate(payload)
+        ]
+        rep_output = simulate_strength_session(SessionInput(
+            sets=set_inputs,
+            profiles={lift.value: profile},
+            init_A_local={lift.value: max(0.02, 1.0 - lift_state.D_l / 2.0)},
+            init_A_sys=max(0.02, 1.0 - day_state.D_sys / 2.0),
+            init_M=0.0,
+            R_mito=day_state.R_mito,
+            e1rm={lift.value: capacity},
+            params=self.orchestrator.rep_params,
+        ))
+
+        total_tonnage = sum(item["load_kg"] * item["reps"] for item in payload)
+        total_reps = sum(item["reps"] for item in payload)
+        relative_intensity = (
+            sum((item["load_kg"] / max(capacity, 1.0)) * item["reps"] for item in payload) / total_reps
+            if total_reps else 0.0
+        )
+        session = db_models.StrengthSession(
             athlete_id=athlete_id,
             lift=lift,
-            session_date=start_time.date(),
-            sets_data=payload,
-            vbt_available=any(item["velocities"] for item in payload),
-            optional_rpe=max(rpes) if rpes else None,
+            start_time=start_time,
+            end_time=end_time,
+            content_hash=content_hash,
+            tonnage=total_tonnage,
+            avg_intensity=relative_intensity,
+            raw_data={
+                "sets": payload,
+                "source": "api",
+                "capacity_estimate": capacity,
+                "capacity_source": capacity_source,
+                "final_A_local": rep_output.final_A_local,
+                "final_A_sys": rep_output.final_A_sys,
+                "final_A_M": rep_output.final_A_M,
+            },
+            rep_level_log=[
+                {
+                    "set_idx": set_index,
+                    "rep_idx": rep_index,
+                    "A_l": rep.A_l,
+                    "A_sys": rep.A_sys,
+                    "A_M": rep.A_M,
+                    "v_pred_next": rep.v_pred_next,
+                    "y": rep.y,
+                    "y_phi": rep.y_phi,
+                }
+                for set_index, set_output in enumerate(rep_output.sets)
+                for rep_index, rep in enumerate(set_output.reps)
+            ],
         )
-        session.start_time = start_time
-        session.end_time = end_time
-        raw = dict(session.raw_data or {})
-        raw["sets"] = payload
-        raw["source"] = "api"
-        session.raw_data = raw
-        self.db.flush()
+        self.db.add(session)
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            existing = self.orchestrator._check_existing_strength_session(athlete_id, content_hash)
+            if existing is not None:
+                return existing
+            raise
+
+        self.orchestrator._compute_strength_performance_snapshot(
+            athlete_id,
+            lift,
+            start_time.date(),
+            payload,
+            rep_output,
+            any(item["velocities"] for item in payload),
+        )
         self._rebuild_day(athlete_id, start_time.date())
         self.db.commit()
+
+        # Capacity and breakthrough processing is part of normal ingestion rather
+        # than a separate manual workflow.
+        capacity_service = CapacityProfileService(self.db)
+        for item in payload:
+            velocities = item["velocities"]
+            velocity_loss = None
+            if len(velocities) >= 2 and velocities[0] > 0:
+                velocity_loss = max(0.0, min(1.0, 1.0 - velocities[-1] / velocities[0]))
+            capacity_service.process_quality_set(
+                athlete_id=athlete_id,
+                lift=lift,
+                load_kg=item["load_kg"],
+                reps=item["reps"],
+                rpe=item.get("set_end_rpe"),
+                velocity_loss=velocity_loss,
+                observed_velocity=velocities[0] if velocities else None,
+            )
         self.db.refresh(session)
         return session
 
     def ingest_strength_workout(self, workout: schemas.StrengthWorkoutCreate) -> List[db_models.StrengthSession]:
-        """Ingest a multi-lift workout in performed order.
-
-        Exercise records remain queryable through the existing table while one
-        final day rebuild aggregates all lifts without extra daily decay.
-        """
         sessions: List[db_models.StrengthSession] = []
         for index, exercise in enumerate(workout.exercises):
-            # Preserve ordering even when exercises share the same wall-clock
-            # timestamp. The day model is rebuilt after each insert and finally
-            # once more after the complete workout.
-            exercise_time = workout.start_time + timedelta(seconds=index)
             sessions.append(self.ingest_strength_session(
                 athlete_id=workout.athlete_id,
                 lift=exercise.lift,
-                start_time=exercise_time,
+                start_time=workout.start_time + timedelta(seconds=index),
                 end_time=workout.end_time,
                 sets_data=exercise.sets,
             ))
@@ -139,8 +237,6 @@ class SessionService:
             power_data=power_data,
         )
         session.start_time = start_time
-        if hasattr(session, "end_time"):
-            session.end_time = end_time
         session.intensity_type = load.intensity_type
         session.u_E_Z2 = load.u_z2
         session.u_E_HIIT = load.u_hiit
@@ -176,14 +272,7 @@ class SessionService:
             for lift in LiftType:
                 capacity, _ = get_lift_capacity_estimate(self.db, athlete_id, lift, previous_day)
                 per_lift[lift.value] = PerLiftState(D_l=0.0, F_l=1.0, C_l=capacity)
-            return DayState(
-                date=previous_day,
-                per_lift=per_lift,
-                D_sys=0.0,
-                R_mito=0.0,
-                E_fat=0.0,
-                T_legs=0.0,
-            )
+            return DayState(date=previous_day, per_lift=per_lift, D_sys=0.0, R_mito=0.0, E_fat=0.0, T_legs=0.0)
 
         lift_rows = self.db.query(db_models.LiftDayState).filter(
             db_models.LiftDayState.athlete_id == athlete_id,
@@ -222,14 +311,10 @@ class SessionService:
         for session in strength_sessions:
             sets = (session.raw_data or {}).get("sets", [])
             impulse = self.orchestrator._compute_strength_impulses(
-                session.lift.value,
-                sets,
-                rep_output=None,
-                athlete_id=athlete_id,
-                session_date=target_date,
+                session.lift.value, sets, rep_output=None, athlete_id=athlete_id, session_date=target_date
             )
-            for lift, value in impulse.per_lift.items():
-                per_lift[lift] = per_lift.get(lift, 0.0) + value
+            for lift_name, value in impulse.per_lift.items():
+                per_lift[lift_name] = per_lift.get(lift_name, 0.0) + value
             u_sys += impulse.u_sys
             u_legs += impulse.u_legs
             u_met += impulse.u_met
