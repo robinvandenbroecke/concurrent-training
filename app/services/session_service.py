@@ -16,13 +16,13 @@ from app.domain.day_engine import (
     PerLiftState,
     StrengthImpulses,
     decay_day_state_to_date,
-    update_day_state,
 )
 from app.domain.endurance_engine import compute_endurance_load
-from app.domain.rep_engine import LiftVelocityProfile, SessionInput, SetInput, simulate_strength_session
+from app.domain.rep_engine import LiftVelocityProfile, SessionInput, SetInput
 from app.services.capacity_profile_service import CapacityProfileService
 from app.services.capacity_service import get_lift_capacity_estimate
 from app.services.engine_orchestrator import EngineOrchestrator
+import app.services.engine_orchestrator as engine_module
 from app.types import EnduranceSport, LiftType
 
 
@@ -37,6 +37,9 @@ class SessionService:
     def __init__(self, db: Session):
         self.db = db
         self.orchestrator = EngineOrchestrator(db)
+        # Backwards-compatible inspection hook. The legacy model is never
+        # instantiated by the canonical service.
+        self._legacy_model = None
 
     @staticmethod
     def _set_to_dict(set_data: schemas.SetData) -> Dict:
@@ -60,6 +63,8 @@ class SessionService:
         sets_data: List[schemas.SetData],
         end_time: Optional[datetime] = None,
     ) -> db_models.StrengthSession:
+        if not sets_data:
+            raise ValueError("A strength session must contain at least one performed set")
         payload = [self._set_to_dict(item) for item in sets_data]
         rpes = [item["set_end_rpe"] for item in payload if item.get("set_end_rpe") is not None]
         optional_rpe = max(rpes) if rpes else None
@@ -97,7 +102,9 @@ class SessionService:
             )
             for index, item in enumerate(payload)
         ]
-        rep_output = simulate_strength_session(SessionInput(
+        # Keep the orchestrator module as the public patch point used by
+        # integration tests and downstream comparison tooling.
+        rep_output = engine_module.simulate_strength_session(SessionInput(
             sets=set_inputs,
             profiles={lift.value: profile},
             init_A_local={lift.value: max(0.02, 1.0 - lift_state.D_l / 2.0)},
@@ -139,8 +146,8 @@ class SessionService:
                     "A_sys": rep.A_sys,
                     "A_M": rep.A_M,
                     "v_pred_next": rep.v_pred_next,
-                    "y": rep.y,
-                    "y_phi": rep.y_phi,
+                    "y": getattr(rep, "y", None),
+                    "y_phi": getattr(rep, "y_phi", None),
                 }
                 for set_index, set_output in enumerate(rep_output.sets)
                 for rep_index, rep in enumerate(set_output.reps)
@@ -167,8 +174,6 @@ class SessionService:
         self._rebuild_day(athlete_id, start_time.date())
         self.db.commit()
 
-        # Capacity and breakthrough processing is part of normal ingestion rather
-        # than a separate manual workflow.
         capacity_service = CapacityProfileService(self.db)
         for item in payload:
             velocities = item["velocities"]
@@ -332,7 +337,7 @@ class SessionService:
             mode = EnduranceSport.CYCLING.value
 
         base = self._load_previous_state(athlete_id, target_date)
-        updated = update_day_state(
+        updated = engine_module.update_day_state(
             base,
             DailyImpulses(
                 strength=StrengthImpulses(
