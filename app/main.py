@@ -469,8 +469,8 @@ def strava_status(athlete_id: int, db: Session = Depends(get_db)):
         return HTMLResponse(
             f"<h1>✅ Connected</h1><p>{name}</p><p>Last sync: {last_sync}</p><p>{error}</p>"
             f"<a href='/integrations/strava/login?athlete_id={athlete_id}'>Reconnect</a>"
-            f"<form method='post' action='/integrations/strava/disconnect?athlete_id={athlete_id}'>"
-            "<button type='submit'>Disconnect</button></form>"
+            f'<form method="post" action="/integrations/strava/disconnect?athlete_id={athlete_id}">'
+            '<button type="submit">Disconnect</button></form>'
         )
     return HTMLResponse(
         f"<h1>❌ Not Connected</h1><a href='/integrations/strava/login?athlete_id={athlete_id}'>Connect with Strava</a>"
