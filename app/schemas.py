@@ -1,8 +1,8 @@
 """Pydantic schemas for the API."""
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Re-export canonical enums for backwards-compatible imports.
 from app.types import EnduranceIntensity, EnduranceSport, LiftType
@@ -13,12 +13,11 @@ class AthleteCreate(BaseModel):
 
 
 class AthleteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class RepData(BaseModel):
@@ -73,6 +72,8 @@ class StrengthWorkoutCreate(BaseModel):
 
 
 class StrengthSessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     athlete_id: int
     lift: LiftType
@@ -80,9 +81,6 @@ class StrengthSessionResponse(BaseModel):
     end_time: Optional[datetime]
     tonnage: float
     avg_intensity: float
-
-    class Config:
-        from_attributes = True
 
 
 class PowerPoint(BaseModel):
@@ -112,6 +110,8 @@ class EnduranceSessionCreate(BaseModel):
 
 
 class EnduranceSessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     athlete_id: int
     sport: EnduranceSport
@@ -120,9 +120,6 @@ class EnduranceSessionResponse(BaseModel):
     intensity_type: str
     u_E_Z2: float
     u_E_HIIT: float
-
-    class Config:
-        from_attributes = True
 
 
 class AutoregulateRequest(BaseModel):
