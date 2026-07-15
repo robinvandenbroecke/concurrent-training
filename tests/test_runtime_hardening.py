@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 import pytest
 
@@ -7,6 +8,7 @@ from app.domain.endurance_engine import compute_endurance_load
 from app.integrations.secure_strava import StravaService
 from app.schemas import RepData, SetData, StrengthExerciseData, StrengthWorkoutCreate
 from app.services import AutoregulationService, DayUpdateService, ReadinessService, SessionService
+import app.services.engine_orchestrator as engine_module
 from app.types import LiftType
 
 
@@ -49,10 +51,10 @@ def test_power_without_threshold_is_explicit_fallback():
     assert load.u_hiit == pytest.approx(31.5)
 
 
-def test_multi_lift_workout_schema_preserves_order_and_rpe():
-    workout = StrengthWorkoutCreate(
-        athlete_id=1,
-        start_time=datetime.now(timezone.utc),
+def _two_lift_workout(athlete_id: int) -> StrengthWorkoutCreate:
+    return StrengthWorkoutCreate(
+        athlete_id=athlete_id,
+        start_time=datetime(2026, 1, 1, 18, 0),
         exercises=[
             StrengthExerciseData(
                 lift=LiftType.SQUAT,
@@ -60,7 +62,10 @@ def test_multi_lift_workout_schema_preserves_order_and_rpe():
                     weight=100,
                     target_reps=3,
                     set_end_rpe=8.0,
-                    reps=[RepData(weight=100, velocity=0.5, rep_num=1)],
+                    reps=[
+                        RepData(weight=100, velocity=0.50, rep_num=1),
+                        RepData(weight=100, velocity=0.46, rep_num=2),
+                    ],
                 )],
             ),
             StrengthExerciseData(
@@ -68,13 +73,32 @@ def test_multi_lift_workout_schema_preserves_order_and_rpe():
                 sets=[SetData(
                     weight=80,
                     target_reps=3,
-                    reps=[RepData(weight=80, velocity=0.45, rep_num=1)],
+                    set_end_rpe=8.0,
+                    reps=[
+                        RepData(weight=80, velocity=0.45, rep_num=1),
+                        RepData(weight=80, velocity=0.41, rep_num=2),
+                    ],
                 )],
             ),
         ],
     )
+
+
+def test_multi_lift_workout_schema_preserves_order_and_rpe():
+    workout = _two_lift_workout(1)
     assert [item.lift for item in workout.exercises] == [LiftType.SQUAT, LiftType.BENCH]
     assert workout.exercises[0].sets[0].set_end_rpe == 8.0
+
+
+def test_multi_lift_workout_uses_one_rep_engine_run(db_session, sample_athlete):
+    workout = _two_lift_workout(sample_athlete.id)
+    actual = engine_module.simulate_strength_session
+    with patch("app.services.engine_orchestrator.simulate_strength_session", wraps=actual) as mocked:
+        sessions = SessionService(db_session).ingest_strength_workout(workout)
+    assert mocked.call_count == 1
+    assert [item.lift for item in sessions] == [LiftType.SQUAT, LiftType.BENCH]
+    assert all((item.raw_data or {}).get("source") == "multi_lift_workout" for item in sessions)
+    assert sessions[1].raw_data["final_A_sys"] <= sessions[0].raw_data["final_A_sys"]
 
 
 def test_strava_oauth_state_is_signed_and_expires():
