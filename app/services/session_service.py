@@ -17,6 +17,11 @@ from app.domain.day_engine import (
     StrengthImpulses,
     decay_day_state_to_date,
 )
+from app.domain.day_transition import (
+    apply_day_transition,
+    canonical_day_params,
+    interference_timing_factor,
+)
 from app.domain.endurance_engine import compute_endurance_load
 from app.domain.rep_engine import LiftVelocityProfile, SessionInput, SetInput
 from app.services.capacity_profile_service import CapacityProfileService
@@ -37,8 +42,7 @@ class SessionService:
     def __init__(self, db: Session):
         self.db = db
         self.orchestrator = EngineOrchestrator(db)
-        # Backwards-compatible inspection hook. The legacy model is never
-        # instantiated by the canonical service.
+        self.orchestrator.day_params = canonical_day_params(self.orchestrator.day_params)
         self._legacy_model = None
 
     @staticmethod
@@ -102,8 +106,6 @@ class SessionService:
             )
             for index, item in enumerate(payload)
         ]
-        # Keep the orchestrator module as the public patch point used by
-        # integration tests and downstream comparison tooling.
         rep_output = engine_module.simulate_strength_session(SessionInput(
             sets=set_inputs,
             profiles={lift.value: profile},
@@ -296,6 +298,22 @@ class SessionService:
         )
         return decay_day_state_to_date(state, previous_day, self.orchestrator.day_params)
 
+    def _capacity_ceilings(self, athlete_id: int) -> Dict[str, float]:
+        row = self.db.query(db_models.SystemParameters).filter(
+            db_models.SystemParameters.athlete_id == athlete_id
+        ).first()
+        params = row.params if row and isinstance(row.params, dict) else {}
+        raw = params.get("strength", {}).get("capacity_ceilings", {})
+        result: Dict[str, float] = {}
+        for lift, value in raw.items() if isinstance(raw, dict) else []:
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric > self.orchestrator.day_params.C_min:
+                result[str(lift)] = numeric
+        return result
+
     def _rebuild_day(self, athlete_id: int, target_date: date) -> DayState:
         start = datetime.combine(target_date, time.min)
         end = datetime.combine(target_date + timedelta(days=1), time.min)
@@ -328,7 +346,8 @@ class SessionService:
 
         u_z2 = sum(float(item.u_E_Z2 or 0.0) for item in endurance_sessions)
         u_hiit = sum(float(item.u_E_HIIT or 0.0) for item in endurance_sessions)
-        hiit_modes = [item.sport.value for item in endurance_sessions if (item.u_E_HIIT or 0.0) > 0]
+        hiit_sessions = [item for item in endurance_sessions if (item.u_E_HIIT or 0.0) > 0]
+        hiit_modes = [item.sport.value for item in hiit_sessions]
         if hiit_modes:
             mode = max(hiit_modes, key=self.orchestrator.day_params.get_mode_factor)
         elif endurance_sessions:
@@ -336,8 +355,12 @@ class SessionService:
         else:
             mode = EnduranceSport.CYCLING.value
 
+        timing_factor = interference_timing_factor(
+            [item.start_time for item in strength_sessions],
+            [item.start_time for item in hiit_sessions],
+        )
         base = self._load_previous_state(athlete_id, target_date)
-        updated = engine_module.update_day_state(
+        updated = apply_day_transition(
             base,
             DailyImpulses(
                 strength=StrengthImpulses(
@@ -359,6 +382,9 @@ class SessionService:
                 date=target_date,
             ),
             self.orchestrator.day_params,
+            timing_factor=timing_factor,
+            capacity_ceilings=self._capacity_ceilings(athlete_id),
+            core_update=engine_module.update_day_state,
         )
         updated.date = target_date
         self.orchestrator._persist_day_state(athlete_id, target_date, updated)
