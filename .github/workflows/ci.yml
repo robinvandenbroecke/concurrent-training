@@ -22,7 +22,19 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Compile application
+        run: python -m compileall -q app run_validation.py
       - name: Run tests
-        run: pytest -q
+        id: pytest
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -q --tb=short 2>&1 | tee pytest.log
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-log
+          path: pytest.log
       - name: Validation smoke test
         run: python run_validation.py --source db --athlete-id 1 --days 30
