@@ -8,10 +8,12 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import hmac
+import logging
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
+import httpx
 from sqlalchemy.exc import IntegrityError
 
 from app import models
@@ -25,12 +27,15 @@ from app.integrations.strava import (
 )
 from app.services.session_service import SessionService
 
+logger = logging.getLogger(__name__)
+
 
 class StravaService(BaseStravaService):
     def __init__(self, db):
         super().__init__(db)
         key = settings.strava_token_encryption_key.strip()
         self._fernet = Fernet(key.encode()) if key else None
+        self._sync_access_token: Optional[str] = None
 
     def _protect(self, token: str) -> str:
         if not self._fernet:
@@ -114,6 +119,53 @@ class StravaService(BaseStravaService):
             access_token = response["access_token"]
         return access_token
 
+    def sync_activities(self, athlete_id: int, days_back: int = 30, max_pages: int = 10) -> Dict:
+        """Expose the valid token to per-activity stream imports for this sync only."""
+        connection = self.get_connection(athlete_id)
+        if not connection or not connection.is_active:
+            raise StravaAuthError("No active Strava connection found")
+        self._sync_access_token = self.ensure_valid_token(connection)
+        try:
+            return super().sync_activities(athlete_id, days_back=days_back, max_pages=max_pages)
+        finally:
+            self._sync_access_token = None
+
+    def _fetch_power_stream(self, activity_id: object) -> Optional[List[Dict]]:
+        """Fetch second-level watts when Strava exposes a power stream."""
+        if not activity_id or not self._sync_access_token:
+            return None
+        try:
+            response = httpx.get(
+                f"{self.BASE_URL}/activities/{activity_id}/streams",
+                headers={"Authorization": f"Bearer {self._sync_access_token}"},
+                params={"keys": "watts,time", "key_by_type": "true"},
+                timeout=30.0,
+            )
+            if response.status_code == 429:
+                logger.warning("Strava stream rate limit reached for activity %s", activity_id)
+                return None
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            logger.info("No usable power stream for activity %s: %s", activity_id, exc)
+            return None
+
+        watts = payload.get("watts", {}).get("data", []) if isinstance(payload, dict) else []
+        times = payload.get("time", {}).get("data", []) if isinstance(payload, dict) else []
+        if not watts:
+            return None
+        points: List[Dict] = []
+        for index, value in enumerate(watts):
+            try:
+                power = float(value)
+            except (TypeError, ValueError):
+                continue
+            if power <= 0:
+                continue
+            timestamp = times[index] if index < len(times) else index
+            points.append({"power": power, "timestamp": timestamp})
+        return points or None
+
     def _threshold_power(self, athlete_id: int, sport: str) -> Optional[float]:
         row = self.db.query(models.SystemParameters).filter(
             models.SystemParameters.athlete_id == athlete_id
@@ -145,12 +197,19 @@ class StravaService(BaseStravaService):
         if duration_minutes <= 0:
             return "skipped"
 
+        power_data = None
+        if sport.value in {"cycling", "running"} and (
+            activity.get("device_watts") or activity.get("average_watts")
+        ):
+            power_data = self._fetch_power_stream(activity.get("id"))
+
         declared = self._determine_intensity_type(activity)
         threshold = self._threshold_power(athlete_id, sport.value)
         load = compute_endurance_load(
             sport=sport.value,
             duration_minutes=duration_minutes,
             declared_intensity=declared,
+            power_data=power_data,
             average_power_w=activity.get("average_watts"),
             normalized_power_w=activity.get("weighted_average_watts") or activity.get("average_watts"),
             threshold_power_w=threshold,
@@ -168,6 +227,8 @@ class StravaService(BaseStravaService):
                 "source": "strava",
                 "external_id": str(activity.get("id")),
                 "signal_source": load.signal_source,
+                "power_data": power_data,
+                "power_stream_points": len(power_data or []),
                 "average_power_w": load.average_power_w,
                 "normalized_power_w": load.normalized_power_w,
                 "threshold_power_w": load.threshold_power_w,
