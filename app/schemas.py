@@ -1,12 +1,12 @@
-"""Pydantic schemas for API"""
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, List, Any
+"""Pydantic schemas for the API."""
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from app.types import LiftType, EnduranceSport, EnduranceIntensity
+from pydantic import BaseModel, Field, model_validator
+
+from app.types import EnduranceSport, LiftType
 
 
-# Athlete schemas
 class AthleteCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
 
@@ -15,32 +15,58 @@ class AthleteResponse(BaseModel):
     id: int
     name: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
-# Strength session schemas
 class RepData(BaseModel):
-    """Single rep data from VBT"""
-    weight: float
-    velocity: float
-    rep_num: int
-    rest_before: float = 0.0  # seconds
+    """Single rep observation. Velocity may be absent for non-VBT logging."""
+    weight: float = Field(..., gt=0)
+    velocity: Optional[float] = Field(None, gt=0, le=3.0)
+    rep_num: int = Field(..., ge=1)
+    rest_before: float = Field(0.0, ge=0, le=3600)
 
 
 class SetData(BaseModel):
-    """Single set data"""
-    weight: float
-    target_reps: int
+    weight: float = Field(..., gt=0)
+    target_reps: int = Field(..., ge=1, le=100)
     reps: List[RepData]
+    rest_before_sec: Optional[float] = Field(None, ge=0, le=3600)
+    set_end_rpe: Optional[float] = Field(None, ge=1, le=10)
 
 
 class StrengthSessionCreate(BaseModel):
-    athlete_id: int
+    athlete_id: int = Field(..., gt=0)
     lift: LiftType
     start_time: datetime
-    sets: List[SetData]
+    end_time: Optional[datetime] = None
+    sets: List[SetData] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def validate_times(self):
+        if self.end_time and self.end_time < self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
+
+
+class StrengthExerciseData(BaseModel):
+    lift: LiftType
+    sets: List[SetData] = Field(..., min_length=1)
+
+
+class StrengthWorkoutCreate(BaseModel):
+    """A complete multi-lift workout in performed order."""
+    athlete_id: int = Field(..., gt=0)
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    exercises: List[StrengthExerciseData] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def validate_times(self):
+        if self.end_time and self.end_time < self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
 
 
 class StrengthSessionResponse(BaseModel):
@@ -51,18 +77,35 @@ class StrengthSessionResponse(BaseModel):
     end_time: Optional[datetime]
     tonnage: float
     avg_intensity: float
-    
+
     class Config:
         from_attributes = True
 
 
-# Endurance session schemas
+class PowerPoint(BaseModel):
+    power: float = Field(..., gt=0, le=3000)
+    timestamp: Optional[float] = None
+
+
 class EnduranceSessionCreate(BaseModel):
-    athlete_id: int
+    athlete_id: int = Field(..., gt=0)
     sport: EnduranceSport
     start_time: datetime
-    duration_minutes: float = Field(..., gt=0)
-    intensity_type: str = Field(..., pattern="^(z2|hiit|mixed)$")
+    end_time: Optional[datetime] = None
+    duration_minutes: float = Field(..., gt=0, le=1440)
+    intensity_type: str = Field("z2", pattern="^(z2|hiit|mixed)$")
+    power_data: Optional[List[PowerPoint]] = None
+    average_power_w: Optional[float] = Field(None, gt=0, le=3000)
+    normalized_power_w: Optional[float] = Field(None, gt=0, le=3000)
+    threshold_power_w: Optional[float] = Field(None, gt=0, le=3000)
+    average_heartrate: Optional[float] = Field(None, gt=20, le=260)
+    rpe: Optional[float] = Field(None, ge=1, le=10)
+
+    @model_validator(mode="after")
+    def validate_times(self):
+        if self.end_time and self.end_time < self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
 
 
 class EnduranceSessionResponse(BaseModel):
@@ -74,31 +117,33 @@ class EnduranceSessionResponse(BaseModel):
     intensity_type: str
     u_E_Z2: float
     u_E_HIIT: float
-    
+
     class Config:
         from_attributes = True
 
 
-# Autoregulation schemas
 class AutoregulateRequest(BaseModel):
-    athlete_id: int
+    athlete_id: int = Field(..., gt=0)
     lift: LiftType
-    current_weight: float
-    target_v_low: float = 0.35  # m/s
-    target_v_high: float = 0.45  # m/s
-    vl_max: float = 20.0  # %
-    planned_reps: int = 5
-    current_reps_done: int = 0
+    current_weight: float = Field(..., gt=0)
+    target_v_low: float = Field(0.35, gt=0, le=3.0)
+    target_v_high: float = Field(0.45, gt=0, le=3.0)
+    vl_max: float = Field(20.0, ge=0, le=100)
+    planned_reps: int = Field(5, ge=1, le=100)
+    current_reps_done: int = Field(0, ge=0, le=100)
+    recent_v_obs: Optional[List[float]] = None
+    recent_rest_before: Optional[List[float]] = None
 
-    # Last few rep observations from the CURRENT set (most recent last).
-    # Used to reconstruct within-set fatigue without requiring server-side rep state.
-    recent_v_obs: Optional[List[float]] = None  # m/s
-    recent_rest_before: Optional[List[float]] = None  # seconds; same length as recent_v_obs
+    @model_validator(mode="after")
+    def validate_velocity_band(self):
+        if self.target_v_high < self.target_v_low:
+            raise ValueError("target_v_high must be >= target_v_low")
+        return self
 
 
 class AutoregulateResponse(BaseModel):
     continue_set: bool
-    load_change: float  # Percentage
+    load_change: float
     rest_suggestion: Optional[str]
     exercise_switch: Optional[str]
     predicted_velocity: float
@@ -106,7 +151,6 @@ class AutoregulateResponse(BaseModel):
     messages: List[str]
 
 
-# Readiness schemas
 class ReadinessResponse(BaseModel):
     athlete_id: int
     date: str
@@ -116,7 +160,6 @@ class ReadinessResponse(BaseModel):
     explanations: List[str]
 
 
-# Trend schemas
 class LiftTrendPoint(BaseModel):
     date: str
     D_l: float
@@ -145,6 +188,5 @@ class EnduranceTrendResponse(BaseModel):
     data: List[EnduranceTrendPoint]
 
 
-# Error schema
 class ErrorResponse(BaseModel):
     detail: str
