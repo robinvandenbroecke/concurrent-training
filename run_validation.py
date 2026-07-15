@@ -8,10 +8,9 @@ from datetime import date, timedelta
 import json
 import math
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from app import models
-from app.config import settings
 from app.database import SessionLocal
 from app.domain.day_engine import DayState, PerLiftState, decay_day_state_to_date
 from app.eval.baselines import BaselineBanister, BaselineVelocityThreshold
@@ -23,6 +22,7 @@ from app.services.observation_mapping_service import predict_perf_y_operational
 from app.types import LiftType
 
 REPO_ROOT = Path(__file__).resolve().parent
+ARTIFACTS_LATEST = "artifacts/latest"
 
 
 def _mae(pairs: List[Tuple[float, float]]) -> Optional[float]:
@@ -259,7 +259,9 @@ def run_validation(source: str, athlete_id: int, athletes: int, days: int) -> Di
         if source == "db":
             athlete_ids = [athlete_id]
         else:
-            athlete_ids = [row.id for row in db.query(models.Athlete).order_by(models.Athlete.id).limit(athletes).all()]
+            athlete_ids = [
+                row.id for row in db.query(models.Athlete).order_by(models.Athlete.id).limit(athletes).all()
+            ]
         reports = [validate_athlete(db, item, days) for item in athlete_ids]
         return {
             "run_date": date.today().isoformat(),
@@ -282,7 +284,7 @@ def main():
     args = parser.parse_args()
 
     output = run_validation(args.source, args.athlete_id, args.athletes, args.days)
-    directory = REPO_ROOT / "artifacts" / "latest"
+    directory = REPO_ROOT / ARTIFACTS_LATEST
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "validation_report.json"
     path.write_text(json.dumps(output, indent=2, default=str))
