@@ -69,10 +69,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Upgrade all migrations
-        run: alembic upgrade head
-      - name: Verify revision 006 schema
+        shell: bash
         run: |
-          python - <<'PY'
+          set -o pipefail
+          alembic upgrade head 2>&1 | tee migration.log
+      - name: Verify revision 006 schema
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee -a migration.log
           import os
           from sqlalchemy import create_engine, inspect
 
@@ -86,8 +91,17 @@ jobs:
               c["name"] for c in inspector.get_unique_constraints("workout_plans")
           }
           assert "uq_athlete_workout_date_slot" in workout_constraints
+          print("revision 006 schema verified")
           PY
       - name: Exercise lossless downgrade and re-upgrade
+        shell: bash
         run: |
-          alembic downgrade 005
-          alembic upgrade head
+          set -o pipefail
+          alembic downgrade 005 2>&1 | tee -a migration.log
+          alembic upgrade head 2>&1 | tee -a migration.log
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-log
+          path: migration.log
