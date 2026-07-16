@@ -30,9 +30,6 @@ class GoalService:
         athlete_id = int(goal_config.athlete_id)
 
         try:
-            # Execute and flush the deactivation before inserting the next active
-            # row. This is required for the partial unique index under PostgreSQL
-            # and prevents flush-order dependent integrity errors.
             db.query(GoalModel).filter(
                 GoalModel.athlete_id == athlete_id,
                 GoalModel.active.is_(True),
@@ -98,6 +95,10 @@ class GoalService:
             ).update({"active": False}, synchronize_session=False)
             db.flush()
 
+            # The bulk update bypasses the identity map. Refresh before setting
+            # active=True so reactivating the already-active row is not lost as
+            # a no-op by SQLAlchemy's dirty-state tracking.
+            db.refresh(goal)
             goal.active = True
             goal.macrocycle_json = macrocycle.to_dict()
             goal.goal_state_json = goal_state.to_dict()
