@@ -1,9 +1,10 @@
 """Service layer with one canonical runtime model path."""
-from app.services.legacy_services import AthleteService
+from app.services.athlete_service import AthleteService
 from app.services.session_service import SessionService
 from app.services.runtime_services import DayUpdateService, ReadinessService, AutoregulationService
 from app.services.engine_orchestrator import EngineOrchestrator
 from app.services.workout_service import CombinedWorkoutIngestor
+from app.services.workout_plan_service import WorkoutPlanService
 from app.services.velocity_profile_service import VelocityProfileService
 
 
@@ -45,6 +46,7 @@ SessionService.ingest_strength_workout = _ingest_combined_workout
 __all__ = [
     "AthleteService",
     "SessionService",
+    "WorkoutPlanService",
     "DayUpdateService",
     "ReadinessService",
     "AutoregulationService",

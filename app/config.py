@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
     auto_create_tables: bool = True
 
+    # Stable ownership namespace used until account/API-key principals are
+    # introduced. It prevents the data model from requiring another table-wide
+    # ownership backfill later.
+    default_owner_subject: str = "local"
+
     use_legacy_model: bool = False
     day_level_strength_target_mode: str = "heaviest_quality_set_perf_y"
 
@@ -36,6 +41,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self):
+        if not self.default_owner_subject.strip():
+            raise ValueError("DEFAULT_OWNER_SUBJECT cannot be empty")
+        self.default_owner_subject = self.default_owner_subject.strip()
+
         if self.app_env.lower() == "production":
             self.require_api_key = True
             self.auto_create_tables = False
