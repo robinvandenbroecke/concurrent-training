@@ -58,8 +58,6 @@ def upgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
 
-    # Ownership namespace. This is intentionally not an authentication system;
-    # it provides a stable data boundary for the next account/API-key sprint.
     if dialect == "sqlite":
         with op.batch_alter_table("athletes") as batch_op:
             batch_op.add_column(
@@ -85,8 +83,6 @@ def upgrade() -> None:
             "ix_athletes_owner_subject", "athletes", ["owner_subject"], unique=False
         )
 
-    # Allow more than one planned session per calendar day, while preserving
-    # idempotency for the same logical slot.
     if dialect == "sqlite":
         with op.batch_alter_table("workout_plans") as batch_op:
             batch_op.add_column(
@@ -121,9 +117,12 @@ def upgrade() -> None:
             unique=False,
         )
 
-    # The old (athlete_id, active) constraint also limited inactive history to
-    # one row. Replace it with a partial unique index for active rows only.
-    bind.execute(sa.text("UPDATE goals SET active = 0 WHERE active IS NULL"))
+    # Bind a real boolean so both PostgreSQL and SQLite receive the correct
+    # representation instead of dialect-specific literal SQL.
+    bind.execute(
+        sa.text("UPDATE goals SET active = :inactive WHERE active IS NULL"),
+        {"inactive": False},
+    )
     _drop_unique("goals", "uq_athlete_active_goal")
     if dialect == "sqlite":
         with op.batch_alter_table("goals") as batch_op:
@@ -204,6 +203,22 @@ def downgrade() -> None:
         op.drop_index("ix_goals_athlete_created_at", table_name="goals")
     if _index_exists("goals", "uq_goals_one_active_per_athlete"):
         op.drop_index("uq_goals_one_active_per_athlete", table_name="goals")
+    if dialect == "sqlite":
+        with op.batch_alter_table("goals") as batch_op:
+            batch_op.alter_column(
+                "active",
+                existing_type=sa.Boolean(),
+                nullable=True,
+                server_default=None,
+            )
+    else:
+        op.alter_column(
+            "goals",
+            "active",
+            existing_type=sa.Boolean(),
+            nullable=True,
+            server_default=None,
+        )
     _create_unique("goals", "uq_athlete_active_goal", ["athlete_id", "active"])
 
     if _index_exists("workout_plans", "ix_workout_plans_athlete_date"):
