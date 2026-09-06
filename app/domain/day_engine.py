@@ -727,9 +727,9 @@ def compute_readiness(
     
     # H1: T_legs explanation
     if state.T_legs > params.T_legs_guardrail_threshold:
-        explanations.append("Accumulated leg-load proxy high - review heavy lower body work")
+        explanations.append("Legs structural load proxy high (unvalidated) - review heavy lower body work")
     elif state.T_legs > 0.5 * params.T_legs_guardrail_threshold:
-        explanations.append("Accumulated leg-load proxy building - monitor heavy work")
+        explanations.append("Legs structural load proxy building (unvalidated) - monitor heavy work")
     
     # Per-lift explanations
     for lift, lift_state in state.per_lift.items():

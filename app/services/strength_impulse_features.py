@@ -7,6 +7,7 @@ Adds metabolic impulse (u_met) computation aligned with day_engine expectations.
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 import statistics
+import math
 
 from app.domain.rep_engine import LiftVelocityProfile
 
@@ -20,7 +21,7 @@ M_SCALE = 0.15    # Metabolic scaling factor
 INTENSITY_PENALTY_MIN = 0.6  # Floor for intensity penalty
 
 
-def normalize_velocities(raw_velocities: Any) -> Optional[List[float]]:
+def normalize_velocities(raw_velocities: Any) -> Optional[List[Optional[float]]]:
     """
     Sprint P2: Normalize velocities input to a list of floats.
     
@@ -33,7 +34,7 @@ def normalize_velocities(raw_velocities: Any) -> Optional[List[float]]:
         raw_velocities: Raw velocities input (JSON string, list, or other)
     
     Returns:
-        List of float velocities, or None if invalid
+        Per-rep slots, preserving missing observations; None if invalid/all missing.
     """
     if raw_velocities is None:
         return None
@@ -57,8 +58,11 @@ def normalize_velocities(raw_velocities: Any) -> Optional[List[float]]:
         return None
     
     try:
-        normalized = [float(v) for v in velocities if v is not None]
-        return normalized if len(normalized) >= 1 else None
+        normalized = [None if v is None else float(v) for v in velocities]
+        observed = [v for v in normalized if v is not None]
+        if not observed or any(not math.isfinite(v) or v <= 0 for v in observed):
+            return None
+        return normalized
     except (ValueError, TypeError):
         return None
 
@@ -71,7 +75,7 @@ class StrengthImpulseFeatures:
     source: str  # "rep_engine", "derived_from_velocities", "neutral_fallback"
 
 
-def compute_set_vl(velocities: List[float]) -> Optional[float]:
+def compute_set_vl(velocities: List[Optional[float]]) -> Optional[float]:
     """
     Compute velocity loss (VL) from rep velocities.
     
@@ -89,7 +93,7 @@ def compute_set_vl(velocities: List[float]) -> Optional[float]:
     first_v = velocities[0]
     last_v = velocities[-1]
     
-    if first_v <= 0:
+    if first_v is None or last_v is None or first_v <= 0:
         return None
     
     vl = 1.0 - (last_v / first_v)
@@ -171,7 +175,9 @@ def extract_features_from_rep_output(
         # Extract y values from reps for velocity_factor
         reps = getattr(set_output, 'reps', [])
         if reps:
-            y_values = [getattr(rep, 'y', 1.0) for rep in reps if getattr(rep, 'observation_available', True)]
+            if not all(getattr(rep, 'observation_available', True) for rep in (reps[0], reps[-1])):
+                vl = None
+            y_values = [getattr(rep, 'y', 1.0) for rep in reps[:2] if getattr(rep, 'observation_available', True)]
             velocity_factor = compute_velocity_factor_from_y_values(y_values)
             source = "rep_engine" if y_values else "neutral_fallback"
             if not y_values:
@@ -196,7 +202,7 @@ def extract_features_from_rep_output(
 
 
 def compute_velocity_factor_from_raw_velocities(
-    velocities: List[float],
+    velocities: List[Optional[float]],
     load_kg: float,
     lift: str,
 ) -> Optional[float]:
@@ -226,7 +232,7 @@ def compute_velocity_factor_from_raw_velocities(
             return None
         
         # Compute y = v_obs / v_ref for each rep
-        y_values = [v / v_ref for v in velocities if v > 0]
+        y_values = [v / v_ref for v in velocities[:2] if v is not None and v > 0]
         
         if not y_values:
             return None
@@ -367,4 +373,3 @@ def compute_metabolic_impulse(
     )
 
     return tonnage * rep_density_factor * rest_factor * vl_factor * intensity_penalty * M_SCALE
-

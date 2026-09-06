@@ -120,7 +120,7 @@ class TestReadinessFlow:
         
         data = response.json()
         assert data["athlete_id"] == athlete_id
-        assert data["overall"] == 100.0  # Neutral state
+        assert data["overall"] is None  # Missing history is not 100% readiness
         assert data["endurance"] == 100.0
         assert "per_lift" in data
         assert "explanations" in data
@@ -557,7 +557,7 @@ class TestFullTrainingWorkflow:
         readiness_response = client.get(f"/readiness/today?athlete_id={athlete_id}")
         assert readiness_response.status_code == 200
         initial_readiness = readiness_response.json()
-        assert initial_readiness["overall"] == 100.0
+        assert initial_readiness["overall"] is None
         
         # 3. Log strength session (squat with 3 sets)
         strength_session = {
@@ -666,6 +666,6 @@ class TestFullTrainingWorkflow:
         
         # Verify workflow completed successfully
         print(f"✓ Integration test completed successfully for athlete {athlete_id}")
-        print(f"  - Initial readiness: {initial_readiness['overall']:.1f}")
+        print(f"  - Initial readiness: {initial_readiness['assessment_status']}")
         print(f"  - Final readiness: {final_readiness['overall']:.1f}")
         print(f"  - Autoreg suggestion: {autoreg['load_change']:+.1f}% load change")

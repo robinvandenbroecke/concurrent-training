@@ -67,7 +67,7 @@ class SessionService:
         sets_data: List[schemas.SetData],
         end_time: Optional[datetime] = None,
     ) -> db_models.StrengthSession:
-        if not sets_data:
+        if not sets_data or any(not item.reps for item in sets_data):
             raise ValueError("A strength session must contain at least one performed set")
         payload = [self._set_to_dict(item) for item in sets_data]
         rpes = [item["set_end_rpe"] for item in payload if item.get("set_end_rpe") is not None]
@@ -149,6 +149,7 @@ class SessionService:
                     "A_sys": rep.A_sys,
                     "A_M": rep.A_M,
                     "v_pred_next": rep.v_pred_next,
+                    "observation_available": rep.observation_available,
                     "y": getattr(rep, "y", None),
                     "y_phi": getattr(rep, "y_phi", None),
                 }

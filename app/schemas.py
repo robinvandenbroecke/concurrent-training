@@ -6,7 +6,7 @@ from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field, model_va
 
 
 class BaseModel(PydanticBaseModel):
-    model_config = ConfigDict(allow_inf_nan=False)
+    model_config = ConfigDict(allow_inf_nan=False, protected_namespaces=("model_validate", "model_dump"))
 
 # Re-export canonical enums for backwards-compatible imports.
 from app.types import EnduranceIntensity, EnduranceSport, LiftType

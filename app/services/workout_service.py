@@ -40,7 +40,7 @@ class CombinedWorkoutIngestor:
 
         for exercise in workout.exercises:
             payload = [self.service._set_to_dict(item) for item in exercise.sets]
-            if not payload:
+            if not payload or any(not item["reps"] for item in payload):
                 raise ValueError(f"{exercise.lift.value} has no performed sets")
             payloads.append(payload)
             profile_db = self.db.query(db_models.LiftProfile).filter(
@@ -169,6 +169,7 @@ class CombinedWorkoutIngestor:
                         "A_sys": rep.A_sys,
                         "A_M": rep.A_M,
                         "v_pred_next": rep.v_pred_next,
+                        "observation_available": rep.observation_available,
                         "y": getattr(rep, "y", None),
                         "y_phi": getattr(rep, "y_phi", None),
                     }

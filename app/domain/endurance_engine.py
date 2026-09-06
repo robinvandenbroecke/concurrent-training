@@ -96,6 +96,6 @@ def compute_endurance_load(
         return EnduranceLoad(low, high, total, label, "power", average, supplied_np, factor, threshold, method, assumption)
     source = "power_unscaled" if power_capable and has_power else "summary"
     fraction = {"z2": 0.0, "hiit": 1.0, "mixed": 0.7}[declared_intensity]
-    return EnduranceLoad(duration * (1 - fraction), duration * fraction, duration,
+    return EnduranceLoad(duration - duration * fraction, duration * fraction, duration,
                          declared_intensity, source, average, supplied_np, None, threshold,
                          "declared_intensity_duration", assumption)

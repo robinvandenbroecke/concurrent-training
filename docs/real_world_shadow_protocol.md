@@ -1,3 +1,5 @@
+> Historical specification. The September 2026 [audit](audit_2026_09.md) and [model reference](model_reference.md) supersede conflicting scientific/validation claims. `run_validation.py` is retrospective diagnostics, not leakage-free scientific validation. Older thresholds and calibration artifacts are unvalidated.
+
 # Real-world shadow validation protocol
 
 ## Purpose
@@ -60,3 +62,4 @@ Assisted coaching may begin only when:
 - missing-data fallbacks are visible to the user.
 
 Autonomous coaching is outside the current validation stage.
+

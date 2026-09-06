@@ -1,16 +1,18 @@
 """
 Rep-level fatigue estimator (VBT-driven) for concurrent strength training.
 
-SPRINT H1: MODEL HARDENING & IDENTIFIABILITY
+SPRINT H1: HISTORICAL MODEL CHANGES (identifiability remains unproven)
 - Replaced dimensionless M with x_M = ln(A_M) log-space metabolic availability
 - Fixed fatigue driver: y_phi = min(y, 1.0) prevents anti-fatigue when y>1
 - Added catastrophe nonlinearity for high velocity loss (VL > 0.40)
-- Added central driver density factor (reps per minute / rest) for identifiability
-- Added optional set_end_rpe for central vs local fatigue split
+- Added heuristic density factor (reps per minute / rest)
+- Added optional retrospective set_end_rpe input; not a physiological compartment measurement
 - Hardened velocity prediction using x_M instead of exp(-kM*M)
 
 This module provides deterministic, testable domain logic for tracking fatigue
 across reps and sets using velocity-based training (VBT) data.
+State names are phenomenological proxies, not validated physiological measurements.
+See docs/audit_2026_09.md for limitations and the corrected causal session contract.
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -645,4 +647,3 @@ def simulate_strength_session(session_input: SessionInput) -> SessionOutput:
         final_A_M=state.A_M,  # H1: New metabolic availability
         final_M=state.M  # H1: Legacy M for backward compatibility
     )
-
