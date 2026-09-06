@@ -38,6 +38,17 @@ jobs:
           path: pytest.log
       - name: Validation smoke test
         run: python run_validation.py --source db --athlete-id 1 --days 30
+      - name: Reproduce frozen research fixture
+        run: |
+          python -m research.evaluate --manifest research/example_manifest.json --events research/example_events.csv --output /tmp/reference-demo-check.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = json.loads(Path("artifacts/audit_2026_09/reference_demo.json").read_text())
+          actual = json.loads(Path("/tmp/reference-demo-check.json").read_text())
+          assert actual == expected, "Research fixture, forecasts or input hashes differ"
+          print("Research fixture reproduced exactly")
+          PY
 
   migration-postgres:
     runs-on: ubuntu-latest

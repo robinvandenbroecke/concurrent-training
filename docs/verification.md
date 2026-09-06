@@ -42,8 +42,12 @@ Both jobs succeeded in [GitHub Actions run 34020247430](https://github.com/robin
 
 The eight skipped tests did not execute and are not counted as verified. The warning
 concerns Starlette's deprecated AnyIO alias; no dependency upgrade is claimed.
-The final verification-record update is documentation-only. The test and migration
-logs are available in the linked workflow and its diagnostic artifacts.
+Application code is unchanged since the cited validated commit. Follow-up changes
+record verification and enforce LF line endings for research fixtures, with a CI
+check that regenerates and compares the report including its input hashes. The
+upload check caught and corrected a CSV CRLF/LF hash discrepancy; all predictions
+and metrics were identical. The test and migration logs are available in the linked
+workflow and its diagnostic artifacts.
 
 ## Remaining verification and release conditions
 
