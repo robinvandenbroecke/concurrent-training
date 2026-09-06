@@ -45,6 +45,8 @@ class LiftVelocityProfile:
     
     def __post_init__(self):
         """Validate profile parameters."""
+        if not all(math.isfinite(v) for v in (self.a, self.b, self.v_min, self.v_max)):
+            raise ValueError("Velocity profile parameters must be finite")
         # Ensure b is positive so v_ref decreases with load
         if self.b <= 0:
             raise ValueError(
@@ -133,7 +135,7 @@ class RepEngineParams:
     """
     Configurable parameters for the rep-level fatigue engine.
     
-    All values have sensible defaults based on literature and practice.
+    Defaults are uncalibrated heuristics. State labels are not physiological measurements.
     """
     # Update coefficients
     alpha: float = 1.3  # Exponent on intensity in phi calculation
@@ -198,10 +200,11 @@ class SetInput:
     """Input data for a set (collection of reps)."""
     lift: str
     load_kg: float
-    velocities: List[float]  # Observed velocities per rep
+    velocities: List[Optional[float]]  # One entry per performed rep; None = unmeasured
     rest_before_sec: Optional[float] = None  # Rest before this set
     # H1: Optional RPE at end of set for central vs local split
-    set_end_rpe: Optional[float] = None  # 1-10 scale, None if not available
+    set_end_rpe: Optional[float] = None  # Retrospective set rating, never a future rep input
+    performed_reps: Optional[int] = None  # Supports count-only legacy logging
 
 
 @dataclass
@@ -231,6 +234,7 @@ class RepOutput:
     v_pred_next: float  # Predicted velocity for next rep
     limiting: str  # Primary limiting factor
     phi: float  # H1: Fatigue impulse for transparency
+    observation_available: bool = True
 
 
 @dataclass
@@ -457,7 +461,7 @@ class RepState:
         A_l = self.A_local(lift)
         A_sys = self.A_sys
         
-        return A_l, A_sys, A_M, y_phi, phi_local
+        return A_l, A_sys, self.A_M, y_phi, phi_local
     
     def apply_rest(self, delta_t: float, R_mito: float = 0.0) -> None:
         """
@@ -467,40 +471,21 @@ class RepState:
             delta_t: Rest duration in seconds
             R_mito: Recovery capacity factor (0-1+)
         """
-        if delta_t <= 0:
+        if not math.isfinite(delta_t) or delta_t < 0:
+            raise ValueError("Rest duration must be finite and nonnegative")
+        if delta_t == 0:
             return
-        
-        R = max(0.0, min(1.0, R_mito))  # H1: Bound R_mito to [0, 1]
-        
-        # Recovery magnitude boost from R_mito
-        recovery_boost = 1.0 + self.params.beta_rest * R
-        
-        # Update each lift's local availability
+        R = max(0.0, min(1.0, R_mito))
+        # Exact solution of dx/dt = -rate*x in log availability. The old
+        # fixed additive recovery changed when a rest was split into callbacks
+        # and could increase fatigue during arbitrarily short rests.
+        boost = 1.0 + self.params.beta_rest * R
         for lift in self.x_local:
-            _, _, tau_rest_local = self._get_lift_params(lift)
-            a_local, _, _ = self._get_lift_params(lift)
-            r_local = a_local * 1.2  # r_local proportional to a_local
-            
-            recovery = r_local * (1.0 - math.exp(-delta_t / tau_rest_local)) * recovery_boost
-            # H1: Metabolic penalty uses (1 - A_M) instead of M
-            A_M = self.A_M
-            self.x_local[lift] = min(0.0, self.x_local[lift] + recovery - self.params.eta_Mrest * (1.0 - A_M))
-            self.x_local[lift] = max(self.min_log, self.x_local[lift])
-        
-        # Update system availability
-        recovery_sys = self.params.r_sys * (1.0 - math.exp(-delta_t / self.params.tau_rest_sys)) * recovery_boost
-        A_M = self.A_M
-        self.x_sys = min(0.0, self.x_sys + recovery_sys - self.params.eta_Mrest * (1.0 - A_M))
-        self.x_sys = max(self.min_log, self.x_sys)
-        
-        # H1: Update metabolic recovery using x_M log-space
-        # A_M recovers toward 1.0 (x_M toward 0)
-        tau_M_eff = self.params.tau_M / (1.0 + self.params.beta_M * R)
-        recovery_M = (1.0 - math.exp(-delta_t / tau_M_eff))
-        # Move x_M toward 0 (A_M toward 1)
-        self.x_M = min(0.0, self.x_M + recovery_M * (-self.x_M))
-        self.x_M = max(self.min_log, self.x_M)
-    
+            _, _, tau = self._get_lift_params(lift)
+            self.x_local[lift] *= math.exp(-delta_t * boost / tau)
+        self.x_sys *= math.exp(-delta_t * boost / self.params.tau_rest_sys)
+        self.x_M *= math.exp(-delta_t * (1.0 + self.params.beta_M * R) / self.params.tau_M)
+
     def predict_velocity(self, v_ref: float, lift: str) -> float:
         """
         H1: Predict velocity using hardened model.
@@ -578,17 +563,27 @@ def simulate_strength_session(session_input: SessionInput) -> SessionOutput:
         rep_outputs: List[RepOutput] = []
         
         # Track velocity for catastrophe calculation
-        v_first = set_input.velocities[0] if set_input.velocities else 0.0
-        
-        for rep_idx, v_obs in enumerate(set_input.velocities):
+        velocities = list(set_input.velocities)
+        if set_input.performed_reps is not None:
+            if set_input.performed_reps < len(velocities) or set_input.performed_reps < 0:
+                raise ValueError("performed_reps cannot be smaller than the velocity slots")
+            velocities += [None] * (set_input.performed_reps - len(velocities))
+        v_first = velocities[0] if velocities else None
+
+        for rep_idx, v_obs in enumerate(velocities):
             # Compute reference velocity
             v_ref = profile.v_ref(load_kg)
             
             # Normalize observation
-            y = max(params.min_y, min(params.max_y, v_obs / v_ref))
+            measured = v_obs is not None
+            if measured and (not math.isfinite(v_obs) or v_obs <= 0):
+                raise ValueError("Measured velocity must be finite and positive")
+            # Count-only reps still incur load-dependent fatigue; y=1 is an
+            # explicitly unobserved nominal driver, not a synthetic measurement.
+            y = max(params.min_y, min(params.max_y, v_obs / v_ref)) if measured else 1.0
             
             # H1: Compute velocity loss for catastrophe
-            vl_current = 1.0 - (v_obs / v_first) if v_first > 0 and rep_idx > 0 else 0.0
+            vl_current = 1.0 - (v_obs / v_first) if measured and v_first and rep_idx > 0 else 0.0
             
             # H1: Apply rep fatigue with hardened model
             A_l, A_sys, A_M, y_phi, phi = state.apply_rep(
@@ -598,8 +593,9 @@ def simulate_strength_session(session_input: SessionInput) -> SessionOutput:
                 rep_index=rep_idx,
                 e1rm=e1rm,
                 vl_catastrophe=vl_current,
-                density_factor=density_factor,
-                set_end_rpe=set_input.set_end_rpe
+                density_factor=state.compute_density_factor(set_input.rest_before_sec, rep_idx + 1),
+                # The final RPE and eventual rep count are unknown at this rep.
+                set_end_rpe=None
             )
             
             # Predict next velocity
@@ -617,14 +613,13 @@ def simulate_strength_session(session_input: SessionInput) -> SessionOutput:
                 A_M=A_M,  # H1: Metabolic availability
                 v_pred_next=v_pred_next,
                 limiting=limiting,
-                phi=phi  # H1: Include phi for transparency
+                phi=phi,  # H1: Include phi for transparency
+                observation_available=measured
             ))
         
         # Compute set summary
-        if len(rep_outputs) >= 2:
-            v_first = set_input.velocities[0]
-            v_last = set_input.velocities[-1]
-            VL = 1.0 - (v_last / v_first) if v_first > 0 else 0.0
+        if len(velocities) >= 2 and velocities[0] and velocities[-1]:
+            VL = max(0.0, 1.0 - velocities[-1] / velocities[0])
         else:
             VL = 0.0
         
@@ -650,3 +645,4 @@ def simulate_strength_session(session_input: SessionInput) -> SessionOutput:
         final_A_M=state.A_M,  # H1: New metabolic availability
         final_M=state.M  # H1: Legacy M for backward compatibility
     )
+

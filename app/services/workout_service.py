@@ -71,6 +71,7 @@ class CombinedWorkoutIngestor:
                     lift=exercise.lift.value,
                     load_kg=item["load_kg"],
                     velocities=item["velocities"],
+                    performed_reps=item["reps"],
                     rest_before_sec=item.get("rest_sec") if combined_sets else None,
                     set_end_rpe=item.get("set_end_rpe"),
                 ))
@@ -194,14 +195,14 @@ class CombinedWorkoutIngestor:
                 workout.start_time.date(),
                 payload,
                 exercise_output,
-                any(item["velocities"] for item in payload),
+                any(any(v is not None for v in item["velocities"]) for item in payload),
             )
             sessions.append(session)
 
             for item in payload:
                 velocities = item["velocities"]
                 velocity_loss = None
-                if len(velocities) >= 2 and velocities[0] > 0:
+                if len(velocities) >= 2 and velocities[0] and velocities[-1]:
                     velocity_loss = max(
                         0.0, min(1.0, 1.0 - velocities[-1] / velocities[0])
                     )
@@ -220,3 +221,4 @@ class CombinedWorkoutIngestor:
         for session in sessions:
             self.db.refresh(session)
         return sessions
+

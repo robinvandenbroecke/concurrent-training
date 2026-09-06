@@ -438,7 +438,7 @@ def update_capacity_with_saturation(
     """
     # Saturation factor: (1 - C/C_max)^alpha
     # As C approaches C_max, this goes to 0
-    saturation_ratio = current_C / params.C_max
+    saturation_ratio = max(0.0, min(1.0, current_C / params.C_max))
     saturation_factor = (1.0 - saturation_ratio) ** params.capacity_saturation_alpha
     
     # Fitness contribution with saturation
@@ -524,7 +524,13 @@ def update_day_state(
         params
     )
     
-    R = new_R_mito  # Use bounded value
+    # Prior fatigue decays using only prior recovery history, not the current
+    # day's endurance impulse. Newly added load has no retroactive effect.
+    decayed = decay_day_state_to_date(current, current.date + timedelta(days=1), params)
+    R = new_R_mito
+    if impulses.strength.u_sys == 0 and impulses.endurance.u_E_total == 0 and not any(impulses.strength.per_lift.values()):
+        decayed.date = current.date
+        return decayed
     
     # Compute interference (explicit terms only)
     interf_per_lift, interf_sys = compute_interference(impulses.endurance, params)
@@ -543,12 +549,12 @@ def update_day_state(
     )
     
     # Per-lift updates
-    for lift in list(current.per_lift.keys()) + list(impulses.strength.per_lift.keys()):
-        current_lift = current.get_lift(lift)
+    for lift in dict.fromkeys([*current.per_lift, *impulses.strength.per_lift]):
+        current_lift = current.per_lift.get(lift, PerLiftState())
         
         # Fatigue update
         tau_eff = params.get_tau_Dl(lift) / (1.0 + params.get_beta_l(lift) * R)
-        D_new = current_lift.D_l * math.exp(-1.0 / tau_eff)
+        D_new = decayed.per_lift.get(lift, PerLiftState()).D_l
         D_new += params.k_Dl * impulses.strength.per_lift.get(lift, 0.0)
         D_new += interf_per_lift.get(lift, 0.0)
         
@@ -573,14 +579,14 @@ def update_day_state(
     
     # System fatigue update
     tau_sys_eff = params.tau_sys / (1.0 + params.beta_sys * R)
-    D_sys_new = current.D_sys * math.exp(-1.0 / tau_sys_eff)
+    D_sys_new = decayed.D_sys
     D_sys_new += params.k_sys * impulses.strength.u_sys
     D_sys_new += interf_sys
     new_state.D_sys = max(0.0, D_sys_new)
     
     # Endurance fatigue update
     E_fat_new = current.E_fat * math.exp(-1.0 / params.tau_Efat)
-    E_fat_new += params.k_EHIIT * impulses.endurance.u_E_HIIT
+    E_fat_new += params.k_EHIIT * impulses.endurance.u_E_total  # Easy work also has a load cost
     E_fat_new += params.k_SE * impulses.strength.u_legs
     new_state.E_fat = max(0.0, E_fat_new)
     
@@ -634,22 +640,26 @@ def decay_day_state_to_date(
         T_legs=0.0
     )
     
+    # Integral of the decaying recovery proxy over this interval; ensures
+    # splitting a rest-day interval does not change the resulting fatigue.
+    rate = params.k_mito_decay
+    integrated_R = current.R_mito * (-math.expm1(-rate * days_diff)) / rate if rate else current.R_mito * days_diff
     # Decay per-lift states
     for lift, lift_state in current.per_lift.items():
         # Fatigue decay over days_diff
-        D_new = lift_state.D_l * math.exp(-days_diff / params.get_tau_Dl(lift))
+        D_new = lift_state.D_l * math.exp(-(days_diff + params.get_beta_l(lift) * integrated_R) / params.get_tau_Dl(lift))
         # Fitness decay
         F_new = lift_state.F_l * math.exp(-days_diff / params.tau_Fl)
         # Capacity stays (it's a baseline, doesn't decay quickly)
-        C_new = lift_state.C_l
+        C_new = max(params.C_min, lift_state.C_l - params.lambda_l * days_diff)
         
         new_state.per_lift[lift] = PerLiftState(D_l=D_new, F_l=F_new, C_l=C_new)
     
     # System fatigue decay
-    new_state.D_sys = current.D_sys * math.exp(-days_diff / params.tau_sys)
+    new_state.D_sys = current.D_sys * math.exp(-(days_diff + params.beta_sys * integrated_R) / params.tau_sys)
     
     # R_mito decay
-    new_state.R_mito = current.R_mito * math.exp(-days_diff / params.tau_mito)
+    new_state.R_mito = current.R_mito * math.exp(-days_diff * params.k_mito_decay)
     
     # E_fat decay
     new_state.E_fat = current.E_fat * math.exp(-days_diff / params.tau_Efat)
@@ -687,7 +697,7 @@ def compute_readiness(
         readiness = 1.0 - lift_state.D_l - params.w_sys * state.D_sys
         
         # H1: Apply legs structural guardrail for lower body lifts
-        if lift in ['squat', 'deadlift', 'clean']:
+        if lift in ['squat', 'deadlift', 'clean', 'power_clean']:
             # Heavy legs work readiness is gated by structural state
             readiness = min(readiness, legs_structural_ready)
         
@@ -708,25 +718,23 @@ def compute_readiness(
         explanations.append("System fatigue high - consider lighter session")
     
     if state.R_mito > 0.5:
-        explanations.append("Recovery capacity elevated from recent Z2 work")
+        explanations.append("Aerobic exposure proxy elevated; recovery benefit is unvalidated")
     elif state.R_mito < 0.2:
-        explanations.append("Recovery capacity depleted - prioritize rest/Z2")
+        explanations.append("Limited recorded aerobic exposure; mitochondrial capacity is not measured")
     
     if state.E_fat > 0.3:
         explanations.append("Endurance fatigue elevated - monitor HIIT volume")
     
     # H1: T_legs explanation
     if state.T_legs > params.T_legs_guardrail_threshold:
-        explanations.append("Legs structural fatigue high - avoid heavy lower body")
+        explanations.append("Accumulated leg-load proxy high - review heavy lower body work")
     elif state.T_legs > 0.5 * params.T_legs_guardrail_threshold:
-        explanations.append("Legs structural fatigue building - monitor heavy work")
+        explanations.append("Accumulated leg-load proxy building - monitor heavy work")
     
     # Per-lift explanations
     for lift, lift_state in state.per_lift.items():
         if lift_state.D_l > 0.4:
             explanations.append(f"{lift}: local fatigue elevated")
-        if lift_state.C_l > 110:  # Improved capacity
-            explanations.append(f"{lift}: capacity trending up")
         # H1: Capacity saturation note
         saturation_ratio = lift_state.C_l / params.C_max
         if saturation_ratio > 0.9:
@@ -817,3 +825,4 @@ def create_initial_state(
         E_fat=0.0,
         T_legs=0.0  # H1
     )
+

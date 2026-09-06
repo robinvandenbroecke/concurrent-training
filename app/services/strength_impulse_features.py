@@ -171,9 +171,11 @@ def extract_features_from_rep_output(
         # Extract y values from reps for velocity_factor
         reps = getattr(set_output, 'reps', [])
         if reps:
-            y_values = [getattr(rep, 'y', 1.0) for rep in reps]
+            y_values = [getattr(rep, 'y', 1.0) for rep in reps if getattr(rep, 'observation_available', True)]
             velocity_factor = compute_velocity_factor_from_y_values(y_values)
-            source = "rep_engine"
+            source = "rep_engine" if y_values else "neutral_fallback"
+            if not y_values:
+                vl = None
         else:
             velocity_factor = 1.0
             source = "neutral_fallback"
@@ -365,3 +367,4 @@ def compute_metabolic_impulse(
     )
 
     return tonnage * rep_density_factor * rest_factor * vl_factor * intensity_penalty * M_SCALE
+

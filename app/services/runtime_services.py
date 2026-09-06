@@ -50,14 +50,22 @@ class ReadinessService:
     def get_readiness(self, athlete_id: int, target_date: Optional[date] = None) -> schemas.ReadinessResponse:
         target_date = target_date or date.today()
         state = self.orchestrator.get_day_state_with_carryover(athlete_id, target_date)
-        if state is None:
+        has_history = self.db.query(db_models.StrengthSession.id).filter(
+            db_models.StrengthSession.athlete_id == athlete_id,
+            db_models.StrengthSession.start_time < target_date + timedelta(days=1),
+        ).first() or self.db.query(db_models.EnduranceSession.id).filter(
+            db_models.EnduranceSession.athlete_id == athlete_id,
+            db_models.EnduranceSession.start_time < target_date + timedelta(days=1),
+        ).first()
+        if state is None or not has_history:
             return schemas.ReadinessResponse(
                 athlete_id=athlete_id,
                 date=target_date.isoformat(),
-                overall=100.0,
-                per_lift={lift.value: 100.0 for lift in LiftType},
-                endurance=100.0,
-                explanations=["No training data yet"],
+                overall=None,
+                per_lift={lift.value: None for lift in LiftType},
+                endurance=None,
+                assessment_status="insufficient_data",
+                explanations=["No recorded training history; readiness cannot be estimated"],
             )
         output = compute_readiness(state, self.orchestrator.day_params)
         return schemas.ReadinessResponse(
@@ -127,6 +135,13 @@ class AutoregulationService:
         self.orchestrator = EngineOrchestrator(db)
 
     def suggest(self, request: schemas.AutoregulateRequest) -> schemas.AutoregulateResponse:
+        if not request.recent_v_obs:
+            return schemas.AutoregulateResponse(
+                continue_set=request.current_reps_done < request.planned_reps,
+                load_change=0.0, rest_suggestion=None, exercise_switch=None,
+                predicted_velocity=None, current_vl=0.0,
+                messages=["No measured velocity: keep the planned load and use effort/technique feedback"],
+            )
         profile_db = self.db.query(db_models.LiftProfile).filter(
             db_models.LiftProfile.athlete_id == request.athlete_id,
             db_models.LiftProfile.lift == request.lift,
@@ -193,3 +208,4 @@ class AutoregulationService:
             current_vl=round(current_vl, 1),
             messages=messages,
         )
+

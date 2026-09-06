@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Reproducible temporal validation for stored real or synthetic datasets."""
+"""Retrospective runtime diagnostics; not leakage-free scientific validation.
+
+Use research/evaluate.py with an explicit provenance-labelled event log for a
+prefix-only evaluation. Existing mutable profiles/states cannot prove as-of use.
+"""
 from __future__ import annotations
 
 import argparse
@@ -41,10 +45,10 @@ def _prepare_sets(raw_sets: List[Dict]) -> List[Dict]:
     prepared = []
     for item in raw_sets or []:
         row = dict(item)
-        velocities = [float(v) for v in row.get("velocities", []) if v is not None]
+        velocities = list(row.get("velocities", []))
         row["velocities"] = velocities
         row["rpe"] = row.get("rpe", row.get("set_end_rpe"))
-        if len(velocities) >= 2 and velocities[0] > 0:
+        if len(velocities) >= 2 and velocities[0] and velocities[-1]:
             row["vl"] = max(0.0, min(1.0, 1.0 - velocities[-1] / velocities[0]))
         prepared.append(row)
     return prepared
@@ -124,7 +128,7 @@ def _rep_pairs(session) -> List[Tuple[float, float]]:
         velocities = set_data.get("velocities", [])
         for rep_index in range(max(0, len(velocities) - 1)):
             log = by_set.get(set_index, {}).get(rep_index)
-            if log and log.get("v_pred_next") is not None:
+            if log and log.get("v_pred_next") is not None and velocities[rep_index + 1] is not None:
                 pairs.append((float(log["v_pred_next"]), float(velocities[rep_index + 1])))
     return pairs
 
@@ -265,10 +269,19 @@ def run_validation(source: str, athlete_id: int, athletes: int, days: int) -> Di
         reports = [validate_athlete(db, item, days) for item in athlete_ids]
         return {
             "run_date": date.today().isoformat(),
-            "data_source": "real_db" if source == "db" else "synthetic_db",
+            "data_source": "database_provenance_unverified",
+            "requested_source": source,
+            "scientific_validation": False,
             "n_athletes": len(athlete_ids),
             "holdout_policy": "per-athlete first 70% dates train, final 30% dates test",
-            "no_lookahead": True,
+            "no_lookahead": False,
+            "limitations": [
+                "Current mutable load-velocity/capacity profiles can contain later observations",
+                "Persisted day states and stored rep predictions lack complete model-version provenance",
+                "Synthetic/real provenance cannot be inferred from a command-line label",
+                "Legacy baseline calibration and update exposure are not equivalent",
+                "Use research/evaluate.py for isolated prefix-only evaluation",
+            ],
             "reports": reports,
         }
     finally:
@@ -294,3 +307,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

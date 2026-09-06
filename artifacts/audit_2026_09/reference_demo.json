@@ -1,0 +1,3006 @@
+{
+  "model_version": "research-reference-v1",
+  "data_source": "synthetic",
+  "evaluation_kind": "fixed_parameter_exploratory_prequential_holdout",
+  "prefix_only": true,
+  "runtime_model_validated": false,
+  "clinical_or_coaching_efficacy_demonstrated": false,
+  "parameters": {
+    "alpha": 0.1,
+    "tau_strength_days": 3.0,
+    "tau_endurance_days": 2.0,
+    "k_strength": 0.005,
+    "k_endurance": 0.001
+  },
+  "n_test": 60,
+  "metrics": {
+    "fixed_profile": {
+      "n": 60,
+      "mae_m_s": 0.022876500000000036,
+      "rmse_m_s": 0.027661843424953963,
+      "bias_m_s": -0.020858833333333385
+    },
+    "last_observation": {
+      "n": 60,
+      "mae_m_s": 0.015794666666666658,
+      "rmse_m_s": 0.01955863253570317,
+      "bias_m_s": 0.0012170000000000143
+    },
+    "M0": {
+      "n": 60,
+      "mae_m_s": 0.017416884088726135,
+      "rmse_m_s": 0.021155800706989355,
+      "bias_m_s": -0.006504694558716715
+    },
+    "M1": {
+      "n": 60,
+      "mae_m_s": 0.018785757134164985,
+      "rmse_m_s": 0.0232164544604202,
+      "bias_m_s": -0.008841608052937346
+    },
+    "M2": {
+      "n": 60,
+      "mae_m_s": 0.019091902528454177,
+      "rmse_m_s": 0.023411312105127195,
+      "bias_m_s": -0.00914413549070462
+    }
+  },
+  "per_athlete": {
+    "synthetic_a": {
+      "fixed_profile": {
+        "n": 30,
+        "mae_m_s": 0.02130200000000003,
+        "rmse_m_s": 0.025268620856706874,
+        "bias_m_s": -0.020016666666666714
+      },
+      "last_observation": {
+        "n": 30,
+        "mae_m_s": 0.016710333333333327,
+        "rmse_m_s": 0.020209950107146064,
+        "bias_m_s": 0.0006943333333333487
+      },
+      "M0": {
+        "n": 30,
+        "mae_m_s": 0.016297253529315277,
+        "rmse_m_s": 0.01892395667134076,
+        "bias_m_s": -0.008507989919938815
+      },
+      "M1": {
+        "n": 30,
+        "mae_m_s": 0.0177448383956114,
+        "rmse_m_s": 0.02155836224991386,
+        "bias_m_s": -0.010887328566678208
+      },
+      "M2": {
+        "n": 30,
+        "mae_m_s": 0.01800257530253435,
+        "rmse_m_s": 0.022135079767847468,
+        "bias_m_s": -0.011185135245957885
+      }
+    },
+    "synthetic_b": {
+      "fixed_profile": {
+        "n": 30,
+        "mae_m_s": 0.024451000000000046,
+        "rmse_m_s": 0.02986389062619497,
+        "bias_m_s": -0.02170100000000006
+      },
+      "last_observation": {
+        "n": 30,
+        "mae_m_s": 0.014878999999999991,
+        "rmse_m_s": 0.018884865104098567,
+        "bias_m_s": 0.0017396666666666801
+      },
+      "M0": {
+        "n": 30,
+        "mae_m_s": 0.018536514648136992,
+        "rmse_m_s": 0.023173684881971628,
+        "bias_m_s": -0.004501399197494616
+      },
+      "M1": {
+        "n": 30,
+        "mae_m_s": 0.019826675872718576,
+        "rmse_m_s": 0.024763774601764953,
+        "bias_m_s": -0.006795887539196484
+      },
+      "M2": {
+        "n": 30,
+        "mae_m_s": 0.020181229754374,
+        "rmse_m_s": 0.02462148071579733,
+        "bias_m_s": -0.007103135735451357
+      }
+    }
+  },
+  "limitations": [
+    "Candidate parameters are not fitted or fairly tuned against all literature baselines",
+    "No calibrated predictive intervals, causal inference or athlete-external validation",
+    "Manifest calibration provenance must be independently verified",
+    "Endurance coupling is phenomenological, not a chronic interference mechanism"
+  ],
+  "predictions": [
+    {
+      "event_id": "synthetic_a-0-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-01T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69048,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7,
+        "M1": 0.7,
+        "M2": 0.7,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7
+      }
+    },
+    {
+      "event_id": "synthetic_a-0-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-01T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69179,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7,
+        "M1": 0.7,
+        "M2": 0.7,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7
+      }
+    },
+    {
+      "event_id": "synthetic_a-2-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-03T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.74341,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6990421230765371,
+        "M1": 0.6800125326032238,
+        "M2": 0.6717345255968925,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69048
+      }
+    },
+    {
+      "event_id": "synthetic_a-2-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-03T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70841,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6991746344162327,
+        "M1": 0.6796159534125155,
+        "M2": 0.6713456286757897,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69179
+      }
+    },
+    {
+      "event_id": "synthetic_a-4-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-05T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.74278,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7033570608546691,
+        "M1": 0.6675535487396272,
+        "M2": 0.6520655226501886,
+        "fixed_profile": 0.7,
+        "last_observation": 0.74341
+      }
+    },
+    {
+      "event_id": "synthetic_a-4-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-05T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70647,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7000927269345304,
+        "M1": 0.6702488615959183,
+        "M2": 0.6547036365517924,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70841
+      }
+    },
+    {
+      "event_id": "synthetic_a-6-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-07T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71447,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7072033131083086,
+        "M1": 0.663726262664795,
+        "M2": 0.6600764622943193,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7427799999999999
+      }
+    },
+    {
+      "event_id": "synthetic_a-6-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-07T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68948,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7007278550947249,
+        "M1": 0.6570863769282895,
+        "M2": 0.6534743399278837,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70647
+      }
+    },
+    {
+      "event_id": "synthetic_a-8-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-09T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7299,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7079266434874203,
+        "M1": 0.6642053759514414,
+        "M2": 0.6566324081245406,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71447
+      }
+    },
+    {
+      "event_id": "synthetic_a-8-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-09T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69823,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6995948614059329,
+        "M1": 0.64984991688976,
+        "M2": 0.6424431809928779,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68948
+      }
+    },
+    {
+      "event_id": "synthetic_a-10-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-11T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7168,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7100938777904192,
+        "M1": 0.6678410190126133,
+        "M2": 0.6541858305931554,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7299
+      }
+    },
+    {
+      "event_id": "synthetic_a-10-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-11T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70829,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6994582552932985,
+        "M1": 0.6637126567846585,
+        "M2": 0.6501465427951539,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69823
+      }
+    },
+    {
+      "event_id": "synthetic_a-12-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-13T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69326,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7107616569757635,
+        "M1": 0.6647593084880212,
+        "M2": 0.6632967692118793,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7168
+      }
+    },
+    {
+      "event_id": "synthetic_a-12-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-13T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72303,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7003364513784051,
+        "M1": 0.6726872149452772,
+        "M2": 0.6712077466822909,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7082900000000001
+      }
+    },
+    {
+      "event_id": "synthetic_a-14-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-15T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71268,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7089917902534826,
+        "M1": 0.6728106098874127,
+        "M2": 0.6673156952259834,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69326
+      }
+    },
+    {
+      "event_id": "synthetic_a-14-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-15T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70929,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7025733787324475,
+        "M1": 0.6780423692348184,
+        "M2": 0.6725066408370173,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72303
+      }
+    },
+    {
+      "event_id": "synthetic_a-16-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-17T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72168,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7093597506808865,
+        "M1": 0.6739844846510032,
+        "M2": 0.6622170413343421,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71268
+      }
+    },
+    {
+      "event_id": "synthetic_a-16-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-17T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72752,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7032421687348733,
+        "M1": 0.6850531810173673,
+        "M2": 0.6730965994626498,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70929
+      }
+    },
+    {
+      "event_id": "synthetic_a-18-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-19T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71814,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7105822511312744,
+        "M1": 0.685563986264532,
+        "M2": 0.6859594235611051,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72168
+      }
+    },
+    {
+      "event_id": "synthetic_a-18-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-19T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68434,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7056330402498457,
+        "M1": 0.6811929587434081,
+        "M2": 0.6815857383610482,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72752
+      }
+    },
+    {
+      "event_id": "synthetic_a-20-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-21T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71936,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7113344329104495,
+        "M1": 0.6947143182320294,
+        "M2": 0.6907759682052389,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71814
+      }
+    },
+    {
+      "event_id": "synthetic_a-20-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-21T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72967,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7034742572058106,
+        "M1": 0.6769001374173362,
+        "M2": 0.6730641047586551,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68434
+      }
+    },
+    {
+      "event_id": "synthetic_a-22-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-23T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71449,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7121329438504171,
+        "M1": 0.6961056805445655,
+        "M2": 0.6855057816565826,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7193599999999999
+      }
+    },
+    {
+      "event_id": "synthetic_a-22-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-23T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71816,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7060509434832581,
+        "M1": 0.6861967026868174,
+        "M2": 0.6757512917907299,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72967
+      }
+    },
+    {
+      "event_id": "synthetic_a-24-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-25T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70077,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7123682991314981,
+        "M1": 0.7009075538701791,
+        "M2": 0.7027469190868357,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71449
+      }
+    },
+    {
+      "event_id": "synthetic_a-24-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-25T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72725,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7072526040155706,
+        "M1": 0.6788493438486337,
+        "M2": 0.6806302032658619,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71816
+      }
+    },
+    {
+      "event_id": "synthetic_a-26-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-27T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71202,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.711199882942634,
+        "M1": 0.6895962672054152,
+        "M2": 0.6869500836450225,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70077
+      }
+    },
+    {
+      "event_id": "synthetic_a-26-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-27T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71188,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7092273461405497,
+        "M1": 0.6807839707520268,
+        "M2": 0.6781725077363504,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72725
+      }
+    },
+    {
+      "event_id": "synthetic_a-28-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-29T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71237,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7112818521222761,
+        "M1": 0.6953554654161617,
+        "M2": 0.6859023764271778,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71202
+      }
+    },
+    {
+      "event_id": "synthetic_a-28-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-29T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69976,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.70949216611541,
+        "M1": 0.6930000815028254,
+        "M2": 0.6835822613596737,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71188
+      }
+    },
+    {
+      "event_id": "synthetic_a-30-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-01-31T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70567,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7113905920713719,
+        "M1": 0.6909950032513212,
+        "M2": 0.6938421834585399,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71237
+      }
+    },
+    {
+      "event_id": "synthetic_a-30-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-01-31T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68662,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7085128894265017,
+        "M1": 0.7013600369018538,
+        "M2": 0.7042489199370261,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69976
+      }
+    },
+    {
+      "event_id": "synthetic_a-32-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-02T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68772,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.710816452183376,
+        "M1": 0.698768059522725,
+        "M2": 0.6970214841048779,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7056699999999999
+      }
+    },
+    {
+      "event_id": "synthetic_a-32-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-02T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.65245,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7062925492234473,
+        "M1": 0.699631056367154,
+        "M2": 0.6978829302172359,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68662
+      }
+    },
+    {
+      "event_id": "synthetic_a-34-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-04T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7114,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7084723240679046,
+        "M1": 0.6977046912547684,
+        "M2": 0.6890514328313914,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68772
+      }
+    },
+    {
+      "event_id": "synthetic_a-34-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-04T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69331,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7007141472862572,
+        "M1": 0.6883397385157745,
+        "M2": 0.6798055739071358,
+        "fixed_profile": 0.7,
+        "last_observation": 0.65245
+      }
+    },
+    {
+      "event_id": "synthetic_a-36-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-06T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70167,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7087645486597526,
+        "M1": 0.6980006327689317,
+        "M2": 0.7016389942580255,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7114
+      }
+    },
+    {
+      "event_id": "synthetic_a-36-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-06T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.6881,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6999701881740632,
+        "M1": 0.6891381189409499,
+        "M2": 0.6927290338487933,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69331
+      }
+    },
+    {
+      "event_id": "synthetic_a-38-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-08T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7033,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7080518777303805,
+        "M1": 0.6998416045629018,
+        "M2": 0.6987756680428516,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70167
+      }
+    },
+    {
+      "event_id": "synthetic_a-38-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-08T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7142,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6987740125258293,
+        "M1": 0.6861199517389357,
+        "M2": 0.6850752773414057,
+        "fixed_profile": 0.7,
+        "last_observation": 0.6881
+      }
+    },
+    {
+      "event_id": "synthetic_a-40-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-10T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70134,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7075752487417065,
+        "M1": 0.7071295456198141,
+        "M2": 0.6989745913841602,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7033
+      }
+    },
+    {
+      "event_id": "synthetic_a-40-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-10T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.66751,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7003014978189585,
+        "M1": 0.6961942748652943,
+        "M2": 0.6881682025529637,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7142
+      }
+    },
+    {
+      "event_id": "synthetic_a-42-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-12T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69523,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7069492374158747,
+        "M1": 0.6957783444304521,
+        "M2": 0.6999596030212285,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70134
+      }
+    },
+    {
+      "event_id": "synthetic_a-42-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-12T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7074,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6969511312226844,
+        "M1": 0.6839429810497616,
+        "M2": 0.6880516842282192,
+        "fixed_profile": 0.7,
+        "last_observation": 0.66751
+      }
+    },
+    {
+      "event_id": "synthetic_a-44-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-14T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68897,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7057684785275309,
+        "M1": 0.7034655593493866,
+        "M2": 0.7028952488105703,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69523
+      }
+    },
+    {
+      "event_id": "synthetic_a-44-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-14T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70893,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.697989034970953,
+        "M1": 0.6951183732499605,
+        "M2": 0.6945550254670622,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7074
+      }
+    },
+    {
+      "event_id": "synthetic_a-46-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-16T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70192,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7040703622368116,
+        "M1": 0.7065829570878311,
+        "M2": 0.6988827787787096,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68897
+      }
+    },
+    {
+      "event_id": "synthetic_a-46-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-16T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69525,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6990754897548466,
+        "M1": 0.6903897961532961,
+        "M2": 0.6828686848482668,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70893
+      }
+    },
+    {
+      "event_id": "synthetic_a-48-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-18T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69804,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.703855029897854,
+        "M1": 0.703545862085046,
+        "M2": 0.7081828086737694,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70192
+      }
+    },
+    {
+      "event_id": "synthetic_a-48-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-18T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.64995,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6986919954763359,
+        "M1": 0.6850652599363269,
+        "M2": 0.6895788314997779,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69525
+      }
+    },
+    {
+      "event_id": "synthetic_a-50-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-20T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68582,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7032713536399658,
+        "M1": 0.6996774030438941,
+        "M2": 0.699473755628435,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69804
+      }
+    },
+    {
+      "event_id": "synthetic_a-50-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-20T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68498,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6936576589255841,
+        "M1": 0.6842217349600963,
+        "M2": 0.6840226551830217,
+        "fixed_profile": 0.7,
+        "last_observation": 0.64995
+      }
+    },
+    {
+      "event_id": "synthetic_a-52-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-22T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.67945,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7015064192727347,
+        "M1": 0.7017442545125648,
+        "M2": 0.6944216850251919,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68582
+      }
+    },
+    {
+      "event_id": "synthetic_a-52-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-22T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71638,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6927849688849569,
+        "M1": 0.6922188036090503,
+        "M2": 0.6849981248991384,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68498
+      }
+    },
+    {
+      "event_id": "synthetic_a-54-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-24T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70295,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6992689344834432,
+        "M1": 0.6917810222327048,
+        "M2": 0.6966337570865216,
+        "fixed_profile": 0.7,
+        "last_observation": 0.67945
+      }
+    },
+    {
+      "event_id": "synthetic_a-54-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-24T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71671,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6951090710338066,
+        "M1": 0.6919686296114405,
+        "M2": 0.6968209894650159,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71638
+      }
+    },
+    {
+      "event_id": "synthetic_a-56-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-26T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71965,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6996361719334948,
+        "M1": 0.6865696410518297,
+        "M2": 0.68663001866717,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70295
+      }
+    },
+    {
+      "event_id": "synthetic_a-56-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-26T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71497,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6972395385801421,
+        "M1": 0.690381735726501,
+        "M2": 0.6904424275031095,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71671
+      }
+    },
+    {
+      "event_id": "synthetic_a-58-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-02-28T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70909,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.701612248781509,
+        "M1": 0.7004417919315866,
+        "M2": 0.6933693053555776,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7196500000000001
+      }
+    },
+    {
+      "event_id": "synthetic_a-58-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-02-28T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72531,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6989926161194311,
+        "M1": 0.6915535447627525,
+        "M2": 0.6845732162808705,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71497
+      }
+    },
+    {
+      "event_id": "synthetic_a-60-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-02T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73866,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7023564615372494,
+        "M1": 0.7018248667627406,
+        "M2": 0.7069650775459069,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70909
+      }
+    },
+    {
+      "event_id": "synthetic_a-60-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-02T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69013,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7015808007872597,
+        "M1": 0.6895621779530682,
+        "M2": 0.6946108163002651,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72531
+      }
+    },
+    {
+      "event_id": "synthetic_a-62-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-04T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69635,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7059050391503853,
+        "M1": 0.7125737717267924,
+        "M2": 0.7128333784173347,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73866
+      }
+    },
+    {
+      "event_id": "synthetic_a-62-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-04T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7231,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7004272225269536,
+        "M1": 0.6909887905644037,
+        "M2": 0.6912404459482274,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69013
+      }
+    },
+    {
+      "event_id": "synthetic_a-64-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-06T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72978,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7049436647365855,
+        "M1": 0.70511239641506,
+        "M2": 0.6981663533296527,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69635
+      }
+    },
+    {
+      "event_id": "synthetic_a-64-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-06T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72021,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7026621356186781,
+        "M1": 0.6961690645967933,
+        "M2": 0.6893134910858612,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7230999999999999
+      }
+    },
+    {
+      "event_id": "synthetic_a-66-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-08T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71655,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7073887788959488,
+        "M1": 0.6967920099524462,
+        "M2": 0.7020524744779763,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72978
+      }
+    },
+    {
+      "event_id": "synthetic_a-66-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-08T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73638,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7043975080792637,
+        "M1": 0.7052009866434973,
+        "M2": 0.710523079910553,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72021
+      }
+    },
+    {
+      "event_id": "synthetic_a-68-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-10T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73075,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7082996053764586,
+        "M1": 0.6965166545189367,
+        "M2": 0.696910780441447,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71655
+      }
+    },
+    {
+      "event_id": "synthetic_a-68-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-10T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71961,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7075322305679644,
+        "M1": 0.7022205545732623,
+        "M2": 0.7026177700787608,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7363800000000001
+      }
+    },
+    {
+      "event_id": "synthetic_a-70-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-12T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73403,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.710513251600698,
+        "M1": 0.7032053731947437,
+        "M2": 0.6964043578947963,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73075
+      }
+    },
+    {
+      "event_id": "synthetic_a-70-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-12T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73607,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7087308289010147,
+        "M1": 0.7130139784408245,
+        "M2": 0.7061204820864929,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71961
+      }
+    },
+    {
+      "event_id": "synthetic_a-72-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-14T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71996,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.712830617145562,
+        "M1": 0.7024784626359608,
+        "M2": 0.7078973509992441,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73403
+      }
+    },
+    {
+      "event_id": "synthetic_a-72-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-14T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7293,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7114184167706986,
+        "M1": 0.7152085581125093,
+        "M2": 0.7207237231908266,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7360700000000001
+      }
+    },
+    {
+      "event_id": "synthetic_a-74-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-16T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71473,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7135403669027832,
+        "M1": 0.7108968798117247,
+        "M2": 0.7114036028419047,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7199600000000002
+      }
+    },
+    {
+      "event_id": "synthetic_a-74-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-16T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.74354,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7131866658032907,
+        "M1": 0.7106732679148398,
+        "M2": 0.7111796556335421,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7293
+      }
+    },
+    {
+      "event_id": "synthetic_a-76-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-18T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.74741,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.713659241054205,
+        "M1": 0.7070224114898636,
+        "M2": 0.7002770241817352,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71473
+      }
+    },
+    {
+      "event_id": "synthetic_a-76-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-18T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70911,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7161653864671983,
+        "M1": 0.7160928913628354,
+        "M2": 0.709263327066425,
+        "fixed_profile": 0.7,
+        "last_observation": 0.74354
+      }
+    },
+    {
+      "event_id": "synthetic_a-78-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-20T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73743,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7169645700059223,
+        "M1": 0.7060485361483948,
+        "M2": 0.7115795986302518,
+        "fixed_profile": 0.7,
+        "last_observation": 0.74741
+      }
+    },
+    {
+      "event_id": "synthetic_a-78-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-20T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72003,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7154567003513101,
+        "M1": 0.7194937609705242,
+        "M2": 0.7251281866432215,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70911
+      }
+    },
+    {
+      "event_id": "synthetic_a-80-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-22T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72207,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7189852906826392,
+        "M1": 0.7224265824891524,
+        "M2": 0.7230189200619782,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73743
+      }
+    },
+    {
+      "event_id": "synthetic_a-80-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-22T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70494,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7159127201244072,
+        "M1": 0.7138904774321936,
+        "M2": 0.714475612725416,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72003
+      }
+    },
+    {
+      "event_id": "synthetic_a-82-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-24T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73339,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7192931676738176,
+        "M1": 0.7211220370968855,
+        "M2": 0.7143109495596717,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7220700000000001
+      }
+    },
+    {
+      "event_id": "synthetic_a-82-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-24T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69675,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.714807805824415,
+        "M1": 0.7083267952015874,
+        "M2": 0.701638871914643,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70494
+      }
+    },
+    {
+      "event_id": "synthetic_a-84-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-26T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73179,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.720690570810634,
+        "M1": 0.7308493667200249,
+        "M2": 0.736638587159071,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73339
+      }
+    },
+    {
+      "event_id": "synthetic_a-84-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-26T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70652,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7129811623520728,
+        "M1": 0.7054873610491521,
+        "M2": 0.7110737356847461,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69675
+      }
+    },
+    {
+      "event_id": "synthetic_a-86-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-28T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70085,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7217928954791745,
+        "M1": 0.726766781883899,
+        "M2": 0.7274194441901174,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73179
+      }
+    },
+    {
+      "event_id": "synthetic_a-86-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-28T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69749,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7123323960451932,
+        "M1": 0.7146281116505832,
+        "M2": 0.7152696501059859,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70652
+      }
+    },
+    {
+      "event_id": "synthetic_a-88-squat-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "squat",
+      "timestamp": "2026-03-30T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70217,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7196707479105411,
+        "M1": 0.7158021083290638,
+        "M2": 0.709091070579443,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7008500000000001
+      }
+    },
+    {
+      "event_id": "synthetic_a-88-bench-probe",
+      "athlete_id": "synthetic_a",
+      "lift": "bench",
+      "timestamp": "2026-03-30T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7114,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7108340532195111,
+        "M1": 0.7134851273578909,
+        "M2": 0.7067981239357658,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69749
+      }
+    },
+    {
+      "event_id": "synthetic_b-0-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-01T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.705,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7,
+        "M1": 0.7,
+        "M2": 0.7,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7
+      }
+    },
+    {
+      "event_id": "synthetic_b-0-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-01T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71751,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7,
+        "M1": 0.7,
+        "M2": 0.7,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7
+      }
+    },
+    {
+      "event_id": "synthetic_b-2-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-03T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71864,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7004984000901092,
+        "M1": 0.670650531810454,
+        "M2": 0.662486491392149,
+        "fixed_profile": 0.7,
+        "last_observation": 0.705
+      }
+    },
+    {
+      "event_id": "synthetic_b-2-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-03T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72264,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.701731596692452,
+        "M1": 0.6769406840134803,
+        "M2": 0.6687029149378999,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7175099999999999
+      }
+    },
+    {
+      "event_id": "synthetic_b-4-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-05T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69896,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7022917579717116,
+        "M1": 0.661995635537682,
+        "M2": 0.6466365595599417,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71864
+      }
+    },
+    {
+      "event_id": "synthetic_b-4-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-05T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.73384,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7037949209861775,
+        "M1": 0.6640211495198639,
+        "M2": 0.6486203651324542,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7226400000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-6-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-07T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72696,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7019578687480127,
+        "M1": 0.6677158887868655,
+        "M2": 0.6640441496447644,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69896
+      }
+    },
+    {
+      "event_id": "synthetic_b-6-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-07T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70782,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7067432244337664,
+        "M1": 0.6611879039057551,
+        "M2": 0.6575533206044047,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73384
+      }
+    },
+    {
+      "event_id": "synthetic_b-8-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-09T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70657,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7044188897911814,
+        "M1": 0.6664299449846245,
+        "M2": 0.6588316136326351,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7269600000000002
+      }
+    },
+    {
+      "event_id": "synthetic_b-8-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-09T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72483,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7068508282369226,
+        "M1": 0.6647756944342155,
+        "M2": 0.6571988403462647,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70782
+      }
+    },
+    {
+      "event_id": "synthetic_b-10-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-11T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69393,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7046337057808615,
+        "M1": 0.6589922890193222,
+        "M2": 0.6455180285031997,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70657
+      }
+    },
+    {
+      "event_id": "synthetic_b-10-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-11T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69579,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7086284919376968,
+        "M1": 0.6728024393010748,
+        "M2": 0.6590505325223307,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72483
+      }
+    },
+    {
+      "event_id": "synthetic_b-12-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-13T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70446,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7035559472900125,
+        "M1": 0.6679148212383778,
+        "M2": 0.6664453395076138,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69393
+      }
+    },
+    {
+      "event_id": "synthetic_b-12-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-13T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71389,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7073340540490162,
+        "M1": 0.6674130224688528,
+        "M2": 0.6659451539511988,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69579
+      }
+    },
+    {
+      "event_id": "synthetic_b-14-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-15T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70717,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7036463003276314,
+        "M1": 0.6732379696727244,
+        "M2": 0.6677395647192048,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7044600000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-14-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-15T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69592,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7079869302092389,
+        "M1": 0.6653590081741543,
+        "M2": 0.6599268302994309,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71389
+      }
+    },
+    {
+      "event_id": "synthetic_b-16-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-17T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69798,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7039978787395298,
+        "M1": 0.6680697913453947,
+        "M2": 0.6564056157148512,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70717
+      }
+    },
+    {
+      "event_id": "synthetic_b-16-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-17T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70067,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7067708809378473,
+        "M1": 0.6755127974222737,
+        "M2": 0.6637227290342398,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69592
+      }
+    },
+    {
+      "event_id": "synthetic_b-18-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-19T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68131,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7033937633774622,
+        "M1": 0.6758446672645686,
+        "M2": 0.6762344984013858,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69798
+      }
+    },
+    {
+      "event_id": "synthetic_b-18-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-19T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.7159,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.706158409966935,
+        "M1": 0.6735993917416053,
+        "M2": 0.673987792866624,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70067
+      }
+    },
+    {
+      "event_id": "synthetic_b-20-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-21T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68428,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7011535517694071,
+        "M1": 0.6721767694880906,
+        "M2": 0.6683661852973711,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68131
+      }
+    },
+    {
+      "event_id": "synthetic_b-20-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-21T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71546,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7071265738642346,
+        "M1": 0.6853858847419315,
+        "M2": 0.6815017628569804,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7159
+      }
+    },
+    {
+      "event_id": "synthetic_b-22-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-23T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70424,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6994476400251148,
+        "M1": 0.6810962016693534,
+        "M2": 0.670724858535023,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68428
+      }
+    },
+    {
+      "event_id": "synthetic_b-22-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-23T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.67334,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7079555297918033,
+        "M1": 0.6964083538282587,
+        "M2": 0.685807499322952,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71546
+      }
+    },
+    {
+      "event_id": "synthetic_b-24-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-25T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69792,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6999254048051895,
+        "M1": 0.6753692501535686,
+        "M2": 0.6771415961644978,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7042400000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-24-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-25T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69411,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7044153675468237,
+        "M1": 0.685494997120324,
+        "M2": 0.6872932904119748,
+        "fixed_profile": 0.7,
+        "last_observation": 0.67334
+      }
+    },
+    {
+      "event_id": "synthetic_b-26-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-27T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.67517,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6997246052924094,
+        "M1": 0.6828348210725608,
+        "M2": 0.6802145831682747,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69792
+      }
+    },
+    {
+      "event_id": "synthetic_b-26-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-27T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.6765,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7033779828694524,
+        "M1": 0.6849796532818071,
+        "M2": 0.6823520957776839,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69411
+      }
+    },
+    {
+      "event_id": "synthetic_b-28-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-29T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69432,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6972294855012479,
+        "M1": 0.6884343783488653,
+        "M2": 0.6790753788654676,
+        "fixed_profile": 0.7,
+        "last_observation": 0.67517
+      }
+    },
+    {
+      "event_id": "synthetic_b-28-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-29T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69295,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7006428154531215,
+        "M1": 0.6862817597081392,
+        "M2": 0.6769552410640998,
+        "fixed_profile": 0.7,
+        "last_observation": 0.6765
+      }
+    },
+    {
+      "event_id": "synthetic_b-30-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-01-31T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68077,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6969379891550684,
+        "M1": 0.6887541205994591,
+        "M2": 0.6915920674595434,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69432
+      }
+    },
+    {
+      "event_id": "synthetic_b-30-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-01-31T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69635,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6998697063647498,
+        "M1": 0.6942229474948052,
+        "M2": 0.697082433051616,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69295
+      }
+    },
+    {
+      "event_id": "synthetic_b-32-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-02T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69413,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6953040596414709,
+        "M1": 0.6930656213318145,
+        "M2": 0.6913332991961978,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68077
+      }
+    },
+    {
+      "event_id": "synthetic_b-32-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-02T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.666,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6995169366408416,
+        "M1": 0.6913832414291354,
+        "M2": 0.6896557235996194,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69635
+      }
+    },
+    {
+      "event_id": "synthetic_b-34-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-04T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.67622,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.695186564370873,
+        "M1": 0.6806205772328522,
+        "M2": 0.6721792039457213,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69413
+      }
+    },
+    {
+      "event_id": "synthetic_b-34-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-04T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69492,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6960907033381056,
+        "M1": 0.6823849826203008,
+        "M2": 0.6739246461871584,
+        "fixed_profile": 0.7,
+        "last_observation": 0.666
+      }
+    },
+    {
+      "event_id": "synthetic_b-36-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-06T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68175,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6932662117919318,
+        "M1": 0.684687591546199,
+        "M2": 0.6882565581748679,
+        "fixed_profile": 0.7,
+        "last_observation": 0.67622
+      }
+    },
+    {
+      "event_id": "synthetic_b-36-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-06T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68289,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6959735443084444,
+        "M1": 0.6904479107045307,
+        "M2": 0.6940456505878626,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69492
+      }
+    },
+    {
+      "event_id": "synthetic_b-38-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-08T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72404,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6921058903550071,
+        "M1": 0.6798460403302189,
+        "M2": 0.6788105592761137,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68175
+      }
+    },
+    {
+      "event_id": "synthetic_b-38-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-08T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68472,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6946539882420854,
+        "M1": 0.692948848183926,
+        "M2": 0.6918937762265213,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68289
+      }
+    },
+    {
+      "event_id": "synthetic_b-40-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-10T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71406,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6952348708457979,
+        "M1": 0.6774187913081169,
+        "M2": 0.6696064756218201,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72404
+      }
+    },
+    {
+      "event_id": "synthetic_b-40-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-10T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70293,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6936541381086289,
+        "M1": 0.6831624058219962,
+        "M2": 0.6752865713485598,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68472
+      }
+    },
+    {
+      "event_id": "synthetic_b-42-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-12T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.6756,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6970948314923866,
+        "M1": 0.6793311636752739,
+        "M2": 0.6834135834384595,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7140600000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-42-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-12T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.66878,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.694576189269154,
+        "M1": 0.6806817304852285,
+        "M2": 0.6847708421027935,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70293
+      }
+    },
+    {
+      "event_id": "synthetic_b-44-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-14T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71322,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6949149269755062,
+        "M1": 0.6927367713477259,
+        "M2": 0.6921751588052573,
+        "fixed_profile": 0.7,
+        "last_observation": 0.6756
+      }
+    },
+    {
+      "event_id": "synthetic_b-44-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-14T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71067,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.691952415590296,
+        "M1": 0.677386260793343,
+        "M2": 0.6768372837228627,
+        "fixed_profile": 0.7,
+        "last_observation": 0.66878
+      }
+    },
+    {
+      "event_id": "synthetic_b-46-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-16T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.68099,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.696724091288556,
+        "M1": 0.6993144322451802,
+        "M2": 0.6916934646455319,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7132200000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-46-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-16T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69251,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6938017725628289,
+        "M1": 0.682284032446299,
+        "M2": 0.6748512253882215,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7106700000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-48-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-18T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70559,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6951344601527694,
+        "M1": 0.7013529399105551,
+        "M2": 0.7059754333363158,
+        "fixed_profile": 0.7,
+        "last_observation": 0.68099
+      }
+    },
+    {
+      "event_id": "synthetic_b-48-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-18T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.69863,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6936724869483603,
+        "M1": 0.6932563018470943,
+        "M2": 0.6978238403185256,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69251
+      }
+    },
+    {
+      "event_id": "synthetic_b-50-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-20T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.70987,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6961730040292929,
+        "M1": 0.6931423689993019,
+        "M2": 0.692940623664412,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70559
+      }
+    },
+    {
+      "event_id": "synthetic_b-50-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-20T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72942,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6941666510751062,
+        "M1": 0.6973810977339882,
+        "M2": 0.6971781891352413,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69863
+      }
+    },
+    {
+      "event_id": "synthetic_b-52-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-22T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71853,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6975307258174019,
+        "M1": 0.6954306393694366,
+        "M2": 0.6881739512701972,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70987
+      }
+    },
+    {
+      "event_id": "synthetic_b-52-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-22T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71179,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6976139199137031,
+        "M1": 0.698932294069693,
+        "M2": 0.6916415855406176,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7294200000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-54-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-24T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.74067,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6996027356892881,
+        "M1": 0.6887576640938614,
+        "M2": 0.6935891905667827,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71853
+      }
+    },
+    {
+      "event_id": "synthetic_b-54-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-24T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.72806,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.6990187292116885,
+        "M1": 0.6972781230516714,
+        "M2": 0.7021677151896448,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7117899999999999
+      }
+    },
+    {
+      "event_id": "synthetic_b-56-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-26T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71961,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7036048502711446,
+        "M1": 0.7032512415048139,
+        "M2": 0.7033130861166469,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7406699999999999
+      }
+    },
+    {
+      "event_id": "synthetic_b-56-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-26T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71459,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.701869948832811,
+        "M1": 0.6926530960562366,
+        "M2": 0.6927139875091786,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7280600000000002
+      }
+    },
+    {
+      "event_id": "synthetic_b-58-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-02-28T12:00:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.71974,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7051892140814051,
+        "M1": 0.702076844227552,
+        "M2": 0.6949878482348468,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71961
+      }
+    },
+    {
+      "event_id": "synthetic_b-58-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-02-28T12:01:00+00:00",
+      "split": "train",
+      "observed_m_s": 0.73784,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7031316977781322,
+        "M1": 0.6954849486330941,
+        "M2": 0.6884649377714198,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71459
+      }
+    },
+    {
+      "event_id": "synthetic_b-60-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-02T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.74684,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7066309558748016,
+        "M1": 0.7036676138789443,
+        "M2": 0.7088213210613492,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7197400000000002
+      }
+    },
+    {
+      "event_id": "synthetic_b-60-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-02T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7386,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7065277573313405,
+        "M1": 0.6952657622673857,
+        "M2": 0.7003561594804345,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73784
+      }
+    },
+    {
+      "event_id": "synthetic_b-62-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-04T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.75322,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7105524644725578,
+        "M1": 0.7127744914690822,
+        "M2": 0.713034171286352,
+        "fixed_profile": 0.7,
+        "last_observation": 0.74684
+      }
+    },
+    {
+      "event_id": "synthetic_b-62-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-04T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.75266,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7096712900832484,
+        "M1": 0.6965595722442984,
+        "M2": 0.6968132564847709,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7385999999999999
+      }
+    },
+    {
+      "event_id": "synthetic_b-64-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-06T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.74121,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7147081251447241,
+        "M1": 0.7166514201237654,
+        "M2": 0.7095917064288897,
+        "fixed_profile": 0.7,
+        "last_observation": 0.75322
+      }
+    },
+    {
+      "event_id": "synthetic_b-64-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-06T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.74812,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.71385728532674,
+        "M1": 0.7147557440945534,
+        "M2": 0.7077171369584561,
+        "fixed_profile": 0.7,
+        "last_observation": 0.75266
+      }
+    },
+    {
+      "event_id": "synthetic_b-66-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-08T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70353,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7173151021618106,
+        "M1": 0.7200023944299162,
+        "M2": 0.7254380868605078,
+        "fixed_profile": 0.7,
+        "last_observation": 0.74121
+      }
+    },
+    {
+      "event_id": "synthetic_b-66-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-08T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.75011,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.717211728639593,
+        "M1": 0.7176368932140533,
+        "M2": 0.7230528392349796,
+        "fixed_profile": 0.7,
+        "last_observation": 0.74812
+      }
+    },
+    {
+      "event_id": "synthetic_b-68-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-10T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73761,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7159245235276303,
+        "M1": 0.7103210055115105,
+        "M2": 0.7107229426651439,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70353
+      }
+    },
+    {
+      "event_id": "synthetic_b-68-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-10T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.74712,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7204355586806457,
+        "M1": 0.7287446773403234,
+        "M2": 0.7291568963839045,
+        "fixed_profile": 0.7,
+        "last_observation": 0.75011
+      }
+    },
+    {
+      "event_id": "synthetic_b-70-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-12T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73904,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7180640674982637,
+        "M1": 0.7122944288338848,
+        "M2": 0.7054055091907394,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7376100000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-70-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-12T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72084,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7230605421209961,
+        "M1": 0.7285789928739391,
+        "M2": 0.7215350122745658,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7471200000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-72-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-14T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7243,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7201345868182059,
+        "M1": 0.7074047740079685,
+        "M2": 0.712861663723304,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7390399999999999
+      }
+    },
+    {
+      "event_id": "synthetic_b-72-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-14T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7296,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7228381804396803,
+        "M1": 0.7314002970988271,
+        "M2": 0.7370403210206267,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7208400000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-74-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-16T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72051,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7205500478776263,
+        "M1": 0.7046304060501932,
+        "M2": 0.7051326623754781,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7243
+      }
+    },
+    {
+      "event_id": "synthetic_b-74-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-16T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71265,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.723511532728498,
+        "M1": 0.7217809235751976,
+        "M2": 0.7222952260145796,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7296000000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-76-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-18T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70225,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.720546042989697,
+        "M1": 0.7217021460716572,
+        "M2": 0.7148167059254213,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72051
+      }
+    },
+    {
+      "event_id": "synthetic_b-76-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-18T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.73243,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7224179714042105,
+        "M1": 0.724974567610282,
+        "M2": 0.7180602964556926,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7126500000000001
+      }
+    },
+    {
+      "event_id": "synthetic_b-78-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-20T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71194,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7186951904606239,
+        "M1": 0.7129502073374312,
+        "M2": 0.7185353363212656,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70225
+      }
+    },
+    {
+      "event_id": "synthetic_b-78-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-20T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.72331,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.723412984450385,
+        "M1": 0.7251817341903883,
+        "M2": 0.7308607029349985,
+        "fixed_profile": 0.7,
+        "last_observation": 0.73243
+      }
+    },
+    {
+      "event_id": "synthetic_b-80-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-22T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.7217,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7180167970738843,
+        "M1": 0.708450192175029,
+        "M2": 0.7090310701181621,
+        "fixed_profile": 0.7,
+        "last_observation": 0.71194
+      }
+    },
+    {
+      "event_id": "synthetic_b-80-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-22T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.67357,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.723402685345552,
+        "M1": 0.72145076481162,
+        "M2": 0.7220420968410541,
+        "fixed_profile": 0.7,
+        "last_observation": 0.72331
+      }
+    },
+    {
+      "event_id": "synthetic_b-82-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-24T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69663,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7183842699025852,
+        "M1": 0.7188329509631834,
+        "M2": 0.7120434841298655,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7217
+      }
+    },
+    {
+      "event_id": "synthetic_b-82-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-24T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70176,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7182578455723253,
+        "M1": 0.7219250740863238,
+        "M2": 0.7151087577375447,
+        "fixed_profile": 0.7,
+        "last_observation": 0.67357
+      }
+    },
+    {
+      "event_id": "synthetic_b-84-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-26T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71038,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7161786170423327,
+        "M1": 0.7146696665804193,
+        "M2": 0.7203307240148695,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69663
+      }
+    },
+    {
+      "event_id": "synthetic_b-84-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-26T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70628,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7165907563006528,
+        "M1": 0.7100496837136967,
+        "M2": 0.7156721849264908,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70176
+      }
+    },
+    {
+      "event_id": "synthetic_b-86-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-28T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.70525,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.715596631729798,
+        "M1": 0.7198640928451957,
+        "M2": 0.720510556292221,
+        "fixed_profile": 0.7,
+        "last_observation": 0.7103799999999999
+      }
+    },
+    {
+      "event_id": "synthetic_b-86-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-28T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69418,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7155529430981891,
+        "M1": 0.7041083747410494,
+        "M2": 0.7047404693813291,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70628
+      }
+    },
+    {
+      "event_id": "synthetic_b-88-squat-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "squat",
+      "timestamp": "2026-03-30T12:00:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.69437,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7145551742866093,
+        "M1": 0.7083832272751848,
+        "M2": 0.7017417456084998,
+        "fixed_profile": 0.7,
+        "last_observation": 0.70525
+      }
+    },
+    {
+      "event_id": "synthetic_b-88-bench-probe",
+      "athlete_id": "synthetic_b",
+      "lift": "bench",
+      "timestamp": "2026-03-30T12:01:00+00:00",
+      "split": "test",
+      "observed_m_s": 0.71102,
+      "reference_m_s": 0.7,
+      "predictions": {
+        "M0": 0.7133863656919545,
+        "M1": 0.7121412944088018,
+        "M2": 0.7054668858049632,
+        "fixed_profile": 0.7,
+        "last_observation": 0.69418
+      }
+    }
+  ],
+  "input_sha256": {
+    "example_manifest.json": "942ab562468508e62763206b0608122afd0df671e721b580c6e104922b2d36a6",
+    "example_events.csv": "4d76fe48e3d1195afa966944bb48931bbc6961be3d2096149785d0a9b1d44f01"
+  }
+}

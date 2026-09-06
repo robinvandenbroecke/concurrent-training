@@ -17,6 +17,7 @@ def test_fetch_power_stream_returns_timestamped_points():
         points = service._fetch_power_stream(123)
     assert points == [
         {"power": 180.0, "timestamp": 0},
+        {"power": 0.0, "timestamp": 1},
         {"power": 220.0, "timestamp": 2},
     ]
     assert get.call_args.kwargs["params"]["keys"] == "watts,time"
@@ -25,3 +26,4 @@ def test_fetch_power_stream_returns_timestamped_points():
 def test_fetch_power_stream_falls_back_cleanly_without_token():
     service = StravaService(db=None)
     assert service._fetch_power_stream(123) is None
+

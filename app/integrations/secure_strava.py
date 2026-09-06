@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import hmac
+import math
 import logging
 import time
 from typing import Dict, List, Optional
@@ -159,9 +160,9 @@ class StravaService(BaseStravaService):
             try:
                 power = float(value)
             except (TypeError, ValueError):
-                continue
-            if power <= 0:
-                continue
+                return None
+            if not math.isfinite(power) or power < 0:
+                return None
             timestamp = times[index] if index < len(times) else index
             points.append({"power": power, "timestamp": timestamp})
         return points or None
@@ -203,6 +204,9 @@ class StravaService(BaseStravaService):
         ):
             power_data = self._fetch_power_stream(activity.get("id"))
 
+        # Strava stream timestamps use elapsed time, not moving time.
+        if power_data:
+            duration_minutes = float(activity.get("elapsed_time") or activity.get("moving_time")) / 60.0
         declared = self._determine_intensity_type(activity)
         threshold = self._threshold_power(athlete_id, sport.value)
         load = compute_endurance_load(
@@ -211,7 +215,7 @@ class StravaService(BaseStravaService):
             declared_intensity=declared,
             power_data=power_data,
             average_power_w=activity.get("average_watts"),
-            normalized_power_w=activity.get("weighted_average_watts") or activity.get("average_watts"),
+            normalized_power_w=None,  # Provider weighted watts is not asserted to be NP
             threshold_power_w=threshold,
         )
         session = models.EnduranceSession(
@@ -227,6 +231,9 @@ class StravaService(BaseStravaService):
                 "source": "strava",
                 "external_id": str(activity.get("id")),
                 "signal_source": load.signal_source,
+                "load_method": load.load_method,
+                "sampling_assumption": load.sampling_assumption,
+                "provider_weighted_average_watts": activity.get("weighted_average_watts"),
                 "power_data": power_data,
                 "power_stream_points": len(power_data or []),
                 "average_power_w": load.average_power_w,
@@ -262,3 +269,4 @@ class StravaService(BaseStravaService):
 
 
 __all__ = ["StravaService", "StravaError", "StravaAuthError", "StravaRateLimitError"]
+
