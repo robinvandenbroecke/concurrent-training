@@ -21,15 +21,29 @@ parameter values, injury prevention or Android usability.
   `f764fbb6d1de7341b89fcf86a8cdb50db5553fad`: 762 passed, 7 failed, 8 skipped.
   The failures exposed old expectations for missing readiness, priority frequency,
   explanatory strings and one arithmetic-equality difference. They were reviewed
-  and corrected; the final rerun status is recorded below when available.
+  and corrected; the successful final rerun is recorded below.
 - PostgreSQL migration CI passed on that run, including upgrade and the
   revision 006 → 005 → 006 round trip. This is a schema-cycle check, not proof of
   safe downgrade for every existing production dataset.
 
 ## Final CI status
 
-Pending rerun after the audit documentation, regression expectations and runtime
-integration checks are uploaded. See [PR #3](https://github.com/robinvandenbroecke/concurrent-training/pull/3).
+The complete application/test changes were verified at commit
+[`0fe673d86fa1f994a8878d34d128c687d6cd0ba8`](https://github.com/robinvandenbroecke/concurrent-training/commit/0fe673d86fa1f994a8878d34d128c687d6cd0ba8).
+Both jobs succeeded in [GitHub Actions run 34020247430](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/34020247430):
+
+| Check | Result |
+|---|---|
+| Python 3.11 full pytest suite | **776 passed, 8 skipped**, one dependency deprecation warning |
+| Validation diagnostic smoke run | Passed; output explicitly reports `scientific_validation: false` and `no_lookahead: false` |
+| PostgreSQL 16 migration job | Passed, all upgrades and revision 006 → 005 → 006 |
+| Independent fixture reproduction | Exact report equality, including input hashes and all forecasts |
+| New audit coverage | 28 numerical/research invariants plus 7 runtime/data-contract regression tests |
+
+The eight skipped tests did not execute and are not counted as verified. The warning
+concerns Starlette's deprecated AnyIO alias; no dependency upgrade is claimed.
+The final verification-record update is documentation-only. The test and migration
+logs are available in the linked workflow and its diagnostic artifacts.
 
 ## Remaining verification and release conditions
 
