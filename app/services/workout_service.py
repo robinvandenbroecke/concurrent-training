@@ -40,7 +40,7 @@ class CombinedWorkoutIngestor:
 
         for exercise in workout.exercises:
             payload = [self.service._set_to_dict(item) for item in exercise.sets]
-            if not payload:
+            if not payload or any(not item["reps"] for item in payload):
                 raise ValueError(f"{exercise.lift.value} has no performed sets")
             payloads.append(payload)
             profile_db = self.db.query(db_models.LiftProfile).filter(
@@ -71,6 +71,7 @@ class CombinedWorkoutIngestor:
                     lift=exercise.lift.value,
                     load_kg=item["load_kg"],
                     velocities=item["velocities"],
+                    performed_reps=item["reps"],
                     rest_before_sec=item.get("rest_sec") if combined_sets else None,
                     set_end_rpe=item.get("set_end_rpe"),
                 ))
@@ -168,6 +169,7 @@ class CombinedWorkoutIngestor:
                         "A_sys": rep.A_sys,
                         "A_M": rep.A_M,
                         "v_pred_next": rep.v_pred_next,
+                        "observation_available": rep.observation_available,
                         "y": getattr(rep, "y", None),
                         "y_phi": getattr(rep, "y_phi", None),
                     }
@@ -194,14 +196,14 @@ class CombinedWorkoutIngestor:
                 workout.start_time.date(),
                 payload,
                 exercise_output,
-                any(item["velocities"] for item in payload),
+                any(any(v is not None for v in item["velocities"]) for item in payload),
             )
             sessions.append(session)
 
             for item in payload:
                 velocities = item["velocities"]
                 velocity_loss = None
-                if len(velocities) >= 2 and velocities[0] > 0:
+                if len(velocities) >= 2 and velocities[0] and velocities[-1]:
                     velocity_loss = max(
                         0.0, min(1.0, 1.0 - velocities[-1] / velocities[0])
                     )
@@ -220,3 +222,4 @@ class CombinedWorkoutIngestor:
         for session in sessions:
             self.db.refresh(session)
         return sessions
+

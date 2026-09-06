@@ -124,7 +124,13 @@ def apply_day_transition(
             lift_state.D_l - default_lift.get(lift, 0.0) + timed_lift.get(lift, 0.0),
         )
 
-        prior = current.get_lift(lift)
+        prior = current.per_lift.get(lift)
+        if prior is None:
+            from app.domain.day_engine import PerLiftState
+            prior = PerLiftState()
+        if impulses.strength.u_sys == 0 and impulses.endurance.u_E_total == 0 and not any(impulses.strength.per_lift.values()):
+            lift_state.C_l = max(normalized.C_min, prior.C_l - normalized.lambda_l)
+            continue
         ceiling = _capacity_ceiling(lift, prior.C_l, normalized, capacity_ceilings)
         ratio = max(0.0, min(1.0, prior.C_l / ceiling))
         saturation = (1.0 - ratio) ** normalized.capacity_saturation_alpha
@@ -137,3 +143,4 @@ def apply_day_transition(
         lift_state.C_l = max(normalized.C_min, min(ceiling, capacity))
 
     return updated
+

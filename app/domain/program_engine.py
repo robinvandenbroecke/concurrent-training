@@ -233,16 +233,16 @@ class ProgramState:
             self.key_endurance_sessions = 2
         elif priority == Priority.STRENGTH:
             # Strength priority concurrent
-            self.weekly_strength_sessions_target = max(3, self.config.days_per_week_strength)
-            self.weekly_endurance_sessions_target = min(3, self.config.days_per_week_endurance)
+            self.weekly_strength_sessions_target = self.config.days_per_week_strength
+            self.weekly_endurance_sessions_target = self.config.days_per_week_endurance
             self.weekly_hiit_cap = 1
             self.weekly_heavy_legs_cap = 3
             self.key_strength_sessions = 2
             self.key_endurance_sessions = 1
         elif priority == Priority.ENDURANCE:
             # Endurance priority concurrent
-            self.weekly_strength_sessions_target = min(2, self.config.days_per_week_strength)
-            self.weekly_endurance_sessions_target = max(4, self.config.days_per_week_endurance)
+            self.weekly_strength_sessions_target = self.config.days_per_week_strength
+            self.weekly_endurance_sessions_target = self.config.days_per_week_endurance
             self.weekly_hiit_cap = 2
             self.weekly_heavy_legs_cap = 2  # Limit heavy lower
             self.key_strength_sessions = 1
@@ -411,13 +411,13 @@ def create_microcycle_template(
         strength_key_count = 0
         endurance_key_count = 2
     elif priority == Priority.STRENGTH:
-        strength_target = max(3, config.days_per_week_strength)
-        endurance_target = min(3, config.days_per_week_endurance)
+        strength_target = config.days_per_week_strength
+        endurance_target = config.days_per_week_endurance
         strength_key_count = 2
         endurance_key_count = 1
     elif priority == Priority.ENDURANCE:
-        strength_target = min(2, config.days_per_week_strength)
-        endurance_target = max(4, config.days_per_week_endurance)
+        strength_target = config.days_per_week_strength
+        endurance_target = config.days_per_week_endurance
         strength_key_count = 1
         endurance_key_count = 2
     else:  # BALANCED
@@ -1118,3 +1118,4 @@ def advance_microcycle_with_performance(
     )
 
     return state, microcycle
+

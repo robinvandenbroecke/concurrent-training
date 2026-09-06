@@ -1,8 +1,12 @@
 """Pydantic schemas for the API."""
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Annotated, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field, model_validator
+
+
+class BaseModel(PydanticBaseModel):
+    model_config = ConfigDict(allow_inf_nan=False, protected_namespaces=("model_validate", "model_dump"))
 
 # Re-export canonical enums for backwards-compatible imports.
 from app.types import EnduranceIntensity, EnduranceSport, LiftType
@@ -84,8 +88,8 @@ class StrengthSessionResponse(BaseModel):
 
 
 class PowerPoint(BaseModel):
-    power: float = Field(..., gt=0, le=3000)
-    timestamp: Optional[float] = None
+    power: float = Field(..., ge=0, le=3000)
+    timestamp: Optional[float] = Field(None, ge=0)
 
 
 class EnduranceSessionCreate(BaseModel):
@@ -96,7 +100,7 @@ class EnduranceSessionCreate(BaseModel):
     duration_minutes: float = Field(..., gt=0, le=1440)
     intensity_type: str = Field("z2", pattern="^(z2|hiit|mixed)$")
     power_data: Optional[List[PowerPoint]] = None
-    average_power_w: Optional[float] = Field(None, gt=0, le=3000)
+    average_power_w: Optional[float] = Field(None, ge=0, le=3000)
     normalized_power_w: Optional[float] = Field(None, gt=0, le=3000)
     threshold_power_w: Optional[float] = Field(None, gt=0, le=3000)
     average_heartrate: Optional[float] = Field(None, gt=20, le=260)
@@ -131,7 +135,7 @@ class AutoregulateRequest(BaseModel):
     vl_max: float = Field(20.0, ge=0, le=100)
     planned_reps: int = Field(5, ge=1, le=100)
     current_reps_done: int = Field(0, ge=0, le=100)
-    recent_v_obs: Optional[List[float]] = None
+    recent_v_obs: Optional[List[Annotated[float, Field(gt=0, le=3, allow_inf_nan=False)]]] = None
     recent_rest_before: Optional[List[float]] = None
 
     @model_validator(mode="after")
@@ -146,7 +150,7 @@ class AutoregulateResponse(BaseModel):
     load_change: float
     rest_suggestion: Optional[str]
     exercise_switch: Optional[str]
-    predicted_velocity: float
+    predicted_velocity: Optional[float]
     current_vl: float
     messages: List[str]
 
@@ -154,10 +158,12 @@ class AutoregulateResponse(BaseModel):
 class ReadinessResponse(BaseModel):
     athlete_id: int
     date: str
-    overall: float
-    per_lift: Dict[str, float]
-    endurance: float
+    overall: Optional[float]
+    per_lift: Dict[str, Optional[float]]
+    endurance: Optional[float]
     explanations: List[str]
+    assessment_status: str = "experimental_estimate"
+    model_version: str = "audit-2026-09-v1"
 
 
 class LiftTrendPoint(BaseModel):
@@ -190,3 +196,4 @@ class EnduranceTrendResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+

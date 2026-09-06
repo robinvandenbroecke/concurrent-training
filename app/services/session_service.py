@@ -47,7 +47,7 @@ class SessionService:
 
     @staticmethod
     def _set_to_dict(set_data: schemas.SetData) -> Dict:
-        velocities = [float(rep.velocity) for rep in set_data.reps if rep.velocity is not None]
+        velocities = [float(rep.velocity) if rep.velocity is not None else None for rep in set_data.reps]
         rest_sec = set_data.rest_before_sec
         if rest_sec is None and set_data.reps:
             rest_sec = set_data.reps[0].rest_before
@@ -67,7 +67,7 @@ class SessionService:
         sets_data: List[schemas.SetData],
         end_time: Optional[datetime] = None,
     ) -> db_models.StrengthSession:
-        if not sets_data:
+        if not sets_data or any(not item.reps for item in sets_data):
             raise ValueError("A strength session must contain at least one performed set")
         payload = [self._set_to_dict(item) for item in sets_data]
         rpes = [item["set_end_rpe"] for item in payload if item.get("set_end_rpe") is not None]
@@ -101,6 +101,7 @@ class SessionService:
                 lift=lift.value,
                 load_kg=item["load_kg"],
                 velocities=item["velocities"],
+                performed_reps=item["reps"],
                 rest_before_sec=item.get("rest_sec") if index > 0 else None,
                 set_end_rpe=item.get("set_end_rpe"),
             )
@@ -148,6 +149,7 @@ class SessionService:
                     "A_sys": rep.A_sys,
                     "A_M": rep.A_M,
                     "v_pred_next": rep.v_pred_next,
+                    "observation_available": rep.observation_available,
                     "y": getattr(rep, "y", None),
                     "y_phi": getattr(rep, "y_phi", None),
                 }
@@ -171,7 +173,7 @@ class SessionService:
             start_time.date(),
             payload,
             rep_output,
-            any(item["velocities"] for item in payload),
+            any(any(v is not None for v in item["velocities"]) for item in payload),
         )
         self._rebuild_day(athlete_id, start_time.date())
         self.db.commit()
@@ -180,7 +182,7 @@ class SessionService:
         for item in payload:
             velocities = item["velocities"]
             velocity_loss = None
-            if len(velocities) >= 2 and velocities[0] > 0:
+            if len(velocities) >= 2 and velocities[0] and velocities[-1]:
                 velocity_loss = max(0.0, min(1.0, 1.0 - velocities[-1] / velocities[0]))
             capacity_service.process_quality_set(
                 athlete_id=athlete_id,
@@ -226,6 +228,12 @@ class SessionService:
         source: str = "api",
         external_id: Optional[str] = None,
     ) -> db_models.EnduranceSession:
+        if threshold_power_w is None:
+            row = self.db.query(db_models.SystemParameters).filter(
+                db_models.SystemParameters.athlete_id == athlete_id
+            ).first()
+            params = row.params if row and isinstance(row.params, dict) else {}
+            threshold_power_w = params.get("endurance", {}).get(sport.value, {}).get("threshold_power_w")
         load = compute_endurance_load(
             sport=sport.value,
             duration_minutes=duration_minutes,
@@ -252,6 +260,8 @@ class SessionService:
             "source": source,
             "external_id": external_id,
             "signal_source": load.signal_source,
+            "load_method": load.load_method,
+            "sampling_assumption": load.sampling_assumption,
             "power_data": power_data,
             "average_power_w": load.average_power_w,
             "normalized_power_w": load.normalized_power_w,
@@ -390,3 +400,4 @@ class SessionService:
         self.orchestrator._persist_day_state(athlete_id, target_date, updated)
         self.db.flush()
         return updated
+

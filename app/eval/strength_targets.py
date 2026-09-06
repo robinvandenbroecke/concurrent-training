@@ -53,7 +53,7 @@ def _is_quality_set(
     if reps > 6:
         return False, ["reps > 6"]
     
-    if len(velocities) < 1:
+    if len(velocities) < 1 or velocities[0] is None:
         return False, ["no velocity data"]
     
     # Check load constraint (>= 50% of capacity if available)
@@ -239,7 +239,7 @@ def target_fixed_load_first_rep_velocity(
         
         # Must have velocity data
         velocities = set_data.get("velocities", [])
-        if not velocities:
+        if not velocities or velocities[0] is None:
             continue
         
         if deviation < best_deviation:
@@ -439,3 +439,4 @@ def get_day_level_strength_target(
         )
     else:
         raise ValueError(f"Unknown target_mode: {target_mode}")
+

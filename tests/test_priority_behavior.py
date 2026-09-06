@@ -351,7 +351,9 @@ class TestPriorityStateTargets:
         assert state.key_strength_sessions == 1
         assert state.key_endurance_sessions == 2
         assert state.weekly_hiit_cap == 2
-        assert state.weekly_endurance_sessions_target > state.weekly_strength_sessions_target
+        assert state.weekly_endurance_sessions_target == config.days_per_week_endurance
+        assert state.weekly_strength_sessions_target == config.days_per_week_strength
+        assert state.key_endurance_sessions > state.key_strength_sessions
     
     def test_balanced_priority_state_targets(self):
         """Balanced priority state has equal key targets."""
@@ -414,3 +416,4 @@ class TestDeterminism:
         )
         
         assert diff_found, "Different priorities should produce measurably different plans"
+

@@ -82,8 +82,8 @@
   </div>
 </div>
 <script>
-const q=id=>document.getElementById(id); q('apiKey').value=localStorage.getItem('ct_api_key')||'';
-function saveKey(){localStorage.setItem('ct_api_key',q('apiKey').value);show({saved:true})}
+const q=id=>document.getElementById(id); localStorage.removeItem('ct_api_key');
+function saveKey(){show('Key retained only in this page until it is closed.')}
 function headers(json=true){const h={};if(json)h['Content-Type']='application/json';const key=q('apiKey').value;if(key)h['X-API-Key']=key;return h}
 async function api(path,options={}){options.headers={...headers(options.body!==undefined),...(options.headers||{})};const response=await fetch(path,options);let data;try{data=await response.json()}catch{data=await response.text()}if(!response.ok)throw new Error(typeof data==='string'?data:(data.detail||JSON.stringify(data)));return data}
 function show(value){q('output').textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
@@ -91,7 +91,7 @@ function athleteId(){const value=Number(q('athlete').value);if(!value)throw new 
 async function run(fn){try{show(await fn())}catch(e){show('Error: '+e.message)}}
 async function loadAthletes(){return run(async()=>{const rows=await api('/athletes');q('athlete').replaceChildren(...rows.map(row=>{const option=document.createElement('option');option.value=row.id;option.textContent=`${row.name} (#${row.id})`;return option}));return rows})}
 async function createAthlete(){return run(async()=>{const row=await api('/athletes',{method:'POST',body:JSON.stringify({name:q('newName').value})});await loadAthletes();q('athlete').value=row.id;return row})}
-async function loadReadiness(){return run(async()=>{const data=await api(`/readiness/today?athlete_id=${athleteId()}`);q('overall').textContent=data.overall.toFixed(1)+'%';q('overall').className='score '+(data.overall>=80?'ok':data.overall>=60?'warn':'error');q('readinessNote').textContent=data.explanations.join(' · ');return data})}
+async function loadReadiness(){return run(async()=>{const data=await api(`/readiness/today?athlete_id=${athleteId()}`);q('overall').textContent=data.overall==null?'—':data.overall.toFixed(1)+' / 100';q('overall').className='score '+(data.overall>=80?'ok':data.overall>=60?'warn':'error');q('readinessNote').textContent=data.explanations.join(' · ');return data})}
 async function initializeCapacity(){return run(()=>api('/strength/capacity/init',{method:'POST',body:JSON.stringify({athlete_id:athleteId(),lift:q('capacityLift').value,input_type:q('capacityType').value,input_load_kg:Number(q('capacityLoad').value),input_reps:Number(q('capacityReps').value),input_rpe:Number(q('capacityRpe').value)})}))}
 async function saveEnduranceProfile(){return run(()=>api(`/endurance/profile/${athleteId()}/${q('profileSport').value}`,{method:'PUT',body:JSON.stringify({threshold_power_w:Number(q('thresholdPower').value)})}))}
 async function submitWorkout(){return run(()=>{const body=JSON.parse(q('workoutJson').value);body.athlete_id=athleteId();body.start_time=new Date().toISOString();return api('/sessions/strength-workout',{method:'POST',body:JSON.stringify(body)})})}
@@ -102,3 +102,4 @@ loadAthletes();
 </script>
 </body>
 </html>
+
