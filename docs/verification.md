@@ -44,7 +44,11 @@ The eight skipped tests did not execute and are not counted as verified. The war
 concerns Starlette's deprecated AnyIO alias; no dependency upgrade is claimed.
 Application code is unchanged since the cited validated commit. Follow-up changes
 record verification and enforce LF line endings for research fixtures, with a CI
-check that regenerates and compares the report including its input hashes. The
+check that regenerates and compares the report including its input hashes. Hashes,
+metadata and event identities must match exactly. Numeric values use absolute and
+relative tolerance `1e-12` to accommodate machine-level floating-point differences
+between Python versions; the first cross-runtime check detected differences around
+`1e-17` in aggregated metrics, not materially different forecasts. The
 upload check caught and corrected a CSV CRLF/LF hash discrepancy; all predictions
 and metrics were identical. The test and migration logs are available in the linked
 workflow and its diagnostic artifacts.

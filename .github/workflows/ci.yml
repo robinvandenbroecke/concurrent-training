@@ -43,11 +43,25 @@ jobs:
           python -m research.evaluate --manifest research/example_manifest.json --events research/example_events.csv --output /tmp/reference-demo-check.json
           python - <<'PY'
           import json
+          import math
           from pathlib import Path
           expected = json.loads(Path("artifacts/audit_2026_09/reference_demo.json").read_text())
           actual = json.loads(Path("/tmp/reference-demo-check.json").read_text())
-          assert actual == expected, "Research fixture, forecasts or input hashes differ"
-          print("Research fixture reproduced exactly")
+          def compare(expected, actual, path="report"):
+              if isinstance(expected, float):
+                  assert isinstance(actual, (int, float)) and math.isclose(expected, actual, rel_tol=1e-12, abs_tol=1e-12), path
+              elif isinstance(expected, dict):
+                  assert isinstance(actual, dict) and expected.keys() == actual.keys(), path
+                  for key in expected:
+                      compare(expected[key], actual[key], f"{path}.{key}")
+              elif isinstance(expected, list):
+                  assert isinstance(actual, list) and len(expected) == len(actual), path
+                  for index, (left, right) in enumerate(zip(expected, actual)):
+                      compare(left, right, f"{path}[{index}]")
+              else:
+                  assert expected == actual, path
+          compare(expected, actual)
+          print("Research fixture reproduced: exact hashes/metadata, numeric tolerance 1e-12")
           PY
 
   migration-postgres:
