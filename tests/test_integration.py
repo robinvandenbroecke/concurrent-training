@@ -121,7 +121,9 @@ class TestReadinessFlow:
         data = response.json()
         assert data["athlete_id"] == athlete_id
         assert data["overall"] is None  # Missing history is not 100% readiness
-        assert data["endurance"] == 100.0
+        assert data["endurance"] is None
+        assert data["assessment_status"] == "insufficient_data"
+        assert all(value is None for value in data["per_lift"].values())
         assert "per_lift" in data
         assert "explanations" in data
         assert len(data["explanations"]) > 0
