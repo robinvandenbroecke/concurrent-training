@@ -1,0 +1,19 @@
+{
+  "name": "Concurrent Training",
+  "short_name": "CT",
+  "description": "Voorlopige kracht- en duurplanner met lokale trainingsregistratie",
+  "start_url": "/concurrent-training/",
+  "scope": "/concurrent-training/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/concurrent-training/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

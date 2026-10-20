@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'agent/**'
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+      DATABASE_URL: sqlite:///./ci_test.db
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile application
+        run: python -m compileall -q app run_validation.py
+      - name: Run tests
+        id: pytest
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -q --tb=short 2>&1 | tee pytest.log
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-log
+          path: pytest.log
+      - name: Validation smoke test
+        run: python run_validation.py --source db --athlete-id 1 --days 30
+      - name: Reproduce frozen research fixture
+        run: |
+          python -m research.evaluate --manifest research/example_manifest.json --events research/example_events.csv --output /tmp/reference-demo-check.json
+          python - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          expected = json.loads(Path("artifacts/audit_2026_09/reference_demo.json").read_text())
+          actual = json.loads(Path("/tmp/reference-demo-check.json").read_text())
+          def compare(expected, actual, path="report"):
+              if isinstance(expected, float):
+                  assert isinstance(actual, (int, float)) and math.isclose(expected, actual, rel_tol=1e-12, abs_tol=1e-12), path
+              elif isinstance(expected, dict):
+                  assert isinstance(actual, dict) and expected.keys() == actual.keys(), path
+                  for key in expected:
+                      compare(expected[key], actual[key], f"{path}.{key}")
+              elif isinstance(expected, list):
+                  assert isinstance(actual, list) and len(expected) == len(actual), path
+                  for index, (left, right) in enumerate(zip(expected, actual)):
+                      compare(left, right, f"{path}[{index}]")
+              else:
+                  assert expected == actual, path
+          compare(expected, actual)
+          print("Research fixture reproduced: exact hashes/metadata, numeric tolerance 1e-12")
+          PY
+
+  migration-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: concurrent_training
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d concurrent_training"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PYTHONPATH: .
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/concurrent_training
+      APP_ENV: test
+      AUTO_CREATE_TABLES: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Upgrade all migrations
+        shell: bash
+        run: |
+          set -o pipefail
+          alembic upgrade head 2>&1 | tee migration.log
+      - name: Verify revision 006 schema
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee -a migration.log
+          import os
+          from sqlalchemy import create_engine, inspect
+
+          engine = create_engine(os.environ["DATABASE_URL"])
+          inspector = inspect(engine)
+          assert "owner_subject" in {c["name"] for c in inspector.get_columns("athletes")}
+          assert "slot" in {c["name"] for c in inspector.get_columns("workout_plans")}
+          goal_indexes = {i["name"] for i in inspector.get_indexes("goals")}
+          assert "uq_goals_one_active_per_athlete" in goal_indexes
+          workout_constraints = {
+              c["name"] for c in inspector.get_unique_constraints("workout_plans")
+          }
+          assert "uq_athlete_workout_date_slot" in workout_constraints
+          print("revision 006 schema verified")
+          PY
+      - name: Exercise lossless downgrade and re-upgrade
+        shell: bash
+        run: |
+          set -o pipefail
+          alembic downgrade 005 2>&1 | tee -a migration.log
+          alembic upgrade head 2>&1 | tee -a migration.log
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-log
+          path: migration.log

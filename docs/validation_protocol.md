@@ -1,3 +1,5 @@
+> Historical specification. The September 2026 [audit](audit_2026_09.md) and [model reference](model_reference.md) supersede conflicting scientific/validation claims. `run_validation.py` is retrospective diagnostics, not leakage-free scientific validation. Older thresholds and calibration artifacts are unvalidated.
+
 # Validation Protocol
 
 **Version**: Sprint H1  

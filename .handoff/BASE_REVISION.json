@@ -1,0 +1,8 @@
+{
+  "source_repository": "https://github.com/robinvandenbroecke/concurrent-training",
+  "source_branch": "agent/scientific-audit-2026-09",
+  "source_commit": "64655e28b49dfd86c93447c2859c531959ac4143",
+  "source_pr": "https://github.com/robinvandenbroecke/concurrent-training/pull/3",
+  "handoff_date": "2026-10-20",
+  "handoff_author": "Claude Sonnet 4.6"
+}

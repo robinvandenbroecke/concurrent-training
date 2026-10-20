@@ -1,11 +1,15 @@
-# Concurrent Training API
+# Concurrent Training
+
+> **October 2026 webapp:** a preliminary React webapp is available in [`webapp/`](webapp/). It records sessions locally in the browser; the research backend and Android synchronization are not connected. See [build, verification and hosting instructions](DEPLOYMENT.md). GitHub Pages currently requires an account upgrade for this private repository.
+
+> **September 2026 audit:** this is an experimental private backend, not a released Android app or validated physiological model. Start with the [full audit](docs/audit_2026_09.md), [research protocol](docs/research_protocol.md), [Android/web roadmap](docs/product_roadmap.md), and [verification record](docs/verification.md). This version includes the runtime, schema and scientific-audit work previously stacked in PRs #1–#3. Historical sprint claims and calibration artifacts below are not evidence of real-world model validity.
 
 API service for managing concurrent strength and endurance training with fatigue modeling and autoregulation.
 
 ## Features
 
 - **Fatigue Modeling**: Three-component model (local, system, metabolic) with rep-level tracking
-- **Concurrent Training**: Explicit modeling of interference (HIIT → strength) and synergy (Z2 → recovery)
+- **Concurrent Training**: Experimental coupling terms for endurance exposure and strength load; causal and physiological interpretation unvalidated
 - **Autoregulation**: Live suggestions for load, rest, and exercise selection based on fatigue state
 - **Readiness Scoring**: Per-lift and endurance readiness with explanations
 - **Trend Analysis**: JSON endpoints for dashboard integration
@@ -502,3 +506,4 @@ curl http://localhost:8000/integrations/strava?athlete_id=1
 ## License
 
 MIT
+

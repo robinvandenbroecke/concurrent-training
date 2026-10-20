@@ -1,0 +1,82 @@
+name: Webapp
+
+on:
+  push:
+    branches: [main, 'agent/**']
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/deploy-webapp.yml'
+  pull_request:
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/deploy-webapp.yml'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Publish to Pages (enable Pages in repository settings first)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webapp-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-webapp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test registration and local persistence
+        run: npm test
+      - name: Compile TypeScript and build React app
+        run: npm run build
+      - name: Save deployable frontend only
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-dist
+          path: webapp/dist
+          if-no-files-found: error
+
+  prepare-pages:
+    needs: build-webapp
+    if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: webapp-dist
+          path: dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: prepare-pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

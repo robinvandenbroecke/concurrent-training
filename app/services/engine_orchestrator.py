@@ -91,15 +91,16 @@ class EngineOrchestrator:
         """
         # Build canonical representation
         canonical_sets = []
-        for set_data in sorted(sets_data, key=lambda x: (x.get("load_kg", 0), x.get("reps", 0))):
+        for set_data in sets_data:
             velocities = set_data.get("velocities", [])
             # Round velocities to 3 decimals for stability
-            rounded_velocities = [round(v, 3) for v in velocities]
+            rounded_velocities = [round(v, 3) if v is not None else None for v in velocities]
 
             canonical_sets.append({
                 "lift": lift,
                 "load_kg": round(set_data.get("load_kg", 0), 2),
                 "reps": set_data.get("reps", 0),
+                "set_end_rpe": set_data.get("set_end_rpe"),
                 "velocities": rounded_velocities,
                 "rest_sec": round(set_data.get("rest_sec", 0), 1) if set_data.get("rest_sec") else None,
             })
@@ -919,7 +920,7 @@ class EngineOrchestrator:
             
             # Estimate velocity loss if we have velocities
             vl = 0.0
-            if len(velocities) >= 2:
+            if len(velocities) >= 2 and velocities[0] and velocities[-1]:
                 vl = (velocities[0] - velocities[-1]) / max(velocities[0], 0.001)
             
             e1rm_sets.append({
@@ -1014,3 +1015,4 @@ class EngineOrchestrator:
                     overall_signal="maintain"
                 )
                 self.db.add(snapshot)
+

@@ -1,0 +1,42 @@
+{
+  "data_source": "synthetic",
+  "description": "Independent sinusoidal/noise fixture; software demonstration only. Not human participant data.",
+  "test_start": {
+    "synthetic_a": "2026-03-01T00:00:00Z",
+    "synthetic_b": "2026-03-01T00:00:00Z"
+  },
+  "profiles": {
+    "synthetic_a": {
+      "squat": {
+        "a": 1.0,
+        "b": 0.005,
+        "min_load_kg": 20,
+        "max_load_kg": 100,
+        "calibrated_before": "2025-12-01T00:00:00Z"
+      },
+      "bench": {
+        "a": 1.0,
+        "b": 0.005,
+        "min_load_kg": 20,
+        "max_load_kg": 100,
+        "calibrated_before": "2025-12-01T00:00:00Z"
+      }
+    },
+    "synthetic_b": {
+      "squat": {
+        "a": 1.0,
+        "b": 0.005,
+        "min_load_kg": 20,
+        "max_load_kg": 100,
+        "calibrated_before": "2025-12-01T00:00:00Z"
+      },
+      "bench": {
+        "a": 1.0,
+        "b": 0.005,
+        "min_load_kg": 20,
+        "max_load_kg": 100,
+        "calibrated_before": "2025-12-01T00:00:00Z"
+      }
+    }
+  }
+}

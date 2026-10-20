@@ -46,3 +46,7 @@ htmlcov/
 # Logs
 *.log
 strength_data_*.csv
+
+# Webapp
+node_modules/
+*.tsbuildinfo
