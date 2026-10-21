@@ -72,6 +72,7 @@ export default function Vandaag({ profile, onStartTraining, isDemo }: Props) {
             className="collapse-toggle"
             onClick={() => setShowExpl(v => !v)}
             aria-expanded={showExpl}
+            aria-label="Toelichting belastbaarheid"
           >
             <IconInfo />
           </button>

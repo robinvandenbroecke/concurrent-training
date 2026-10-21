@@ -51,7 +51,9 @@ De Vite-base is `/concurrent-training/`. Navigatie zit in de appstate en gebruik
 - Een ontbrekende rep-snelheid blijft `null`; één gemiddelde wordt nooit gekopieerd naar alle reps. Gewicht, werkelijk aantal reps, RPE en opmerking blijven behouden.
 - Opslagfouten geven geen vals succesbericht. Een herhaalde opslagpoging gebruikt dezelfde sessie-ID.
 
-De bestaande Python-CI blijft afzonderlijk de backend, PostgreSQL-migraties en de bevroren onderzoeksfixture controleren. Een JSDOM-test bewijst geen visuele kwaliteit of koppeling met een echte server. De gehoste browsercontrole blijft open tot hosting beschikbaar is.
+De bestaande Python-CI blijft afzonderlijk de backend, PostgreSQL-migraties en de bevroren onderzoeksfixture controleren. Een JSDOM-test bewijst geen visuele kwaliteit of koppeling met een echte server.
+
+Op 21 oktober 2026 is de live Pages-app gecontroleerd in Chrome: onboarding met twee trainingsdagen en VBT, setregistratie (42,5 kg × 3, RPE 8), tabwissel, herladen, afronden, historie en JSON-export. De export behield de drie snelheidsposities `[0.5, null, 0.42]` en de opmerking. Bij de visuele controle bleken SVG-pictogrammen zonder afmetingen knoppen sterk uit te rekken; de pictogrammen hebben nu expliciete standaardafmetingen. De uitgevoerde controle is geen volledige test op Android/iOS en valideert geen fysiologische voorspellingen.
 
 ## Nog te bouwen
 
