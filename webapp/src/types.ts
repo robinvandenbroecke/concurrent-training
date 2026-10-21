@@ -26,9 +26,13 @@ export interface PlannedSet {
   targetReps: number;
   restSec: number;
   note?: string;
+  targetRpe?: number;
+  kind?: 'work' | 'warmup';
 }
 
 export interface PlannedExercise {
+  id?: string;
+  exerciseId?: string;
   lift: LiftType;
   displayName: string;
   sets: PlannedSet[];
@@ -65,6 +69,8 @@ export interface WorkoutSession {
 }
 
 export interface CompletedExercise {
+  id?: string;
+  exerciseId?: string;
   lift: LiftType;
   displayName: string;
   sets: CompletedSet[];
@@ -78,6 +84,7 @@ export interface CompletedSet {
   velocities: (number | null)[];
   rpe?: number;
   note?: string;
+  kind?: 'work' | 'warmup';
 }
 
 export interface CompletedEndurance {
@@ -119,6 +126,7 @@ export interface AthleteProfile {
   availableDays: number[];  // 0=zo, 1=ma, ... 6=za
   sessionDurationMinutes: number;
   hasVbt: boolean;
+  olympicExperience?: boolean;
   hasStravaSync: boolean;
   capacities: Partial<Record<LiftType, number>>;
   enduranceThreshold?: number;

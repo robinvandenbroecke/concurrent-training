@@ -56,7 +56,7 @@ test('onboarding → plan → workout → navigation → reload → save → rea
     await click(button(/^Overslaan$/));
     await click(button(/^Week$/)); await click(button(/^Training$/));
     assert.match(activeTraining().textContent!, /42.5 kg/);
-    assert.equal(readDraft()?.completed[0][0].completedReps, 3);
+    assert.equal(Object.values(readDraft()!.completed)[0][0].completedReps, 3);
     await act(async () => root.unmount());
     root = createRoot(host); await act(async () => root.render(<App />)); await flush();
     await click(button(/^Training$/));

@@ -120,8 +120,8 @@ export default function Historie({ isDemo }: Props) {
                   <div className="text-small text-muted">{s.durationMinutes} min</div>
                 )}
 
-                {s.exercises?.map(ex => (
-                  <div key={ex.lift} style={{ marginTop: 6 }}>
+                {s.exercises?.map((ex,exIndex) => (
+                  <div key={ex.id??`${ex.lift}-${exIndex}`} style={{ marginTop: 6 }}>
                     <div className="text-small" style={{ fontWeight: 600 }}>{ex.displayName}</div>
                     {ex.sets.map(set => (
                       <div key={set.setNum} className="text-xs text-muted" style={{ marginLeft: 8 }}>

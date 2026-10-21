@@ -59,6 +59,7 @@ test('invalid imported measurements do not overwrite saved data', () => {
 });
 test('workout draft round trips across a reload', () => {
   const s = storage(); const draft = { plan: buildWeek(profile, new Date(2026, 9, 20, 12))[1].planned!, phase: 'active', startTime: '2026-10-20T12:00:00Z', completed: { 0: session.exercises[0].sets }, exerciseIndex: 0 };
+  draft.completed={ [draft.plan.exercises![0].id!]: session.exercises[0].sets };
   writeJson(KEYS.draft, draft, s); assert.deepEqual(readDraft(s), draft);
 });
 test('trends are measured work weights, with no invented history', () => {

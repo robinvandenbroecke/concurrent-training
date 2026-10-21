@@ -19,6 +19,7 @@ export default function Onboarding({ onComplete }: Props) {
   const [days, setDays] = useState<number[]>([1, 3, 5]);
   const [duration, setDuration] = useState(60);
   const [hasVbt, setHasVbt] = useState(false);
+  const [olympicExperience,setOlympicExperience]=useState(false);
   const [capacities, setCapacities] = useState<Partial<Record<LiftType, number>>>({});
   const [saveError, setSaveError] = useState('');
 
@@ -51,6 +52,7 @@ export default function Onboarding({ onComplete }: Props) {
       availableDays: days,
       sessionDurationMinutes: duration,
       hasVbt,
+      olympicExperience,
       hasStravaSync: false,
       capacities,
       onboardingComplete: true,
@@ -242,6 +244,8 @@ export default function Onboarding({ onComplete }: Props) {
               </p>
             </div>
 
+            <label className="warmup-toggle" style={{marginTop:16}}><input type="checkbox" checked={olympicExperience} onChange={e=>setOlympicExperience(e.target.checked)}/> Ik beheers de opvangtechniek van de power clean</label>
+            <p className="text-xs text-muted">Zonder deze techniekervaring kiest het startschema een pull zonder opvang. Ook daarvoor is technische instructie nodig.</p>
             <div className="card" style={{ marginTop: 12, borderColor: 'rgba(232,184,109,0.3)', background: 'rgba(232,184,109,0.05)' }}>
               <p className="text-small">
                 <span className="text-accent" style={{ fontWeight: 700 }}>Lokaal prototype.</span>{' '}

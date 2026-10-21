@@ -6,10 +6,11 @@ import { IconClock } from '../components/Icons';
 
 interface Props {
   onStartTraining: (plan: PlannedTraining) => void;
+  onEditTraining: (plan: PlannedTraining) => void;
   onChanged: () => void;
 }
 
-export default function Week({ onStartTraining, onChanged }: Props) {
+export default function Week({ onStartTraining, onEditTraining, onChanged }: Props) {
   const [days, setDays] = useState<WeekDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,7 +125,7 @@ export default function Week({ onStartTraining, onChanged }: Props) {
               {selected.planned.exercises && (
                 <div style={{ marginBottom: 12 }}>
                   {selected.planned.exercises.map(ex => (
-                    <div key={ex.lift} className="text-small text-muted" style={{ marginBottom: 3 }}>
+                    <div key={ex.id??ex.lift} className="text-small text-muted" style={{ marginBottom: 3 }}>
                       • {ex.displayName}: {ex.sets.length} sets
                     </div>
                   ))}
@@ -147,6 +148,7 @@ export default function Week({ onStartTraining, onChanged }: Props) {
                   ▶ Start training
                 </button>
               )}
+              {!selected.isPast&&selected.planned.type==='kracht'&&<button className="btn btn-secondary btn-full" style={{marginTop:8}} onClick={()=>onEditTraining(selected.planned!)}>Training aanpassen</button>}
               {!selected.isToday && !selected.isPast && (
                 <button className="btn btn-ghost btn-full btn-sm" onClick={async () => { await api.skipDay(selected.date); onChanged(); }}>
                   Overslaan

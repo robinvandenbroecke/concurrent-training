@@ -4,9 +4,9 @@
 
 `webapp/src/` is de enige frontendbron. De productiebuild gebruikt React, TypeScript en Vite met een vastgelegde `package-lock.json`. De losse HTML-implementatie uit Claudes ZIP is niet opgenomen: anders konden ontwikkeling en publicatie verschillende apps opleveren.
 
-Dit is een lokaal prototype met onboarding, een voorlopige weekindeling, registratie van kracht- en duursessies, rusttimer, historie, gemeten werkgewichten en JSON-export/import. Gegevens staan in deze browser op dit toestel. Er is geen account, serveropslag, synchronisatie met Android/Strava of gekoppeld onderzoeksmodel. Browsergegevens wissen verwijdert ook de lokale gegevens; maak exports via Historie. Een import voegt sessies toe en wijzigt het profiel niet.
+Dit is een lokaal prototype met onboarding, een aanpasbaar A/B-krachtprogramma met 42 catalogusoefeningen en volumefeedback, registratie van kracht- en duursessies, rusttimer, historie, gemeten werkgewichten en JSON-export/import. Gegevens staan in deze browser op dit toestel. Er is geen account, serveropslag, synchronisatie met Android/Strava of gekoppeld onderzoeksmodel. Browsergegevens wissen verwijdert ook de lokale gegevens; maak exports via Historie. Een import voegt sessies toe en wijzigt het profiel niet.
 
-De weekindeling is een eenvoudige template binnen de opgegeven dagen en sessieduur. Werkgewichten komen uit de invoer van de gebruiker. Belastbaarheid blijft onbekend zolang het onderzoeksmodel niet is gekoppeld. De app toont geen fictieve trainingshistorie, berekende 1RM of wetenschappelijk gevalideerde personalisatie.
+De weekindeling gebruikt een transparant startschema binnen de opgegeven dagen en sessieduur. Trainingen kunnen vooraf via Vandaag/Week en tijdens de training worden aangepast. Zie [de literatuur, programmering en telregels](docs/strength_program_2026_10.md). Werkgewichten komen uit de invoer van de gebruiker. Belastbaarheid blijft onbekend zolang het onderzoeksmodel niet is gekoppeld. De app toont geen fictieve trainingshistorie, berekende 1RM of wetenschappelijk gevalideerde personalisatie.
 
 ## Lokaal uitvoeren
 
@@ -44,7 +44,7 @@ De Vite-base is `/concurrent-training/`. Navigatie zit in de appstate en gebruik
 
 ## Verificatie van de frontend
 
-- 16 tests: opslag en fouten, export/import, weekbeperkingen, ontbrekende en gedeeltelijke snelheidsmetingen, plus een React/JSDOM-keten van onboarding naar training, navigatie, herladen, opslaan en historie.
+- 34 tests: opslag en fouten, export/import, weekbeperkingen, ontbrekende en gedeeltelijke snelheidsmetingen, plus React/JSDOM-ketens voor onboarding en het vooraf/tijdens aanpassen, toevoegen en herschikken met behoud van bevestigde metingen na herladen.
 - `npm run build`: TypeScript en Vite-productiebuild geslaagd.
 - `npm audit`: nul gemelde kwetsbaarheden op 20 oktober 2026, inclusief ontwikkelafhankelijkheden. Dit is een momentopname, geen veiligheidsgarantie.
 - Bevestigde krachtsets blijven behouden na tabwissel en herladen. Nog niet bevestigde invoervelden en een niet opgeslagen duurformulier worden niet als draft bewaard.

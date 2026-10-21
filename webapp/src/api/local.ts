@@ -1,6 +1,8 @@
 import type { AthleteProfile, CompletedExercise, LiftType, PlannedTraining, WeekDay, WorkoutSession } from '../types';
+import { normalizePlan, definition } from '../data/exercises';
+import { strengthProgram, strengthSlots } from '../domain/program';
 
-export const KEYS = { profile: 'ct_profile', sessions: 'ct_local_sessions_v1', draft: 'ct_workout_draft_v1', overrides: 'ct_week_overrides_v1' };
+export const KEYS = { profile: 'ct_profile', sessions: 'ct_local_sessions_v1', draft: 'ct_workout_draft_v1', overrides: 'ct_week_overrides_v1', volumeTargets: 'ct_volume_targets_v1' };
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export function readJson<T>(key: string, fallback: T, storage: StorageLike = localStorage): T {
@@ -48,25 +50,16 @@ export function parseVelocities(text: string, count: number): (number | null)[] 
   });
 }
 
-const NAMES: Partial<Record<LiftType, string>> = { squat: 'Kniebuiging', bench: 'Bankdrukken', deadlift: 'Deadlift', press: 'Schouderdrukken', power_clean: 'Power clean' };
-
-export function planForDay(profile: AthleteProfile, date: string, index: number): PlannedTraining {
+export function planForDay(profile: AthleteProfile, date: string, index: number, sessions:WorkoutSession[]=[]): PlannedTraining {
   const slots = [...new Set(profile.availableDays)].length;
-  const strengthCount = profile.priority === 'kracht' ? (slots <= 2 ? slots : Math.ceil(slots * 2 / 3))
-    : profile.priority === 'duur' ? Math.floor(slots / 3) : Math.ceil(slots / 2);
+  const strengthCount = strengthSlots(profile);
   // Distribute emphasis across the chosen slots, without adding days or claiming model optimization.
   const strength = Math.floor((index + 1) * strengthCount / slots) > Math.floor(index * strengthCount / slots);
   const durationMinutes = profile.sessionDurationMinutes;
   if (!strength) return { date, type: 'duur', title: 'Rustige duurtraining', durationMinutes,
     reason: 'Voorlopige weekindeling binnen jouw gekozen dagen en tijd. Kies zelf een passende inspanning.',
     endurance: { sport: 'cycling', durationMinutes, intensityType: 'easy', description: 'Handmatig plan; geen berekende vermogensdoelstelling.' } };
-  const lifts = Object.keys(NAMES).filter(l => Number.isFinite(profile.capacities[l as LiftType]) && Number(profile.capacities[l as LiftType]) > 0) as LiftType[];
-  const count = durationMinutes < 45 ? 2 : 3;
-  const rotated = [...lifts.slice(index % Math.max(1, lifts.length)), ...lifts.slice(0, index % Math.max(1, lifts.length))];
-  return { date, type: 'kracht', title: 'Krachttraining', durationMinutes,
-    reason: 'Voorlopig schema met jouw zelf opgegeven recente werkgewichten. Pas de invoer aan je uitgevoerde training aan.',
-    exercises: rotated.slice(0, count).map(lift => ({ lift, displayName: NAMES[lift]!,
-      sets: Array.from({ length: durationMinutes < 45 ? 2 : 3 }, (_, i) => ({ setNum: i + 1, weight: profile.capacities[lift]!, targetReps: lift === 'power_clean' ? 2 : 5, restSec: 120 })) })) };
+  return strengthProgram(profile,date,index,sessions);
 }
 
 export function buildWeek(profile: AthleteProfile, now = new Date(), sessions: WorkoutSession[] = [], overrides: Record<string, PlannedTraining | null> = {}): WeekDay[] {
@@ -75,8 +68,9 @@ export function buildWeek(profile: AthleteProfile, now = new Date(), sessions: W
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(d.getDate() + i); const date = localDate(d);
     const available = profile.availableDays.includes(d.getDay());
-    const base = available ? planForDay(profile, date, index++) : undefined;
-    const planned = Object.hasOwn(overrides, date) ? overrides[date] ?? undefined : base;
+    const base = available ? planForDay(profile, date, index++,sessions) : undefined;
+    const selected = Object.hasOwn(overrides, date) ? overrides[date] ?? undefined : base;
+    const planned = selected ? normalizePlan(selected) : undefined;
     days.push({ date, dayLabel: d.toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'numeric' }),
       dayName: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'][d.getDay()], planned,
       completed: sessions.find(s => s.date === date), isToday: date === localDate(now), isPast: date < localDate(now) });
@@ -91,16 +85,35 @@ export function measuredTrend(sessions: WorkoutSession[], lift: LiftType) {
   return [...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value, isEstimate: false }));
 }
 
-export interface WorkoutDraft { plan: PlannedTraining; phase: 'start' | 'active'; startTime: string; completed: Record<number, import('../types').CompletedSet[]>; exerciseIndex: number }
+export interface WorkoutDraft { plan: PlannedTraining; phase: 'start' | 'active'; startTime: string; completed: Record<string, import('../types').CompletedSet[]>; exerciseIndex: number; sessionId?: string }
+
+export function saveEditedPlan(plan:PlannedTraining,draft:WorkoutDraft,storage:StorageLike=localStorage){
+  const previousOverrides=storage.getItem(KEYS.overrides),previousDraft=storage.getItem(KEYS.draft);
+  try{
+    writeJson(KEYS.overrides,{...readJson<Record<string,PlannedTraining|null>>(KEYS.overrides,{},storage),[plan.date]:plan},storage);
+    writeJson(KEYS.draft,draft,storage);
+  }catch(e){
+    // Restore the last complete snapshot when the second storage write fails.
+    try{if(previousOverrides===null)storage.removeItem(KEYS.overrides);else storage.setItem(KEYS.overrides,previousOverrides);
+      if(previousDraft===null)storage.removeItem(KEYS.draft);else storage.setItem(KEYS.draft,previousDraft);}catch{/* Keep the original actionable storage error. */}
+    throw e;
+  }
+}
 
 export function readDraft(storage: StorageLike = localStorage): WorkoutDraft | null {
   const d = readJson<WorkoutDraft | null>(KEYS.draft, null, storage);
-  return d && d.plan && ['start', 'active'].includes(d.phase) && Number.isFinite(Date.parse(d.startTime)) && d.completed ? d : null;
+  if(!d?.plan || !['start','active'].includes(d.phase) || !Number.isFinite(Date.parse(d.startTime)) || !d.completed)return null;
+  const plan=normalizePlan(d.plan),completed:WorkoutDraft['completed']={};
+  for(const [key,sets] of Object.entries(d.completed)){
+    const id=plan.exercises?.find(e=>e.id===key)?.id ?? (/^\d+$/.test(key)?plan.exercises?.[Number(key)]?.id:undefined);
+    if(id)completed[id]=sets;
+  }
+  return{...d,plan,completed};
 }
 
 export function exportLocal(storage: StorageLike = localStorage) {
   return { format: 'concurrent-training-local', version: 1, profile: readProfile(storage), sessions: readSessions(storage),
-    overrides: readJson(KEYS.overrides, {}, storage) };
+    overrides: readJson(KEYS.overrides, {}, storage), volumeTargets:readJson(KEYS.volumeTargets,undefined,storage) };
 }
 
 export function importLocal(text: string, storage: StorageLike = localStorage) {
@@ -110,7 +123,7 @@ export function importLocal(text: string, storage: StorageLike = localStorage) {
     if (!['kracht', 'duur'].includes(s.type) || !/^\d{4}-\d{2}-\d{2}$/.test(s.date) || typeof s.title !== 'string'
       || !Number.isFinite(s.durationMinutes) || s.durationMinutes < 0) throw new Error('Het bestand bevat een ongeldige sessie.');
     if (s.exercises) for (const ex of s.exercises as CompletedExercise[]) for (const set of ex.sets) {
-      if (!Number.isFinite(set.weight) || set.weight <= 0 || !Number.isInteger(set.completedReps) || set.completedReps < 1
+      if (!Number.isFinite(set.weight) || set.weight < 0 || set.weight > 500 || (set.weight===0 && !['bodyweight','assistance'].includes(definition(ex)?.load??'')) || !Number.isInteger(set.completedReps) || set.completedReps < 1
         || set.completedReps > 100 || !Array.isArray(set.velocities) || set.velocities.length !== set.completedReps
         || set.velocities.some(v => v !== null && (!Number.isFinite(v) || v <= 0 || v > 3))) throw new Error('Het bestand bevat ongeldige setgegevens.');
     }

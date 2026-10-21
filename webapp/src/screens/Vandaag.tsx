@@ -7,6 +7,7 @@ import { IconPlay, IconClock, IconInfo } from '../components/Icons';
 interface Props {
   profile: AthleteProfile;
   onStartTraining: (plan: PlannedTraining) => void;
+  onEditTraining: (plan: PlannedTraining) => void;
   isDemo: boolean;
 }
 
@@ -27,7 +28,7 @@ function ReadinessBar({ label, value }: { label: string; value: number | null })
   );
 }
 
-export default function Vandaag({ profile, onStartTraining, isDemo }: Props) {
+export default function Vandaag({ profile, onStartTraining, onEditTraining, isDemo }: Props) {
   const [readiness, setReadiness] = useState<ReadinessData | null>(null);
   const [plan, setPlan] = useState<PlannedTraining | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,7 +165,7 @@ export default function Vandaag({ profile, onStartTraining, isDemo }: Props) {
             {plan.exercises && (
               <div style={{ marginBottom: 12 }}>
                 {plan.exercises.map(ex => (
-                  <div key={ex.lift} style={{ marginBottom: 8 }}>
+                  <div key={ex.id??ex.lift} style={{ marginBottom: 8 }}>
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>{ex.displayName}</div>
                     <div className="text-small text-muted">
                       {ex.sets.length}×{ex.sets[0]?.targetReps ?? 0} @ {ex.sets.map(s => `${s.weight}kg`).join(', ')}
@@ -193,6 +194,7 @@ export default function Vandaag({ profile, onStartTraining, isDemo }: Props) {
             >
               <IconPlay /> Start training
             </button>
+            {plan.type==='kracht'&&<button className="btn btn-secondary btn-full" style={{marginTop:8}} onClick={()=>onEditTraining(plan)}>Training aanpassen</button>}
           </>
         )}
       </div>

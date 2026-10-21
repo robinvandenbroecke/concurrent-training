@@ -23,6 +23,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('vandaag');
   const [activePlan, setActivePlan] = useState<PlannedTraining | null>(() => readDraft()?.plan ?? null);
   const [trainingSaved, setTrainingSaved] = useState(0); // increment to trigger refresh
+  const [editRequest,setEditRequest]=useState(0);
 
   // Always demo mode in this build (no backend credentials in frontend)
   const isDemo = true;
@@ -44,12 +45,15 @@ export default function App() {
   const handleStartTraining = useCallback((plan: PlannedTraining) => {
     const draft = readDraft();
     if (draft && (draft.plan.date !== plan.date || draft.plan.title !== plan.title)) {
-      if (!window.confirm('Er staat nog een training open. Die vervangen door deze training?')) return;
+      if (!window.confirm('Er staat nog een training open. Die vervangen door deze training?')) return false;
       localStorage.removeItem(KEYS.draft);
     }
     setActivePlan(plan);
     setTab('training');
+    return true;
   }, []);
+
+  const handleEditTraining=(plan:PlannedTraining)=>{if(handleStartTraining(plan))setEditRequest(n=>n+1);};
 
   const handleTrainingSaved = useCallback(() => {
     setTrainingSaved(n => n + 1);
@@ -79,6 +83,7 @@ export default function App() {
                 localStorage.removeItem(PROFILE_KEY);
                 localStorage.removeItem(KEYS.draft);
                 localStorage.removeItem(KEYS.overrides);
+                localStorage.removeItem(KEYS.volumeTargets);
                 setActivePlan(null);
                 setProfile(null);
               }
@@ -96,6 +101,7 @@ export default function App() {
             key={trainingSaved}
             profile={profile}
             onStartTraining={handleStartTraining}
+            onEditTraining={handleEditTraining}
             isDemo={isDemo}
           />
         </div>
@@ -105,10 +111,12 @@ export default function App() {
             onSaved={handleTrainingSaved}
             isDemo={isDemo}
             hasVbt={profile.hasVbt}
+            editRequest={editRequest}
+            onPlanEdited={()=>setTrainingSaved(n=>n+1)}
           />
         </div>
         <div style={{ flex: 1, overflow: 'hidden', display: tab === 'week' ? 'block' : 'none' }}>
-          <Week key={trainingSaved} onStartTraining={handleStartTraining} onChanged={() => setTrainingSaved(n => n + 1)} />
+          <Week key={trainingSaved} onStartTraining={handleStartTraining} onEditTraining={handleEditTraining} onChanged={() => setTrainingSaved(n => n + 1)} />
         </div>
         <div style={{ flex: 1, overflow: 'hidden', display: tab === 'historie' ? 'block' : 'none' }}>
           <Historie key={trainingSaved} isDemo={isDemo} />
