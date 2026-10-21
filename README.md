@@ -1,8 +1,8 @@
 # Concurrent Training
 
-> **October 2026 webapp:** a preliminary React webapp is available in [`webapp/`](webapp/). It records sessions locally in the browser; the research backend and Android synchronization are not connected. See [build, verification and hosting instructions](DEPLOYMENT.md). GitHub Pages currently requires an account upgrade for this private repository.
+> **October 2026 webapp:** a preliminary React webapp is available in [`webapp/`](webapp/). It records sessions locally in the browser; the research backend and Android synchronization are not connected. See [build, verification and hosting instructions](DEPLOYMENT.md). The repository is public. The webapp is published from `main` through GitHub Pages: [open webapp](https://robinvandenbroecke.github.io/concurrent-training/).
 
-> **September 2026 audit:** this is an experimental private backend, not a released Android app or validated physiological model. Start with the [full audit](docs/audit_2026_09.md), [research protocol](docs/research_protocol.md), [Android/web roadmap](docs/product_roadmap.md), and [verification record](docs/verification.md). This version includes the runtime, schema and scientific-audit work previously stacked in PRs #1–#3. Historical sprint claims and calibration artifacts below are not evidence of real-world model validity.
+> **September 2026 audit:** this is an experimental backend, not a released Android app or validated physiological model. Start with the [full audit](docs/audit_2026_09.md), [research protocol](docs/research_protocol.md), [Android/web roadmap](docs/product_roadmap.md), and [verification record](docs/verification.md). This version includes the runtime, schema and scientific-audit work previously stacked in PRs #1–#3. Historical sprint claims and calibration artifacts below are not evidence of real-world model validity.
 
 API service for managing concurrent strength and endurance training with fatigue modeling and autoregulation.
 

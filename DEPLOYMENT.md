@@ -32,16 +32,13 @@ Open `http://localhost:4173/concurrent-training/`. Alleen `webapp/dist/` wordt g
 
 `.github/workflows/deploy-webapp.yml` installeert de lockfile, voert tests uit, compileert TypeScript en bouwt de React-app. De workflow draait op relevante pushes naar `main` en `agent/**`, pull requests en handmatige uitvoering. Het downloadbare artifact `webapp-dist` bevat de deploybare frontend.
 
-**Hostingblokkade vastgesteld op 20 oktober 2026:** Settings → Pages van deze privérepository toont “Upgrade or make this repository public to enable Pages”. De repository blijft privé. Pages is dus nog niet actief en de onderstaande URL is nog geen werkende publicatie.
+De repository is openbaar gemaakt op verzoek van de eigenaar. Op 21 oktober 2026 is Settings → Pages → Source ingesteld op **GitHub Actions**. Na een relevante push naar `main` publiceert de workflow automatisch de geslaagde frontendbuild. De eerdere `PAGES_ENABLED`-variabele is niet meer nodig.
 
-Zodra het GitHub-abonnement Pages voor deze privérepository ondersteunt:
+Webapp: [Concurrent Training](https://robinvandenbroecke.github.io/concurrent-training/).
 
-1. Kies Settings → Pages → Build and deployment → Source: **GitHub Actions**.
-2. Ga naar Actions → **Webapp** → Run workflow, selecteer `main` en vink `deploy` aan.
-3. Voor automatisch publiceren bij volgende pushes: voeg onder Settings → Secrets and variables → Actions → Variables de repositoryvariabele `PAGES_ENABLED` toe met waarde `true`.
-4. Controleer de geslaagde deployment en de door GitHub geretourneerde site-URL. De verwachte project-URL is `https://robinvandenbroecke.github.io/concurrent-training/`.
+Bij handmatige uitvoering: Actions → **Webapp** → Run workflow → branch `main` → vink `deploy` aan. Zonder dit vinkje voert een handmatige run alleen tests en de build uit. Controleer steeds de geslaagde `deploy`-job voordat je een nieuwe publicatie als live beschouwt.
 
-Zonder `PAGES_ENABLED=true` of een handmatige `deploy`-uitvoering blijft CI bouwen en testen, zonder een onmogelijke Pages-deployment te starten. Openbaar maken van de broncode is een afzonderlijke keuze en gebeurt niet automatisch. De standaard Pages-site zelf is publiek; de persoonlijke trainingsgegevens staan alleen in de browser.
+De broncode en de Pages-site zijn publiek. Persoonlijke trainingsgegevens worden in deze versie alleen in de browser opgeslagen.
 
 De Vite-base is `/concurrent-training/`. Navigatie zit in de appstate en gebruikt geen subroutes waarvoor serverrewrites nodig zijn. Manifest en pictogram verwijzen naar bestaande bestanden. Er is geen service worker en geen gegarandeerde offlinebeschikbaarheid.
 

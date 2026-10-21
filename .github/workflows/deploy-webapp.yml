@@ -52,7 +52,7 @@ jobs:
 
   prepare-pages:
     needs: build-webapp
-    if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
     runs-on: ubuntu-latest
     permissions:
       contents: read
