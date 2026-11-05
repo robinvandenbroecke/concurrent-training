@@ -4,9 +4,11 @@
 
 - De bestaande webapp staat op https://robinvandenbroecke.github.io/concurrent-training/.
 - Supabase-project `concurrent-training` is aangemaakt op het Free-plan in Frankfurt. Projectreferentie: `dvwbkbohdgfuzjenrete`. De lege databaseverbinding is getest.
-- In Render is bij de laatste controle alleen `My Workspace` zichtbaar. De gevraagde aparte werkruimte `Concurrent Training` en de server zijn nog niet aangemaakt. De dashboardaanmelding blokkeert deze stap; de Render-koppeling kan geen werkruimtes aanmaken.
+- De gevraagde aparte Render-werkruimte `Concurrent Training` is zichtbaar in de koppeling (workspace-ID `tea-dbmdl10u01pc73a8f5ng`). Er zijn nog geen services aangemaakt. De serverdeploy wacht op de juiste Supabase session-poolerhost en de geheime databaseconfiguratie. Er zijn nog geen database-inloggegevens aan Render doorgegeven.
 - Deze wijziging bevat de hostingcode en configuratie. Dit document is geen bewijs van een actieve Render-deploy.
 - Garmin- en Wahoo-synchronisatie zijn nog niet geïmplementeerd of actief. Er zijn geen providercredentials ingesteld of persoonlijke trainingsgegevens geïmporteerd.
+
+Controles op de hostingcode: 787 Python-tests geslaagd (8 bestaande skips), 34 frontendtests geslaagd, productiebuild geslaagd en `render.yaml` gevalideerd tegen het actuele officiële JSON-schema. GitHub Actions heeft ook het volledige Docker-image gebouwd, de weigering van tijdelijke SQLite-opslag getest, de PostgreSQL-migraties uitgevoerd en private-schema-isolatie met behoud van gegevens na herhaalde startup bevestigd. Zie [CI](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/42095999283) en [containerbuild](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/42095999585). Dit is geen controle van een live Render-server.
 
 ## Wat de configuratie doet
 
@@ -33,7 +35,7 @@ Render genereert `ADMIN_API_KEY` via `generateValue`. Bij directe creatie moet d
 
 ## Render activeren
 
-Maak de door de eigenaar gevraagde werkruimte **Concurrent Training** aan met het **Hobby-plan**. Selecteer daarna expliciet deze werkruimte. Importeer de Blueprint uit de repository, vul `DATABASE_URL` in via Render en controleer dat uitsluitend de Free-webservice wordt aangemaakt. De Blueprint maakt geen Render-database, disk, worker of cronjob aan. Er wordt dus geen database gebruikt die na 30 dagen vervalt.
+Gebruik de door de eigenaar gevraagde werkruimte **Concurrent Training**. Importeer de Blueprint uit de repository, vul `DATABASE_URL` in via Render en controleer dat uitsluitend de Free-webservice wordt aangemaakt. De Blueprint maakt geen Render-database, disk, worker of cronjob aan. Er wordt dus geen database gebruikt die na 30 dagen vervalt.
 
 Bij een gekoppelde GitHub-repository staat automatisch deployen op **After CI Checks Pass**. Een service die alleen via een openbare Git-URL is gekoppeld ondersteunt geen automatische deploys. Gebruik in dat geval een gecontroleerde handmatige deploy; een nieuwe commit is dan niet vanzelf live.
 
