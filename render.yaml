@@ -1,0 +1,28 @@
+# One Free web service serves the existing frontend and protected Python API.
+# The persistent database is external; no expiring Render database is created.
+services:
+  - type: web
+    name: concurrent-training
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /ready
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: AUTO_CREATE_TABLES
+        value: "false"
+      - key: REQUIRE_API_KEY
+        value: "true"
+      - key: DEFAULT_OWNER_SUBJECT
+        value: concurrent-training-private
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://robinvandenbroecke.github.io

@@ -1,5 +1,7 @@
 # Webapp bouwen en publiceren
 
+Voor de voorbereide gecombineerde React/Python-hosting op Render, de aparte Supabase-database en de nog ontbrekende activatiestappen: zie [gratis hosting](docs/free_hosting.md). De huidige Pages-app en lokale opslag blijven zoals hieronder beschreven.
+
 ## Huidige versie
 
 `webapp/src/` is de enige frontendbron. De productiebuild gebruikt React, TypeScript en Vite met een vastgelegde `package-lock.json`. De losse HTML-implementatie uit Claudes ZIP is niet opgenomen: anders konden ontwikkeling en publicatie verschillende apps opleveren.

@@ -1,0 +1,32 @@
+name: Hosting image
+
+on:
+  push:
+    branches: [main, 'agent/**']
+    paths: ['Dockerfile', '.dockerignore', 'deployment/**', 'app/**', 'alembic/**', 'alembic.ini', 'requirements.txt', 'webapp/**', 'render.yaml', '.github/workflows/hosting.yml']
+  pull_request:
+    paths: ['Dockerfile', '.dockerignore', 'deployment/**', 'app/**', 'alembic/**', 'alembic.ini', 'requirements.txt', 'webapp/**', 'render.yaml', '.github/workflows/hosting.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build combined frontend and API image
+        run: docker build --tag concurrent-training-hosting .
+      - name: Check image refuses temporary database storage
+        run: |
+          python - <<'PY'
+          import subprocess
+          result = subprocess.run([
+              'docker', 'run', '--rm', '-e', 'APP_ENV=production',
+              '-e', 'ADMIN_API_KEY=ci-test-key-that-is-at-least-thirty-two-characters',
+              '-e', 'DATABASE_URL=sqlite:///temporary.db', 'concurrent-training-hosting',
+          ], capture_output=True, text=True)
+          assert result.returncode != 0
+          assert 'persistent PostgreSQL database with TLS' in result.stderr
+          print('Container rejects ephemeral SQLite storage')
+          PY

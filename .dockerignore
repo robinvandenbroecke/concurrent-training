@@ -1,0 +1,17 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+**/node_modules
+webapp/dist
+**/.env
+**/.env.*
+**/*.db
+**/*.sqlite3
+**/*.log
+.pytest_cache
+artifacts
+research
+tests
+upload
+*.zip

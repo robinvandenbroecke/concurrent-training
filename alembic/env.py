@@ -20,7 +20,9 @@ config = context.config
 
 # Set database URL from config or env
 sqlalchemy_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/concurrent_training')
-config.set_main_option('sqlalchemy.url', sqlalchemy_url)
+# ConfigParser treats '%' as interpolation, including percent-encoded passwords
+# and PostgreSQL connection options. SQLAlchemy must receive the original URL.
+config.set_main_option('sqlalchemy.url', sqlalchemy_url.replace('%', '%%'))
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
