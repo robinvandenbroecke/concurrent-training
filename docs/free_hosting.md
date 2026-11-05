@@ -2,13 +2,15 @@
 
 ## Status op 5 november 2026
 
-- De bestaande webapp staat op https://robinvandenbroecke.github.io/concurrent-training/.
-- Supabase-project `concurrent-training` is aangemaakt op het Free-plan in Frankfurt. Projectreferentie: `dvwbkbohdgfuzjenrete`. De lege databaseverbinding is getest.
-- De gevraagde aparte Render-werkruimte `Concurrent Training` is zichtbaar in de koppeling (workspace-ID `tea-dbmdl10u01pc73a8f5ng`). Er zijn nog geen services aangemaakt. De serverdeploy wacht op de juiste Supabase session-poolerhost en de geheime databaseconfiguratie. Er zijn nog geen database-inloggegevens aan Render doorgegeven.
-- Deze wijziging bevat de hostingcode en configuratie. Dit document is geen bewijs van een actieve Render-deploy.
+- De gecombineerde webapp en Python-API zijn live op [Render](https://concurrent-training.onrender.com/concurrent-training/). De bestaande [GitHub Pages-app](https://robinvandenbroecke.github.io/concurrent-training/) blijft beschikbaar.
+- De Free-webservice `concurrent-training` draait in Frankfurt in de aparte Render-werkruimte **Concurrent Training**. Workspace-ID: `tea-dbmdl10u01pc73a8f5ng`; service-ID: `srv-dbmdoomk1f9s73dhr2l0`.
+- Supabase-project `concurrent-training` gebruikt het Free-plan in Frankfurt. Projectreferentie: `dvwbkbohdgfuzjenrete`. De API gebruikt TLS en de session pooler met een eigen database-login `ct_backend_app`. Deze login heeft geen superuser-, databasecreatie- of rolcreatierechten.
+- De migraties hebben 13 tabellen met RLS aangemaakt in het private schema `ct_backend`, met `ct_backend_app` als eigenaar. De rollen `anon` en `authenticated` hebben geen toegang tot dit schema. Dit is infrastructuurisolatie; gebruikersauthenticatie en autorisatie per atleet zijn nog niet aangesloten.
+- Deploy `dep-dbme0cmgekts73b2ad40` van commit `4340f576f256c81f759c0943478ac23638857728` is op 5 november 2026 om 20:00 UTC als `live` bevestigd. `/ready` gaf HTTP 200 met een verbonden database. De webapp en alle vier gekoppelde buildassets laadden. Een API-aanroep zonder sleutel gaf 401, met een onjuiste sleutel 403 en met de geldige beheersleutel 200.
+- Databasewachtwoord en beheer-API-sleutel zijn als geheime Render-omgevingsvariabelen ingesteld. Ze staan niet in deze repository of de frontend.
 - Garmin- en Wahoo-synchronisatie zijn nog niet geïmplementeerd of actief. Er zijn geen providercredentials ingesteld of persoonlijke trainingsgegevens geïmporteerd.
 
-Controles op de hostingcode: 787 Python-tests geslaagd (8 bestaande skips), 34 frontendtests geslaagd, productiebuild geslaagd en `render.yaml` gevalideerd tegen het actuele officiële JSON-schema. GitHub Actions heeft ook het volledige Docker-image gebouwd, de weigering van tijdelijke SQLite-opslag getest, de PostgreSQL-migraties uitgevoerd en private-schema-isolatie met behoud van gegevens na herhaalde startup bevestigd. Zie [CI](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/42095999283) en [containerbuild](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/42095999585). Dit is geen controle van een live Render-server.
+Controles op de hostingcode: 787 Python-tests geslaagd (8 bestaande skips), 34 frontendtests geslaagd, productiebuild geslaagd en `render.yaml` gevalideerd tegen het actuele officiële JSON-schema. GitHub Actions heeft ook het volledige Docker-image gebouwd, de weigering van tijdelijke SQLite-opslag getest, de PostgreSQL-migraties uitgevoerd en private-schema-isolatie met behoud van gegevens na herhaalde startup bevestigd. Zie [CI](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/42095999283) en [containerbuild](https://github.com/robinvandenbroecke/concurrent-training/actions/runs/42095999585). De live controles hierboven zijn aanvullend uitgevoerd; er zijn daarbij geen persoonlijke trainingsgegevens geïmporteerd.
 
 ## Wat de configuratie doet
 
@@ -20,7 +22,7 @@ De frontend blijft in deze versie een lokaal prototype. Hosting van de API verbi
 
 Gebruik uitsluitend de aparte Concurrent Training-database. Kopieer de verbindingsstring uit het Supabase-dashboard: **Connect → Session pooler**, voor een verbinding vanaf Render. Neem host en gebruikersnaam over uit die string; leid de poolerhost niet af uit de regio. Gebruik **session mode**, geen transaction mode: opstartmigraties gebruiken een sessiegebonden PostgreSQL-lock. Voeg `sslmode=require` toe, of gebruik de strengere certificaatcontrole met de vereiste CA-configuratie.
 
-Stel de volledige string in als geheime Render-variabele `DATABASE_URL`. Gebruik een database-login die eigenaar is van schema `ct_backend` en de bijbehorende tabellen. Bij de eerste start moet de login dit schema kunnen maken, of moet het schema vooraf met deze login als eigenaar zijn aangemaakt. De gratis database is al aangemaakt, maar de verbindingsgegevens zijn nog niet aan Render doorgegeven.
+Stel de volledige string in als geheime Render-variabele `DATABASE_URL`. Gebruik een database-login die eigenaar is van schema `ct_backend` en de bijbehorende tabellen. Bij de eerste start moet de login dit schema kunnen maken, of moet het schema vooraf met deze login als eigenaar zijn aangemaakt. In de actieve omgeving is dit schema vooraf met de beperkte login als eigenaar aangemaakt en is de verbinding in Render ingesteld.
 
 `python -m deployment.serve`:
 
@@ -33,9 +35,9 @@ Stel de volledige string in als geheime Render-variabele `DATABASE_URL`. Gebruik
 
 Render genereert `ADMIN_API_KEY` via `generateValue`. Bij directe creatie moet dezelfde lange, willekeurige waarde via de beveiligde omgevingsvariabelen worden ingesteld. Providersecrets en tokens zijn geen buildargumenten en horen niet in het image of in GitHub. Strava blijft ongeconfigureerd.
 
-## Render activeren
+## Een nieuwe omgeving in gebruik nemen
 
-Gebruik de door de eigenaar gevraagde werkruimte **Concurrent Training**. Importeer de Blueprint uit de repository, vul `DATABASE_URL` in via Render en controleer dat uitsluitend de Free-webservice wordt aangemaakt. De Blueprint maakt geen Render-database, disk, worker of cronjob aan. Er wordt dus geen database gebruikt die na 30 dagen vervalt.
+De huidige omgeving is al actief; maak daarvoor geen tweede service aan. Voor een nieuwe omgeving: importeer de Blueprint uit de repository, vul `DATABASE_URL` in via Render en controleer dat uitsluitend de Free-webservice wordt aangemaakt. De Blueprint maakt geen Render-database, disk, worker of cronjob aan. Er wordt dus geen database gebruikt die na 30 dagen vervalt.
 
 Bij een gekoppelde GitHub-repository staat automatisch deployen op **After CI Checks Pass**. Een service die alleen via een openbare Git-URL is gekoppeld ondersteunt geen automatische deploys. Gebruik in dat geval een gecontroleerde handmatige deploy; een nieuwe commit is dan niet vanzelf live.
 

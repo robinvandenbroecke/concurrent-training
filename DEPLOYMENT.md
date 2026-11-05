@@ -1,12 +1,12 @@
 # Webapp bouwen en publiceren
 
-Voor de voorbereide gecombineerde React/Python-hosting op Render, de aparte Supabase-database en de nog ontbrekende activatiestappen: zie [gratis hosting](docs/free_hosting.md). De huidige Pages-app en lokale opslag blijven zoals hieronder beschreven.
+De gecombineerde React/Python-hosting is live op [Render](https://concurrent-training.onrender.com/concurrent-training/), met een aparte Supabase-database voor de API. Zie [gratis hosting](docs/free_hosting.md) voor de gecontroleerde status en beperkingen. De frontend bewaart gegevens nog lokaal in de browser; ook de Pages-app blijft beschikbaar.
 
 ## Huidige versie
 
 `webapp/src/` is de enige frontendbron. De productiebuild gebruikt React, TypeScript en Vite met een vastgelegde `package-lock.json`. De losse HTML-implementatie uit Claudes ZIP is niet opgenomen: anders konden ontwikkeling en publicatie verschillende apps opleveren.
 
-Dit is een lokaal prototype met onboarding, een aanpasbaar A/B-krachtprogramma met 42 catalogusoefeningen en volumefeedback, registratie van kracht- en duursessies, rusttimer, historie, gemeten werkgewichten en JSON-export/import. Gegevens staan in deze browser op dit toestel. Er is geen account, serveropslag, synchronisatie met Android/Strava of gekoppeld onderzoeksmodel. Browsergegevens wissen verwijdert ook de lokale gegevens; maak exports via Historie. Een import voegt sessies toe en wijzigt het profiel niet.
+Dit is een lokaal prototype met onboarding, een aanpasbaar A/B-krachtprogramma met 42 catalogusoefeningen en volumefeedback, registratie van kracht- en duursessies, rusttimer, historie, gemeten werkgewichten en JSON-export/import. Frontendgegevens staan in deze browser op dit toestel. De gehoste API heeft een database, maar de frontend gebruikt die nog niet. Er is geen account, synchronisatie met Android/Strava/Garmin/Wahoo of gekoppeld onderzoeksmodel. Browsergegevens wissen verwijdert ook de lokale gegevens; maak exports via Historie. Een import voegt sessies toe en wijzigt het profiel niet.
 
 De weekindeling gebruikt een transparant startschema binnen de opgegeven dagen en sessieduur. Trainingen kunnen vooraf via Vandaag/Week en tijdens de training worden aangepast. Zie [de literatuur, programmering en telregels](docs/strength_program_2026_10.md). Werkgewichten komen uit de invoer van de gebruiker. Belastbaarheid blijft onbekend zolang het onderzoeksmodel niet is gekoppeld. De app toont geen fictieve trainingshistorie, berekende 1RM of wetenschappelijk gevalideerde personalisatie.
 
