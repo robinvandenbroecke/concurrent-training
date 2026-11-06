@@ -3,14 +3,27 @@ import { normalizePlan, definition } from '../data/exercises';
 import { strengthProgram, strengthSlots } from '../domain/program';
 
 export const KEYS = { profile: 'ct_profile', sessions: 'ct_local_sessions_v1', draft: 'ct_workout_draft_v1', overrides: 'ct_week_overrides_v1', volumeTargets: 'ct_volume_targets_v1' };
-type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-export function readJson<T>(key: string, fallback: T, storage: StorageLike = localStorage): T {
+let selectedStorage: StorageLike | undefined;
+let observer: ((key: string, storage: StorageLike) => void) | undefined;
+export const getLocalStore = (): StorageLike => selectedStorage ?? localStorage;
+export function selectStorage(storage?: StorageLike) { selectedStorage = storage; }
+export function observeStorage(callback?: typeof observer) { observer = callback; }
+export function accountStorage(userId: string, storage: StorageLike = localStorage): StorageLike {
+  const prefix = `ct_account_${userId}:`;
+  return { getItem: key => storage.getItem(prefix + key), setItem: (key, value) => storage.setItem(prefix + key, value), removeItem: key => storage.removeItem(prefix + key) };
+}
+export function removeJson(key: string, storage: StorageLike = getLocalStore()) {
+  storage.removeItem(key); observer?.(key, storage);
+}
+
+export function readJson<T>(key: string, fallback: T, storage: StorageLike = getLocalStore()): T {
   try { const raw = storage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
 }
 
-export function writeJson(key: string, value: unknown, storage: StorageLike = localStorage) {
-  try { storage.setItem(key, JSON.stringify(value)); }
+export function writeJson(key: string, value: unknown, storage: StorageLike = getLocalStore()) {
+  try { storage.setItem(key, JSON.stringify(value)); observer?.(key, storage); }
   catch { throw new Error('Opslaan op dit toestel lukt niet. Exporteer je gegevens of maak opslagruimte vrij; je invoer blijft open.'); }
 }
 
@@ -18,19 +31,19 @@ export function localDate(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export function readProfile(storage: StorageLike = localStorage): AthleteProfile | null {
+export function readProfile(storage: StorageLike = getLocalStore()): AthleteProfile | null {
   const p = readJson<AthleteProfile | null>(KEYS.profile, null, storage);
   return p && typeof p.name === 'string' && p.onboardingComplete && ['kracht', 'duur', 'balans'].includes(p.priority)
     && Array.isArray(p.availableDays) && p.availableDays.length > 0 && p.availableDays.every(d => Number.isInteger(d) && d >= 0 && d <= 6)
     && Number.isFinite(p.sessionDurationMinutes) && p.sessionDurationMinutes >= 15 && p.capacities ? p : null;
 }
 
-export function readSessions(storage: StorageLike = localStorage): WorkoutSession[] {
+export function readSessions(storage: StorageLike = getLocalStore()): WorkoutSession[] {
   const items = readJson<WorkoutSession[]>(KEYS.sessions, [], storage);
   return Array.isArray(items) ? items : [];
 }
 
-export function appendSession(session: WorkoutSession, storage: StorageLike = localStorage): WorkoutSession {
+export function appendSession(session: WorkoutSession, storage: StorageLike = getLocalStore()): WorkoutSession {
   const record = { ...session, id: session.id ?? crypto.randomUUID(), savedToServer: false };
   const sessions = readSessions(storage).filter(s => s.id !== record.id);
   writeJson(KEYS.sessions, [record, ...sessions], storage);
@@ -87,7 +100,7 @@ export function measuredTrend(sessions: WorkoutSession[], lift: LiftType) {
 
 export interface WorkoutDraft { plan: PlannedTraining; phase: 'start' | 'active'; startTime: string; completed: Record<string, import('../types').CompletedSet[]>; exerciseIndex: number; sessionId?: string }
 
-export function saveEditedPlan(plan:PlannedTraining,draft:WorkoutDraft,storage:StorageLike=localStorage){
+export function saveEditedPlan(plan:PlannedTraining,draft:WorkoutDraft,storage:StorageLike=getLocalStore()){
   const previousOverrides=storage.getItem(KEYS.overrides),previousDraft=storage.getItem(KEYS.draft);
   try{
     writeJson(KEYS.overrides,{...readJson<Record<string,PlannedTraining|null>>(KEYS.overrides,{},storage),[plan.date]:plan},storage);
@@ -100,7 +113,7 @@ export function saveEditedPlan(plan:PlannedTraining,draft:WorkoutDraft,storage:S
   }
 }
 
-export function readDraft(storage: StorageLike = localStorage): WorkoutDraft | null {
+export function readDraft(storage: StorageLike = getLocalStore()): WorkoutDraft | null {
   const d = readJson<WorkoutDraft | null>(KEYS.draft, null, storage);
   if(!d?.plan || !['start','active'].includes(d.phase) || !Number.isFinite(Date.parse(d.startTime)) || !d.completed)return null;
   const plan=normalizePlan(d.plan),completed:WorkoutDraft['completed']={};
@@ -111,12 +124,12 @@ export function readDraft(storage: StorageLike = localStorage): WorkoutDraft | n
   return{...d,plan,completed};
 }
 
-export function exportLocal(storage: StorageLike = localStorage) {
+export function exportLocal(storage: StorageLike = getLocalStore()) {
   return { format: 'concurrent-training-local', version: 1, profile: readProfile(storage), sessions: readSessions(storage),
-    overrides: readJson(KEYS.overrides, {}, storage), volumeTargets:readJson(KEYS.volumeTargets,undefined,storage) };
+    overrides: readJson(KEYS.overrides, {}, storage), volumeTargets:readJson(KEYS.volumeTargets,undefined,storage), draft:readDraft(storage) };
 }
 
-export function importLocal(text: string, storage: StorageLike = localStorage) {
+export function importLocal(text: string, storage: StorageLike = getLocalStore()) {
   const data = JSON.parse(text);
   if (data.format !== 'concurrent-training-local' || data.version !== 1 || !Array.isArray(data.sessions)) throw new Error('Dit is geen ondersteund CT-exportbestand.');
   for (const s of data.sessions) {

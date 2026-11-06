@@ -1,11 +1,11 @@
 # Gratis hosting: status en ingebruikname
 
-## Status op 5 november 2026
+## Status op 6 november 2026
 
 - De gecombineerde webapp en Python-API zijn live op [Render](https://concurrent-training.onrender.com/concurrent-training/). De bestaande [GitHub Pages-app](https://robinvandenbroecke.github.io/concurrent-training/) blijft beschikbaar.
 - De Free-webservice `concurrent-training` draait in Frankfurt in de aparte Render-werkruimte **Concurrent Training**. Workspace-ID: `tea-dbmdl10u01pc73a8f5ng`; service-ID: `srv-dbmdoomk1f9s73dhr2l0`.
 - Supabase-project `concurrent-training` gebruikt het Free-plan in Frankfurt. Projectreferentie: `dvwbkbohdgfuzjenrete`. De API gebruikt TLS en de session pooler met een eigen database-login `ct_backend_app`. Deze login heeft geen superuser-, databasecreatie- of rolcreatierechten.
-- De migraties hebben 13 tabellen met RLS aangemaakt in het private schema `ct_backend`, met `ct_backend_app` als eigenaar. De rollen `anon` en `authenticated` hebben geen toegang tot dit schema. Dit is infrastructuurisolatie; gebruikersauthenticatie en autorisatie per atleet zijn nog niet aangesloten.
+- De migraties hebben 13 tabellen met RLS aangemaakt in het private schema `ct_backend`, met `ct_backend_app` als eigenaar. De rollen `anon` en `authenticated` hebben geen toegang tot dit schema. Dit is de isolatie van de private beheer-API. Voor de webapp zijn op 6 november daarnaast Supabase Auth en twee gebruikersgebonden tabellen in `public` ingericht; zie [accounts en opslag](accounts_and_storage.md).
 - Deploy `dep-dbme0cmgekts73b2ad40` van commit `4340f576f256c81f759c0943478ac23638857728` is op 5 november 2026 om 20:00 UTC als `live` bevestigd. `/ready` gaf HTTP 200 met een verbonden database. De webapp en alle vier gekoppelde buildassets laadden. Een API-aanroep zonder sleutel gaf 401, met een onjuiste sleutel 403 en met de geldige beheersleutel 200.
 - Databasewachtwoord en beheer-API-sleutel zijn als geheime Render-omgevingsvariabelen ingesteld. Ze staan niet in deze repository of de frontend.
 - Garmin- en Wahoo-synchronisatie zijn nog niet geïmplementeerd of actief. Er zijn geen providercredentials ingesteld of persoonlijke trainingsgegevens geïmporteerd.
@@ -16,7 +16,7 @@ Controles op de hostingcode: 787 Python-tests geslaagd (8 bestaande skips), 34 f
 
 `render.yaml` beschrijft één Free-webservice in Frankfurt. Het Docker-image bouwt en test de bestaande React-app en biedt die aan op `/concurrent-training/`. De root verwijst naar dat pad. De bestaande Python-API behoudt haar URLs en beheer-API-sleutel. `/ready` controleert verbinding én migratieversie van de database. `/health` is de bestaande, eenvoudigere livenesscontrole.
 
-De frontend blijft in deze versie een lokaal prototype. Hosting van de API verbindt de browserhistorie niet automatisch met de database. Accounts, autorisatie per atleet en synchronisatie tussen toestellen moeten afzonderlijk worden aangesloten. Zet de beheer-API-sleutel nooit in de webapp, een `VITE_`-variabele, een URL of een GitHub-bestand. Deze beheer-API is bedoeld voor een privéprototype, niet als gedeelde gebruikerslogin.
+De frontend gebruikt Supabase Auth en de gebruikersgebonden tabellen `ct_training_accounts` en `ct_training_sessions`, met RLS. De browsercache is per account gescheiden. Laden op een ander toestel gebeurt na inloggen/vernieuwen; wijzigingen worden geen live stream. Bestaande browserhistorie wordt uitsluitend na een expliciete keuze of JSON-import overgenomen. De private Python-API en het onderzoeksmodel worden hiermee nog niet door de frontend aangeroepen. Zet de beheer-API-sleutel nooit in de webapp, een `VITE_`-variabele, een URL of een GitHub-bestand. Deze beheer-API is bedoeld voor een privéprototype, niet als gedeelde gebruikerslogin.
 
 ## Database en secrets
 

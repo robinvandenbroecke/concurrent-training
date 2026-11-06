@@ -11,7 +11,7 @@ test('onboarding → plan → workout → navigation → reload → save → rea
   Object.defineProperty(globalThis, 'navigator', { value: w.navigator, configurable: true });
   w.confirm = () => true;
   const { createRoot } = await import('react-dom/client');
-  const { default: App } = await import('../src/App.tsx');
+  const { TrainingApp: App } = await import('../src/App.tsx');
   const { readSessions, readDraft } = await import('../src/api/local.ts');
   const host = document.getElementById('root')!;
   let root = createRoot(host);
@@ -69,7 +69,7 @@ test('onboarding → plan → workout → navigation → reload → save → rea
     assert.equal(sessions[0].exercises![0].sets[0].rpe, 8);
     await click(button(/^Historie$/));
     assert.match(activeTraining().textContent!, /42.5 kg × 3 reps/);
-    assert.match(activeTraining().textContent!, /Alleen lokaal opgeslagen/);
+    assert.match(activeTraining().textContent!, /Nog niet in de database bewaard/);
   } finally {
     await act(async () => root.unmount()); dom.window.close();
   }

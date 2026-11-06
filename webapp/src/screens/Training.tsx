@@ -6,7 +6,7 @@ import { api } from '../api/adapter';
 import { LIFT_NAMES, SPORT_NAMES, INTENSITY_NAMES } from '../data/demoData';
 import { useTimer } from '../hooks/useTimer';
 import { IconCheck, IconClock } from '../components/Icons';
-import { KEYS, localDate, parseVelocities, readDraft, readProfile, writeJson, saveEditedPlan } from '../api/local';
+import { KEYS, localDate, parseVelocities, readDraft, readProfile, writeJson, saveEditedPlan, getLocalStore, removeJson, readSessions } from '../api/local';
 import { definition, normalizePlan } from '../data/exercises';
 import type { CompletedMap } from '../domain/volume';
 import PlanEditor from '../components/PlanEditor';
@@ -277,13 +277,18 @@ function EnduranceFlow({
 }
 
 export default function Training({plan:incoming,onSaved,isDemo,hasVbt,editRequest=0,onPlanEdited}:Props){
-  const initial=React.useRef(readDraft());
+  const storage=React.useRef(getLocalStore()).current;
+  const initial=React.useRef(readDraft(storage));
   const [plan,setPlan]=useState<PlannedTraining|null>(()=>initial.current?.plan??(incoming?normalizePlan(incoming):null));
-  const [phase,setPhase]=useState<'start'|'active'|'done'>(initial.current?.phase??'start');
+  const initialSaved=readSessions(storage).find(s=>s.id===initial.current?.sessionId);
+  const [phase,setPhase]=useState<'start'|'active'|'done'>(initialSaved?.savedToServer?'done':initial.current?.phase??'start');
+  const [finalizing,setFinalizing]=useState(!!initialSaved);
+  const retryAction=React.useRef<(()=>Promise<void>)|null>(null);
   const [completed,setCompleted]=useState<CompletedMap>(initial.current?.completed??{});
   const [editor,setEditor]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState(''),[draftError,setDraftError]=useState('');
   const startTime=React.useRef(initial.current?.startTime??new Date().toISOString());
   const sessionId=React.useRef(initial.current?.sessionId??crypto.randomUUID());
+  const saveEndTime=React.useRef<string|null>(null);
   const previousIncoming=React.useRef(incoming);
   const elapsed=useTimer(0,'up');
   useEffect(()=>{if(initial.current?.phase==='active'){elapsed.reset(Math.max(0,Math.floor((Date.now()-Date.parse(startTime.current))/1000)));elapsed.start();}},[]);
@@ -297,7 +302,7 @@ export default function Training({plan:incoming,onSaved,isDemo,hasVbt,editReques
     }else{
       setPlan(incoming?normalizePlan(incoming):null);setCompleted({});setPhase('start');sessionId.current=crypto.randomUUID();elapsed.reset();setError('');setDraftError('');
     }
-    setEditor(false);
+    setEditor(false);saveEndTime.current=null;setFinalizing(false);retryAction.current=null;
   },[incoming]);
   useEffect(()=>{if(editRequest>0)setEditor(true);},[editRequest]);
   const draft=(p:PlannedTraining,stage:'start'|'active',sets:CompletedMap)=>({plan:p,phase:stage,startTime:startTime.current,completed:sets,exerciseIndex:0,sessionId:sessionId.current});
@@ -307,6 +312,7 @@ export default function Training({plan:incoming,onSaved,isDemo,hasVbt,editReques
   };
   const saveEdit=async(next:PlannedTraining)=>{
     saveEditedPlan(next,draft(next,phase==='active'?'active':'start',completed));
+    await api.confirmStorage();
     setPlan(next);setEditor(false);setDraftError('');onPlanEdited();
   };
   const start=()=>{
@@ -314,21 +320,27 @@ export default function Training({plan:incoming,onSaved,isDemo,hasVbt,editReques
     if(plan)try{writeJson(KEYS.draft,draft(plan,'active',{}));}catch(e){setDraftError((e as Error).message);}
   };
   const saveStrength=async(exercises:CompletedExercise[])=>{
-    setSaving(true);setError('');elapsed.pause();const endTime=new Date().toISOString();
+    setFinalizing(true);retryAction.current=()=>saveStrength(exercises);
+    setSaving(true);setError('');elapsed.pause();const endTime=saveEndTime.current??=new Date().toISOString();
     try{
       await api.saveStrengthWorkout({sessionId:sessionId.current,title:plan?.title,athleteId:1,startTime:startTime.current,endTime,
         durationMinutes:Math.max(0,Math.round((Date.parse(endTime)-Date.parse(startTime.current))/60000)),completedExercises:exercises,
         exercises:exercises.map(ex=>({lift:ex.lift,sets:ex.sets.map(s=>({weight:s.weight,target_reps:s.targetReps,reps:s.velocities.map((v,i)=>({weight:s.weight,velocity:v??undefined,rep_num:i+1,rest_before:0})),set_end_rpe:s.rpe}))}))});
-      localStorage.removeItem(KEYS.draft);setPhase('done');onSaved();
+      removeJson(KEYS.draft,storage);setPhase('done');onSaved();
     }catch(e){setError((e as Error).message);elapsed.start();}finally{setSaving(false);}
   };
   const saveEndurance=async(r:{sport:EnduranceSport;durationMinutes:number;intensityType:IntensityType;rpe?:number;avgPower?:number})=>{
+    setFinalizing(true);retryAction.current=()=>saveEndurance(r);
     setSaving(true);setError('');
     try{await api.saveEnduranceSession({sessionId:sessionId.current,athleteId:1,sport:r.sport,startTime:plan?startTime.current:new Date(Date.now()-r.durationMinutes*60000).toISOString(),durationMinutes:r.durationMinutes,intensityType:r.intensityType,rpe:r.rpe,averagePowerW:r.avgPower});
-      localStorage.removeItem(KEYS.draft);elapsed.pause();setPhase('done');onSaved();
+      removeJson(KEYS.draft,storage);elapsed.pause();setPhase('done');onSaved();
     }catch(e){setError((e as Error).message);}finally{setSaving(false);}
   };
-  if(phase==='done')return <div className="screen"><div className="empty-state"><h2>Training afgerond!</h2><p>{isDemo?'Lokaal op dit toestel opgeslagen.':'Opgeslagen op de server.'}</p><button className="btn btn-secondary" onClick={()=>{setPhase('start');elapsed.reset();setCompleted({});sessionId.current=crypto.randomUUID();}}>Nieuwe training</button></div></div>;
+  if(phase==='done')return <div className="screen"><div className="empty-state"><h2>Training afgerond!</h2><p>{isDemo?'Lokaal op dit toestel opgeslagen.':'Opgeslagen op de server.'}</p><button className="btn btn-secondary" onClick={()=>{setPhase('start');elapsed.reset();setCompleted({});sessionId.current=crypto.randomUUID();saveEndTime.current=null;setFinalizing(false);retryAction.current=null;}}>Nieuwe training</button></div></div>;
+  if(finalizing)return <div className="screen"><div className="card"><h2>Training bewaren</h2><p>De training blijft op dit toestel tot de database de opslag bevestigt. Een nieuwe poging gebruikt dezelfde training.</p>{error&&<p role="alert" className="editor-error">{error}</p>}<button className="btn btn-primary btn-full" disabled={saving} onClick={async()=>{
+    if(retryAction.current){await retryAction.current();return;}
+    setSaving(true);setError('');try{await api.retrySession(sessionId.current);removeJson(KEYS.draft,storage);setPhase('done');onSaved();}catch(e){setError((e as Error).message);}finally{setSaving(false);}
+  }}>{saving?'Opslaan…':'Opnieuw opslaan'}</button></div></div>;
   return <div className="screen">
     {error&&<p role="alert" className="editor-error">{error}</p>}{draftError&&<p role="alert" className="editor-error">{draftError}</p>}
     {!plan&&<div className="card"><h3>Vrije training</h3><button className="btn btn-primary btn-full" onClick={()=>{setPlan({date:localDate(),type:'kracht',title:'Vrije krachttraining',durationMinutes:readProfile()?.sessionDurationMinutes??60,exercises:[]});setEditor(true);}}>Krachttraining samenstellen</button><h3 style={{marginTop:20}}>Vrije duurtraining</h3><EnduranceFlow defaultSport="running" defaultDuration={45} defaultIntensity="easy" onSave={saveEndurance}/></div>}

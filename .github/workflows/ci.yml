@@ -126,6 +126,8 @@ jobs:
           alembic upgrade head 2>&1 | tee -a migration.log
       - name: Verify hosted database isolation and restart
         run: python -m deployment.check_postgres
+      - name: Verify cloud storage row ownership
+        run: python -m deployment.check_cloud_storage
       - name: Upload migration diagnostics
         if: always()
         uses: actions/upload-artifact@v4

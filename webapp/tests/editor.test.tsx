@@ -7,7 +7,7 @@ test('future editing and live add/reorder preserve confirmed measurements throug
  const dom=new JSDOM('<div id="root"></div>',{url:'https://example.test/concurrent-training/',pretendToBeVisual:true}),w=dom.window;
  Object.assign(globalThis,{window:w,document:w.document,localStorage:w.localStorage,HTMLElement:w.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true});
  Object.defineProperty(globalThis,'navigator',{value:w.navigator,configurable:true});w.confirm=()=>true;
- const {createRoot}=await import('react-dom/client'),{default:App}=await import('../src/App.tsx');
+ const {createRoot}=await import('react-dom/client'),{TrainingApp:App}=await import('../src/App.tsx');
  const {KEYS,localDate,readDraft,readJson,readSessions,writeJson}=await import('../src/api/local.ts');
  const {createExercise}=await import('../src/data/exercises.ts');
  const today=new Date(),future=new Date(today);future.setDate(today.getDate()+1);

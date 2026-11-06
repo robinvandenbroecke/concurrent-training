@@ -10,9 +10,10 @@ import {
   DEMO_READINESS, DEMO_TODAY, DEMO_WEEK_DAYS, getDemoHistory, getDemoTrend, DEMO_PROFILE
 } from '../data/demoData';
 import { KEYS, readJson, writeJson, readProfile, readSessions, appendSession, buildWeek, measuredTrend, localDate } from './local';
+import type { CloudStore } from './cloud';
 
 export interface ApiConfig {
-  mode: 'demo' | 'backend';
+  mode: 'demo' | 'backend' | 'cloud';
   baseUrl: string;
   apiKey: string;
   athleteId: number | null;
@@ -51,6 +52,12 @@ export interface SaveEnduranceSession {
 }
 
 class ApiAdapter {
+  private cloud: CloudStore | null = null;
+  useCloud(store: CloudStore) { this.cloud = store; this.configure({ mode: 'cloud', apiKey: '', athleteId: null }); }
+  disconnectCloud() { this.cloud = null; this.configure({ mode: 'demo', apiKey: '', athleteId: null }); }
+  async retrySession(id: number | string) { if (this.cloud) await this.cloud.saveSession(id); }
+  async confirmStorage() { if (this.cloud) await this.cloud.flush(); }
+
   private config: ApiConfig = {
     mode: 'demo',
     baseUrl: '',
@@ -84,8 +91,8 @@ class ApiAdapter {
   }
 
   async getReadiness(): Promise<ReadinessData> {
-    if (this.isDemo) return { overall: null, per_lift: {}, endurance: null,
-      explanations: ['Het onderzoeksmodel is niet gekoppeld. Lokale sessies worden niet omgezet in een belastbaarheidsscore.'], assessment_status: 'insufficient_data' };
+    if (this.config.mode !== 'backend') return { overall: null, per_lift: {}, endurance: null,
+      explanations: ['Het onderzoeksmodel is niet gekoppeld. Geregistreerde sessies worden niet omgezet in een belastbaarheidsscore.'], assessment_status: 'insufficient_data' };
     const id = this.config.athleteId;
     if (!id) throw new Error('Geen atleet geselecteerd');
     const r = await this.fetch<ReadinessData>(`/readiness/today?athlete_id=${id}`);
@@ -95,13 +102,13 @@ class ApiAdapter {
   }
 
   async getTodayPlan(): Promise<PlannedTraining | null> {
-    if (this.isDemo) return (await this.getWeekDays()).find(d => d.isToday)?.planned ?? null;
+    if (this.config.mode !== 'backend') return (await this.getWeekDays()).find(d => d.isToday)?.planned ?? null;
     // Backend heeft geen dedicated planning-endpoint; gebruik readiness + autoregulate als proxy
     return Promise.resolve(null);
   }
 
   async getWeekDays(): Promise<WeekDay[]> {
-    if (this.isDemo) {
+    if (this.config.mode !== 'backend') {
       const profile = readProfile();
       return profile ? buildWeek(profile, new Date(), readSessions(), readJson(KEYS.overrides, {})) : [];
     }
@@ -110,7 +117,7 @@ class ApiAdapter {
   }
 
   async getHistory(days = 30): Promise<WorkoutSession[]> {
-    if (this.isDemo) return readSessions().sort((a, b) => b.date.localeCompare(a.date));
+    if (this.config.mode !== 'backend') return readSessions().sort((a, b) => b.date.localeCompare(a.date));
     const id = this.config.athleteId;
     if (!id) throw new Error('Geen atleet geselecteerd');
     const data = await this.fetch<{ strength: unknown[]; endurance: unknown[] }>(
@@ -140,7 +147,7 @@ class ApiAdapter {
   }
 
   async getLiftTrend(lift: LiftType, days = 30): Promise<TrendPoint[]> {
-    if (this.isDemo) return measuredTrend(readSessions(), lift);
+    if (this.config.mode !== 'backend') return measuredTrend(readSessions(), lift);
     const id = this.config.athleteId;
     if (!id) throw new Error('Geen atleet geselecteerd');
     const data = await this.fetch<{ data: Array<{ date: string; C_l: number }> }>(
@@ -150,11 +157,14 @@ class ApiAdapter {
   }
 
   async saveStrengthWorkout(workout: SaveStrengthWorkout): Promise<{ sessionIds: (number | string)[] }> {
-    if (this.isDemo) {
-      // Demo: opslaan in localStorage
-      const record = appendSession({ id: workout.sessionId, date: localDate(new Date(workout.startTime)), type: 'kracht',
+    if (this.config.mode !== 'backend') {
+      // Cache first; cloud mode waits for acknowledgement of this immutable session.
+      const store = this.cloud;
+      const existing = store ? readSessions(store.storage).find(s=>String(s.id)===String(workout.sessionId)) : undefined;
+      const record = existing ?? appendSession({ id: workout.sessionId, date: localDate(new Date(workout.startTime)), type: 'kracht',
         title: workout.title ?? 'Krachttraining', durationMinutes: workout.durationMinutes ?? 0, savedToServer: false,
         exercises: workout.completedExercises ?? [] });
+      if (store) await store.saveSession(record.id!);
       return { sessionIds: [record.id!] };
     }
     const payload = {
@@ -174,11 +184,14 @@ class ApiAdapter {
   }
 
   async saveEnduranceSession(session: SaveEnduranceSession): Promise<{ id: number | string }> {
-    if (this.isDemo) {
-      const record = appendSession({ id: session.sessionId, date: localDate(new Date(session.startTime)), type: 'duur',
+    if (this.config.mode !== 'backend') {
+      const store = this.cloud;
+      const existing = store ? readSessions(store.storage).find(s=>String(s.id)===String(session.sessionId)) : undefined;
+      const record = existing ?? appendSession({ id: session.sessionId, date: localDate(new Date(session.startTime)), type: 'duur',
         title: `Duur — ${session.sport}`, durationMinutes: session.durationMinutes, savedToServer: false,
         enduranceResult: { sport: session.sport, durationMinutes: session.durationMinutes, intensityType: session.intensityType,
           rpe: session.rpe, averagePowerW: session.averagePowerW } });
+      if (store) await store.saveSession(record.id!);
       return { id: record.id! };
     }
     const payload = {
@@ -195,7 +208,7 @@ class ApiAdapter {
   }
 
   async getProfile(): Promise<AthleteProfile> {
-    if (this.isDemo) {
+    if (this.config.mode !== 'backend') {
       const stored = readProfile();
       if (stored) return stored;
       return { ...DEMO_PROFILE };
@@ -205,14 +218,13 @@ class ApiAdapter {
 
   async saveProfile(profile: AthleteProfile): Promise<void> {
     writeJson(KEYS.profile, profile);
-    if (!this.isDemo) {
-      // TODO: sync met backend via athlete endpoint
-    }
+    await this.confirmStorage();
   }
 
   async skipDay(date: string): Promise<void> {
     const overrides = readJson<Record<string, PlannedTraining | null>>(KEYS.overrides, {});
     writeJson(KEYS.overrides, { ...overrides, [date]: null });
+    await this.confirmStorage();
   }
 
   async moveDay(from: string, to: string): Promise<void> {
@@ -223,6 +235,7 @@ class ApiAdapter {
       || !profile?.availableDays.includes(new Date(`${to}T12:00:00`).getDay())) throw new Error('Kies een vrije, beschikbare dag in deze week.');
     const overrides = readJson<Record<string, PlannedTraining | null>>(KEYS.overrides, {});
     writeJson(KEYS.overrides, { ...overrides, [from]: null, [to]: { ...source.planned, date: to } });
+    await this.confirmStorage();
   }
 }
 

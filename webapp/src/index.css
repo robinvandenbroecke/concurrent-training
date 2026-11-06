@@ -430,3 +430,25 @@ input[type=number] { -moz-appearance: textfield; }
 .screen { height: 100%; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
 @supports (height: 100dvh) { .app-shell { height: 100dvh; } }
+
+/* Account access and explicit persistence status */
+.auth-screen { min-height: 100%; overflow-y: auto; padding: 24px 16px; display: flex; align-items: flex-start; justify-content: center; }
+.auth-card { width: 100%; max-width: 440px; margin: 24px auto; padding: 24px; }
+.auth-card h1 { font-size: 25px; margin-bottom: 8px; }
+.auth-card h2 { font-size: 19px; margin: 24px 0 16px; }
+.auth-card .form-label { display: block; margin-bottom: 16px; }
+.auth-card .form-input { margin-top: 6px; width: 100%; }
+.auth-card .text-xs { margin-top: 20px; }
+.auth-logo { color: var(--c-accent); font-size: 32px; font-weight: 800; }
+.auth-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 14px; }
+.account-shell { height: 100%; display: flex; flex-direction: column; max-width: 600px; margin: auto; }
+.account-content { flex: 1; min-height: 0; }
+.account-bar { flex-shrink: 0; padding: 8px 16px; background: var(--c-surface); border-bottom: 1px solid var(--c-border); font-size: 12px; max-height: 50dvh; overflow-y: auto; }
+.account-bar summary { cursor: pointer; overflow-wrap: anywhere; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
+.sync-status { padding-top: 4px; overflow-wrap: anywhere; color: var(--c-text2); }
+.sync-status.saved { color: var(--c-success); }
+.sync-status.error, .sync-status.conflict, .sync-status.pending { color: var(--c-warn); }
+.account-notice { padding: 10px; background: var(--c-surface2); border-radius: 8px; margin: 10px 0; overflow-wrap: anywhere; }
+.account-notice p { margin-bottom: 8px; }
+@media (max-width: 380px) { .auth-card { padding: 18px; } .auth-card h1 { font-size: 22px; } }

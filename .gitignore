@@ -50,3 +50,6 @@ strength_data_*.csv
 # Webapp
 node_modules/
 *.tsbuildinfo
+
+# Supabase CLI local state
+supabase/.temp/

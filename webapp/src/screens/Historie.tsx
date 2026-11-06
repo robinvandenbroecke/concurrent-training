@@ -135,14 +135,14 @@ export default function Historie({ isDemo }: Props) {
 
                 {!s.savedToServer && (
                   <div className="text-xs" style={{ color: 'var(--c-text3)', marginTop: 4 }}>
-                    Alleen lokaal opgeslagen
+                    Nog niet in de database bewaard
                   </div>
                 )}
               </div>
             ))
           )}
 
-          {isDemo && (
+          {(
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <ExportButton isDemo={isDemo} />
               <label className="btn btn-ghost btn-sm" style={{ marginTop: 8, cursor: 'pointer' }}>
@@ -151,7 +151,7 @@ export default function Historie({ isDemo }: Props) {
                   const file = e.target.files?.[0]; if (!file) return;
                   try {
                     if (file.size > 10 * 1024 * 1024) throw new Error('Gebruik een JSON-bestand kleiner dan 10 MB.');
-                    importLocal(await file.text()); setRevision(n => n + 1); setImportMessage('Sessies toegevoegd. Je huidige profiel blijft behouden.');
+                    importLocal(await file.text()); await api.confirmStorage(); setRevision(n => n + 1); setImportMessage('Sessies toegevoegd. Je huidige profiel blijft behouden.');
                   } catch (error) { setImportMessage((error as Error).message); }
                   e.target.value = '';
                 }} />

@@ -14,6 +14,8 @@ export default function Week({ onStartTraining, onEditTraining, onChanged }: Pro
   const [days, setDays] = useState<WeekDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error,setError]=useState('');
+  const skip=async(date:string)=>{setError('');try{await api.skipDay(date);onChanged();}catch(e){setError((e as Error).message);}};
 
   useEffect(() => {
     api.getWeekDays()
@@ -34,6 +36,7 @@ export default function Week({ onStartTraining, onEditTraining, onChanged }: Pro
 
   return (
     <div className="screen">
+      {error&&<p role="alert" className="editor-error">{error}</p>}
       {/* Week strip */}
       <div className="card">
         <div className="card-title">Week overzicht</div>
@@ -150,11 +153,11 @@ export default function Week({ onStartTraining, onEditTraining, onChanged }: Pro
               )}
               {!selected.isPast&&selected.planned.type==='kracht'&&<button className="btn btn-secondary btn-full" style={{marginTop:8}} onClick={()=>onEditTraining(selected.planned!)}>Training aanpassen</button>}
               {!selected.isToday && !selected.isPast && (
-                <button className="btn btn-ghost btn-full btn-sm" onClick={async () => { await api.skipDay(selected.date); onChanged(); }}>
+                <button className="btn btn-ghost btn-full btn-sm" onClick={() => skip(selected.date)}>
                   Overslaan
                 </button>
               )}
-              {selected.isToday && <button className="btn btn-ghost btn-full btn-sm" onClick={async () => { await api.skipDay(selected.date); onChanged(); }}>Overslaan</button>}
+              {selected.isToday && <button className="btn btn-ghost btn-full btn-sm" onClick={() => skip(selected.date)}>Overslaan</button>}
               {selected.isPast && !selected.completed && (
                 <div style={{ color: 'var(--c-text3)', fontSize: 13, textAlign: 'center' }}>
                   Overgeslagen
@@ -170,7 +173,7 @@ export default function Week({ onStartTraining, onEditTraining, onChanged }: Pro
         <div className="card-title">Planning — huidige versie</div>
         <p className="text-small text-muted">
           De weekplanning is gebaseerd op jouw beschikbare dagen en prioriteitskeuze.
-          Overslaan wordt lokaal bijgehouden.
+          Overgeslagen dagen blijven in je planning bewaard.
           Automatisch inhaalvolume wordt niet toegevoegd.
           Volledige integratie met het trainingsmodel is toekomstig werk.
         </p>

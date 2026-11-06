@@ -1,3 +1,4 @@
+import { api } from '../api/adapter';
 import React, { useState } from 'react';
 import type { PlannedTraining } from '../types';
 import { buildWeek, KEYS, localDate, readJson, readProfile, readSessions, writeJson } from '../api/local';
@@ -34,9 +35,9 @@ export default function VolumePanel({plan,completed={},sessionId}:{plan:PlannedT
       <p className="text-xs text-muted">Pas aan met je trainingsrespons of coach. De app meet geen maximale herstelbare dosis en kent trainingen buiten de app niet.</p>
       {(['squat','bench','deadlift'] as Powerlift[]).map(l=><div key={l} className="target-row"><strong>{LIFT_LABELS[l]}</strong>{(['min','max'] as const).map(k=><label key={k}>{k==='min'?'Min. sets':'Max. sets'}<input aria-label={`${LIFT_LABELS[l]} ${k}`} className="form-input" type="number" min="0" max="40" step="1" value={settings.targets[l][k]} onChange={e=>setSettings(s=>({...s,targets:{...s.targets,[l]:{...s.targets[l],[k]:Number(e.target.value)}}}))}/></label>)}</div>)}
       <label className="form-label">Signaalgrens per spiergroep per week<input className="form-input" type="number" min="8" max="40" value={settings.muscleAlert} onChange={e=>setSettings(s=>({...s,muscleAlert:Number(e.target.value)}))}/></label>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>{try{
+      <button type="button" className="btn btn-ghost btn-sm" onClick={async()=>{try{
         if(Object.values(settings.targets).some(t=>!Number.isInteger(t.min)||!Number.isInteger(t.max)||t.min<0||t.max<t.min||t.max>40)||!Number.isInteger(settings.muscleAlert)||settings.muscleAlert<8||settings.muscleAlert>40)throw new Error('Gebruik hele setdoelen van 0–40 met max ≥ min; de spiergroepsignaalgrens is 8–40.');
-        writeJson(KEYS.volumeTargets,settings);setMessage('Volumedoelen opgeslagen.');
+        writeJson(KEYS.volumeTargets,settings);await api.confirmStorage();setMessage('Volumedoelen opgeslagen.');
       }catch(e){setMessage((e as Error).message);}}}>Bewaar volumedoelen</button>
       {message&&<p role="status" className="text-small">{message}</p>}
     </details>

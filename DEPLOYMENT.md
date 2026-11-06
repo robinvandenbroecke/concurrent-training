@@ -1,12 +1,12 @@
 # Webapp bouwen en publiceren
 
-De gecombineerde React/Python-hosting is live op [Render](https://concurrent-training.onrender.com/concurrent-training/), met een aparte Supabase-database voor de API. Zie [gratis hosting](docs/free_hosting.md) voor de gecontroleerde status en beperkingen. De frontend bewaart gegevens nog lokaal in de browser; ook de Pages-app blijft beschikbaar.
+De gecombineerde React/Python-hosting is live op [Render](https://concurrent-training.onrender.com/concurrent-training/), met een aparte Supabase-database voor de API. Zie [gratis hosting](docs/free_hosting.md) voor de gecontroleerde status en beperkingen. De frontend gebruikt nu Supabase Auth en slaat trainingen per account op. Ook de Pages-app blijft beschikbaar. Zie [accounts en opslag](docs/accounts_and_storage.md).
 
 ## Huidige versie
 
 `webapp/src/` is de enige frontendbron. De productiebuild gebruikt React, TypeScript en Vite met een vastgelegde `package-lock.json`. De losse HTML-implementatie uit Claudes ZIP is niet opgenomen: anders konden ontwikkeling en publicatie verschillende apps opleveren.
 
-Dit is een lokaal prototype met onboarding, een aanpasbaar A/B-krachtprogramma met 42 catalogusoefeningen en volumefeedback, registratie van kracht- en duursessies, rusttimer, historie, gemeten werkgewichten en JSON-export/import. Frontendgegevens staan in deze browser op dit toestel. De gehoste API heeft een database, maar de frontend gebruikt die nog niet. Er is geen account, synchronisatie met Android/Strava/Garmin/Wahoo of gekoppeld onderzoeksmodel. Browsergegevens wissen verwijdert ook de lokale gegevens; maak exports via Historie. Een import voegt sessies toe en wijzigt het profiel niet.
+Dit is een prototype met login, onboarding, een aanpasbaar A/B-krachtprogramma met 42 catalogusoefeningen en volumefeedback, registratie van kracht- en duursessies, rusttimer, historie, gemeten werkgewichten en JSON-export/import. Na login staan bevestigde trainingen, profiel, planning, volumedoelen en de bevestigde invoer van de open krachttraining in de aparte Supabase-database. Een cache per account op dit toestel bewaart invoer bij verbindingsproblemen; alleen een bevestigde databaseopslag krijgt een succesmelding. Vernieuwen of opnieuw inloggen laadt het account op een ander toestel. Niet-bevestigde invoervelden blijven tijdelijk. De frontend roept de private beheer-API of het onderzoeksmodel nog niet aan. Strava/Garmin/Wahoo-import en een gekoppelde Android-app blijven toekomstig werk. Bestaande lokale sessies kunnen expliciet worden overgenomen of als JSON worden geïmporteerd; maak ook exports via Historie.
 
 De weekindeling gebruikt een transparant startschema binnen de opgegeven dagen en sessieduur. Trainingen kunnen vooraf via Vandaag/Week en tijdens de training worden aangepast. Zie [de literatuur, programmering en telregels](docs/strength_program_2026_10.md). Werkgewichten komen uit de invoer van de gebruiker. Belastbaarheid blijft onbekend zolang het onderzoeksmodel niet is gekoppeld. De app toont geen fictieve trainingshistorie, berekende 1RM of wetenschappelijk gevalideerde personalisatie.
 
@@ -40,7 +40,7 @@ Webapp: [Concurrent Training](https://robinvandenbroecke.github.io/concurrent-tr
 
 Bij handmatige uitvoering: Actions → **Webapp** → Run workflow → branch `main` → vink `deploy` aan. Zonder dit vinkje voert een handmatige run alleen tests en de build uit. Controleer steeds de geslaagde `deploy`-job voordat je een nieuwe publicatie als live beschouwt.
 
-De broncode en de Pages-site zijn publiek. Persoonlijke trainingsgegevens worden in deze versie alleen in de browser opgeslagen.
+De broncode en de Pages-site zijn publiek. Persoonlijke trainingsgegevens staan per ingelogde gebruiker in Supabase, met RLS. De publieke frontend bevat uitsluitend de publiceerbare Supabase-configuratie.
 
 De Vite-base is `/concurrent-training/`. Navigatie zit in de appstate en gebruikt geen subroutes waarvoor serverrewrites nodig zijn. Manifest en pictogram verwijzen naar bestaande bestanden. Er is geen service worker en geen gegarandeerde offlinebeschikbaarheid.
 
@@ -59,7 +59,8 @@ Op 21 oktober 2026 is de live Pages-app gecontroleerd in Chrome: onboarding met 
 
 ## Nog te bouwen
 
-- Gebruikersauthenticatie, per-atleet autorisatie en een beveiligde backendkoppeling; nooit een beheer-API-sleutel in de frontend opnemen.
+- Eigen SMTP voor registratie en wachtwoordherstel voor publieke gebruikers; de standaard e-maildienst is beperkt tot toegelaten adressen.
+- Een beveiligde koppeling tussen gebruikersdata en de Python-rekenmotor; nooit een beheer-API-sleutel in de frontend opnemen.
 - Echte planning, VBT- en vermogensdata koppelen aan de backend, met contracttests en expliciete onzekerheid.
 - Synchronisatie tussen website en Android, inclusief conflicten en herstel bij verbindingsverlies.
 - Apart literatuuronderzoek en empirische validatie van de deelmodellen en het concurrent model, volgens de afgesproken volgende fase.

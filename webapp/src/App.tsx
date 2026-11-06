@@ -7,7 +7,8 @@ import Training from './screens/Training';
 import Week from './screens/Week';
 import Historie from './screens/Historie';
 import { IconHome, IconDumbbell, IconCalendar, IconChart } from './components/Icons';
-import { KEYS, readProfile, readDraft } from './api/local';
+import { KEYS, readProfile, readDraft, removeJson } from './api/local';
+import AccountGate from './screens/AccountGate';
 
 type Tab = 'vandaag' | 'training' | 'week' | 'historie';
 
@@ -17,7 +18,7 @@ function loadStoredProfile(): AthleteProfile | null {
   return readProfile();
 }
 
-export default function App() {
+export function TrainingApp({ cloudMode = false }: { cloudMode?: boolean }) {
   const [profile, setProfile] = useState<AthleteProfile | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>('vandaag');
@@ -25,11 +26,11 @@ export default function App() {
   const [trainingSaved, setTrainingSaved] = useState(0); // increment to trigger refresh
   const [editRequest,setEditRequest]=useState(0);
 
-  // Always demo mode in this build (no backend credentials in frontend)
-  const isDemo = true;
+  // The production wrapper supplies an authenticated account store.
+  const isDemo = !cloudMode;
 
   useEffect(() => {
-    api.configure({ mode: 'demo', baseUrl: '', apiKey: '', athleteId: 1 });
+    if (!cloudMode) api.configure({ mode: 'demo', baseUrl: '', apiKey: '', athleteId: 1 });
     const stored = loadStoredProfile();
     if (stored?.onboardingComplete) {
       setProfile(stored);
@@ -46,7 +47,7 @@ export default function App() {
     const draft = readDraft();
     if (draft && (draft.plan.date !== plan.date || draft.plan.title !== plan.title)) {
       if (!window.confirm('Er staat nog een training open. Die vervangen door deze training?')) return false;
-      localStorage.removeItem(KEYS.draft);
+      removeJson(KEYS.draft);
     }
     setActivePlan(plan);
     setTab('training');
@@ -80,10 +81,10 @@ export default function App() {
             aria-label="Profiel opnieuw instellen"
             onClick={() => {
               if (window.confirm('Onboarding opnieuw starten?')) {
-                localStorage.removeItem(PROFILE_KEY);
-                localStorage.removeItem(KEYS.draft);
-                localStorage.removeItem(KEYS.overrides);
-                localStorage.removeItem(KEYS.volumeTargets);
+                removeJson(PROFILE_KEY);
+                removeJson(KEYS.draft);
+                removeJson(KEYS.overrides);
+                removeJson(KEYS.volumeTargets);
                 setActivePlan(null);
                 setProfile(null);
               }
@@ -145,3 +146,5 @@ export default function App() {
     </div>
   );
 }
+
+export default function App() { return <AccountGate><TrainingApp cloudMode /></AccountGate>; }
