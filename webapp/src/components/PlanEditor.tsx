@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import type { PlannedExercise, PlannedTraining } from '../types';
-import { EXERCISES, createExercise, definition, normalizePlan } from '../data/exercises';
+import { EXERCISES, available, createExercise, definition, normalizePlan } from '../data/exercises';
 import { readProfile } from '../api/local';
 import { editPrescription, moveExercise, removeExercise, replaceExercise, validatePlan } from '../domain/editing';
 import type { CompletedMap } from '../domain/volume';
@@ -17,7 +17,12 @@ export default function PlanEditor({plan,completed={},sessionId,onSave,onCancel}
   const form=useRef<HTMLFormElement>(null),profile=readProfile()??undefined;
   const edit=(action:()=>PlannedTraining)=>{try{setWorking(action());setError('');}catch(e){setError((e as Error).message);}};
   const update=(ex:PlannedExercise,patch:Parameters<typeof editPrescription>[1])=>edit(()=>({...working,exercises:working.exercises?.map(e=>e.id===ex.id?editPrescription(e,patch,completed):e)}));
-  const filtered=EXERCISES.filter(d=>(!category||d.category===category)&&(!equipment||d.equipment===equipment)&&`${d.name} ${d.id}`.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()));
+  const matching=EXERCISES.filter(d=>(!category||d.category===category)&&(!equipment||d.equipment===equipment)&&`${d.name} ${d.id}`.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()));
+  // When replacing, exercises with the same movement pattern that fit the athlete's equipment come first.
+  const original=replacement?definition(working.exercises?.find(e=>e.id===replacement)??{lift:'other'}):undefined;
+  const program=readProfile()?.program;
+  const fits=(d:typeof EXERCISES[number])=>!!original&&d.id!==original.id&&d.pattern===original.pattern&&(!program||available(d,program.equipment));
+  const filtered=original?[...matching.filter(fits),...matching.filter(d=>!fits(d))]:matching;
   const add=(id:string)=>edit(()=>{
     if(!replacement&&(working.exercises?.length??0)>=30)throw new Error('Maximaal 30 oefeningen per sessie.');
     const ex=createExercise(id,profile);

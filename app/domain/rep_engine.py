@@ -303,7 +303,10 @@ class RepState:
     
     def A_local(self, lift: str) -> float:
         """Current local availability for a lift."""
-        return math.exp(self.x_local.get(lift, self.min_log))
+        # A lift without an initial state has no recorded fatigue. The former
+        # default (the clamping floor, 2 % availability) made its first
+        # predicted velocity 50 times too low.
+        return math.exp(self.x_local.get(lift, 0.0))
     
     @property
     def A_M(self) -> float:
@@ -423,11 +426,11 @@ class RepState:
         vl_catastrophe: float = 0.0,
         density_factor: float = 1.0,
         set_end_rpe: Optional[float] = None
-    ) -> Tuple[float, float, float, float, float, str]:
+    ) -> Tuple[float, float, float, float, float]:
         """
         H1: Apply fatigue from one rep with hardened model.
         
-        Returns: (A_l, A_sys, A_M, v_pred_next, y_phi, limiting_factor)
+        Returns: (A_l, A_sys, A_M, y_phi, phi_local)
         """
         a_local, a_sys, _ = self._get_lift_params(lift)
         
@@ -448,7 +451,7 @@ class RepState:
         # Update local log-availability
         A_M = self.A_M
         delta_x_local = a_local * phi_local * (1.0 + self.params.eta_M * (1.0 - A_M))
-        self.x_local[lift] = max(self.min_log, self.x_local.get(lift, self.min_log) - delta_x_local)
+        self.x_local[lift] = max(self.min_log, self.x_local.get(lift, 0.0) - delta_x_local)
         
         # Update system log-availability (uses central phi with density factor)
         delta_x_sys = a_sys * phi_central

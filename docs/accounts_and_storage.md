@@ -45,3 +45,7 @@ Gratis hosting houdt de eerder beschreven slaap-, pauze- en back-upbeperkingen. 
 - `npm audit --omit=dev`: geen gemelde kwetsbaarheden op 6 november 2026. Dit is een momentopname.
 
 Bronnen: [Supabase password auth](https://supabase.com/docs/guides/auth/passwords), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [redirects](https://supabase.com/docs/guides/auth/redirect-urls). Actuele documentatie en changelog zijn bij implementatie gecontroleerd.
+
+## Rekenmotor (sinds 14 november 2026)
+
+Voor de kaart "Inzicht uit je eigen gegevens" stuurt de webapp de trainingen van de ingelogde gebruiker naar de eigen server op Render (`POST /v3/engine/evaluate`). Naam, e-mailadres, sessietitels en notities gaan niet mee; metingen, datums, starttijden en oefeningen wel. De server controleert het sessietoken tegen de publieke sleutels van het Supabase-project, rekent, en bewaart of logt de gegevens niet. Het laatste antwoord blijft in de accountcache van de browser. Zonder login wordt niets verstuurd. Deze gegevensstroom hoort in de privacytekst voor gebruikers te staan.

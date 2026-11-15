@@ -452,3 +452,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .account-notice { padding: 10px; background: var(--c-surface2); border-radius: 8px; margin: 10px 0; overflow-wrap: anywhere; }
 .account-notice p { margin-bottom: 8px; }
 @media (max-width: 380px) { .auth-card { padding: 18px; } .auth-card h1 { font-size: 22px; } }
+.engine-heading { font-size: 13px; font-weight: 700; margin: 14px 0 6px; color: var(--c-text); }
+.engine-list { margin: 0 0 4px; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--c-text-muted, inherit); }
+.engine-list li { margin-bottom: 5px; overflow-wrap: anywhere; }
+.setup-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+@media (max-width: 380px) { .setup-row { grid-template-columns: 1fr; } }

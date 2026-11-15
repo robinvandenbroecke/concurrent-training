@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { AthleteProfile, Priority, LiftType } from '../types';
-import { LIFT_NAMES } from '../data/demoData';
+import { LIFT_NAMES } from '../data/names';
 
 interface Props {
   onComplete: (profile: AthleteProfile) => void;

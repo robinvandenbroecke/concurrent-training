@@ -101,6 +101,7 @@ export function TrainingApp({ cloudMode = false }: { cloudMode?: boolean }) {
           <Vandaag
             key={trainingSaved}
             profile={profile}
+            onProfileChanged={p => { setProfile(p); setTrainingSaved(n => n + 1); }}
             onStartTraining={handleStartTraining}
             onEditTraining={handleEditTraining}
             isDemo={isDemo}

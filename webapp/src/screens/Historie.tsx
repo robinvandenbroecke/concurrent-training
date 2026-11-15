@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { WorkoutSession, TrendPoint, LiftType } from '../types';
 import { api } from '../api/adapter';
-import { LIFT_NAMES, SPORT_NAMES } from '../data/demoData';
+import { LIFT_NAMES, SPORT_NAMES } from '../data/names';
 import { exportLocal, importLocal } from '../api/local';
 
 interface Props {

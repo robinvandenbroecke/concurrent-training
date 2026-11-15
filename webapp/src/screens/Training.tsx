@@ -3,7 +3,7 @@ import type {
   PlannedTraining, PlannedExercise, CompletedSet, CompletedExercise, LiftType, EnduranceSport, IntensityType
 } from '../types';
 import { api } from '../api/adapter';
-import { LIFT_NAMES, SPORT_NAMES, INTENSITY_NAMES } from '../data/demoData';
+import { LIFT_NAMES, SPORT_NAMES, INTENSITY_NAMES } from '../data/names';
 import { useTimer } from '../hooks/useTimer';
 import { IconCheck, IconClock } from '../components/Icons';
 import { KEYS, localDate, parseVelocities, readDraft, readProfile, writeJson, saveEditedPlan, getLocalStore, removeJson, readSessions } from '../api/local';
@@ -332,7 +332,7 @@ export default function Training({plan:incoming,onSaved,isDemo,hasVbt,editReques
   const saveEndurance=async(r:{sport:EnduranceSport;durationMinutes:number;intensityType:IntensityType;rpe?:number;avgPower?:number})=>{
     setFinalizing(true);retryAction.current=()=>saveEndurance(r);
     setSaving(true);setError('');
-    try{await api.saveEnduranceSession({sessionId:sessionId.current,athleteId:1,sport:r.sport,startTime:plan?startTime.current:new Date(Date.now()-r.durationMinutes*60000).toISOString(),durationMinutes:r.durationMinutes,intensityType:r.intensityType,rpe:r.rpe,averagePowerW:r.avgPower});
+    try{await api.saveEnduranceSession({sessionId:sessionId.current,athleteId:1,sport:r.sport,startTime:plan?startTime.current:new Date(Date.now()-r.durationMinutes*60000).toISOString(),startTimeKnown:!!plan,durationMinutes:r.durationMinutes,intensityType:r.intensityType,rpe:r.rpe,averagePowerW:r.avgPower});
       removeJson(KEYS.draft,storage);elapsed.pause();setPhase('done');onSaved();
     }catch(e){setError((e as Error).message);}finally{setSaving(false);}
   };

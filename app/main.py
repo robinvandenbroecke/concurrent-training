@@ -31,6 +31,7 @@ from app.services import (
 from app.services.capacity_profile_service import CapacityProfileService
 from app.services.engine_orchestrator import EngineOrchestrator
 from app.types import EnduranceSport, LiftType
+from app.api_v3 import router as api_v3_router
 
 
 if settings.auto_create_tables:
@@ -44,7 +45,7 @@ async def verify_api_key(api_key: Optional[str] = Security(api_key_header)):
         return api_key
     if not api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key required")
-    if not hmac.compare_digest(api_key, settings.admin_api_key):
+    if not hmac.compare_digest(api_key.encode("utf-8"), settings.admin_api_key.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
     return api_key
 
@@ -53,7 +54,7 @@ async def verify_admin_api_key(api_key: Optional[str] = Security(api_key_header)
     """Admin mutations always require the configured key in every environment."""
     if not api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin API key required")
-    if not hmac.compare_digest(api_key, settings.admin_api_key):
+    if not hmac.compare_digest(api_key.encode("utf-8"), settings.admin_api_key.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin API key")
     return api_key
 
@@ -68,9 +69,10 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "X-API-Key"],
+    allow_headers=["Content-Type", "X-API-Key", "Authorization"],
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(api_v3_router)      # per-user engine API; authenticated by the user's own session token
 protected = APIRouter(dependencies=[Security(verify_api_key)])
 
 

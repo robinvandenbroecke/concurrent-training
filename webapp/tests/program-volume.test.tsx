@@ -12,7 +12,7 @@ const plan:PlannedTraining=normalizePlan({date:'2026-10-22',type:'kracht',title:
 function storage(){const data=new Map<string,string>();return{getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>{data.set(k,v);},removeItem:(k:string)=>{data.delete(k);}};}
 
 test('catalogue identities are unique and cover all exercise categories',()=>{
- assert.equal(EXERCISES.length,42);assert.equal(new Set(EXERCISES.map(d=>d.id)).size,42);
+ assert.equal(EXERCISES.length,58);assert.equal(new Set(EXERCISES.map(d=>d.id)).size,58);
  assert.deepEqual(new Set(EXERCISES.map(d=>d.category)),new Set(['Powerlifting','Olympisch','Accessoires','Sprongen']));
  for(const d of EXERCISES){const e=createExercise(d.id,p);assert.equal(definition(e)?.id,d.id);validatePlan({...plan,exercises:[e]});}
 });

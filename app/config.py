@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     strava_state_ttl_seconds: int = 600
     strava_token_encryption_key: str = ""
 
+    # Per-user engine API: the caller's own Supabase session token is verified
+    # against the project's public signing keys. Empty = the endpoints answer 503.
+    supabase_url: str = ""
+    supabase_jwt_audience: str = "authenticated"
+    supabase_jwt_secret: str = ""     # only for projects still on the legacy shared HS256 secret
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

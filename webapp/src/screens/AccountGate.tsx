@@ -5,6 +5,7 @@ import { accountStorage, exportLocal, getLocalStore, KEYS, observeStorage, readP
 import { cloudTransport, getSupabase } from '../api/supabase';
 import { api } from '../api/adapter';
 import Auth from './Auth';
+import { configureEngineAuth } from '../engine/client';
 
 export function downloadAccountCopy(recovery = false) {
   const content=recovery?getLocalStore().getItem('ct_conflict_backup'):JSON.stringify(exportLocal(),null,2);
@@ -32,6 +33,8 @@ export default function AccountGate({ children, client: suppliedClient, transpor
     return()=>{live=false;subscription.unsubscribe();};
   },[client]);
   const userId=session?.user.id;
+  // The engine is called with the user's own session token; nothing is sent while signed out.
+  useEffect(()=>{configureEngineAuth(userId?async()=>(await client.auth.getSession()).data.session?.access_token??null:null);return()=>configureEngineAuth(null);},[userId,client]);
   useEffect(()=>{
     setActive(null);setError('');setLegacy(false);
     if(!userId)return;

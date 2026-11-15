@@ -1,43 +1,84 @@
 import React, { useEffect, useState } from 'react';
-import type { ReadinessData, PlannedTraining, AthleteProfile } from '../types';
+import type { PlannedTraining, AthleteProfile, MaximalEffort, VelocityMetric } from '../types';
 import { api } from '../api/adapter';
-import { LIFT_NAMES, SPORT_NAMES, INTENSITY_NAMES } from '../data/demoData';
-import { IconPlay, IconClock, IconInfo } from '../components/Icons';
+import { isCalendarDate, localDate, readProfile } from '../api/local';
+import EngineCard from '../components/EngineCard';
+import ProgramSettingsCard from '../components/ProgramSettingsCard';
+import { SPORT_NAMES, INTENSITY_NAMES } from '../data/names';
+import { IconPlay, IconClock } from '../components/Icons';
 
 interface Props {
   profile: AthleteProfile;
+  onProfileChanged?: (profile: AthleteProfile) => void;
   onStartTraining: (plan: PlannedTraining) => void;
   onEditTraining: (plan: PlannedTraining) => void;
   isDemo: boolean;
 }
 
-function ReadinessBar({ label, value }: { label: string; value: number | null }) {
-  if (value === null) return null;
-  const pct = Math.round(value * 100);
-  const color = value >= 0.75 ? 'var(--c-success)' : value >= 0.55 ? 'var(--c-accent)' : 'var(--c-warn)';
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div className="row between text-small" style={{ marginBottom: 4 }}>
-        <span>{label}</span>
-        <span style={{ color, fontWeight: 700 }}>{pct}%</span>
-      </div>
-      <div className="readiness-bar-wrap">
-        <div className="readiness-bar" style={{ width: `${pct}%`, background: color }} />
-      </div>
+const METRICS: [VelocityMetric, string][] = [['unspecified', 'Niet opgegeven'], ['mean_concentric', 'Gemiddelde concentrische snelheid'],
+  ['mean_propulsive', 'Gemiddelde propulsieve snelheid'], ['peak', 'Pieksnelheid']];
+
+/** Meter and metric are stored with every new velocity; without them velocities cannot be compared over time. */
+function VelocitySetup({ profile }: { profile: AthleteProfile }) {
+  const [metric, setMetric] = useState<VelocityMetric>(profile.velocitySetup?.metric ?? 'unspecified');
+  const [device, setDevice] = useState(profile.velocitySetup?.deviceId ?? '');
+  const [saved, setSaved] = useState(false);
+  const save = async (nextMetric: VelocityMetric, nextDevice: string) => {
+    const current = readProfile() ?? profile;
+    await api.saveProfile({ ...current, velocitySetup: { metric: nextMetric, deviceId: nextDevice.trim().slice(0, 64) } });
+    setSaved(true);
+  };
+  return <div>
+    <div className="setup-row">
+      <label className="text-xs text-muted">Snelheidsmaat
+        <select className="form-select" value={metric} onChange={e => { const m = e.target.value as VelocityMetric; setMetric(m); void save(m, device); }}>
+          {METRICS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="text-xs text-muted">Snelheidsmeter (merk en type)
+        <input className="form-input" value={device} maxLength={64} placeholder="bv. lineaire encoder" onChange={e => { setDevice(e.target.value); setSaved(false); }} onBlur={() => void save(metric, device)} /></label>
     </div>
-  );
+    <p className="text-xs text-muted" style={{ marginTop: 6 }}>{saved ? 'Bewaard. ' : ''}Geldt voor nieuwe metingen. Snelheden van een andere meter of maat worden nooit in hetzelfde profiel gebruikt.</p>
+  </div>;
 }
 
-export default function Vandaag({ profile, onStartTraining, onEditTraining, isDemo }: Props) {
-  const [readiness, setReadiness] = useState<ReadinessData | null>(null);
+/** All-out efforts are the only basis for a critical-power fit; nothing is derived from ordinary rides. */
+function MaximalEfforts({ profile }: { profile: AthleteProfile }) {
+  const [efforts, setEfforts] = useState<MaximalEffort[]>(profile.maximalEfforts ?? []);
+  const [date, setDate] = useState(localDate()), [minutes, setMinutes] = useState(''), [seconds, setSeconds] = useState(''), [power, setPower] = useState('');
+  const [error, setError] = useState('');
+  const store = async (next: MaximalEffort[]) => { await api.saveProfile({ ...(readProfile() ?? profile), maximalEfforts: next }); setEfforts(next); };
+  const add = async () => {
+    const duration = Number(minutes || 0) * 60 + Number(seconds || 0), watts = Number(power);
+    if (!isCalendarDate(date) || date > localDate() || !Number.isFinite(duration) || duration < 120 || duration > 1200 || !Number.isFinite(watts) || watts < 50 || watts > 2000) {
+      setError('Vul een datum tot en met vandaag, een duur van 2 tot 20 minuten en een vermogen van 50 tot 2000 W in.'); return; }
+    if (efforts.length >= 20) { setError('Maximaal 20 inspanningen. Verwijder eerst een oude.'); return; }
+    setError(''); await store([...efforts, { date, durationSeconds: duration, powerW: watts }].sort((a, b) => a.date.localeCompare(b.date) || a.durationSeconds - b.durationSeconds));
+    setMinutes(''); setSeconds(''); setPower('');
+  };
+  return <details style={{ marginTop: 12 }}>
+    <summary className="text-small">Maximale inspanningen op de fiets ({efforts.length})</summary>
+    <p className="text-xs text-muted" style={{ margin: '6px 0' }}>Alleen inspanningen waarbij je voluit ging tot je niet meer kon, tussen 2 en 20 minuten. Drie van verschillende duur binnen enkele weken zijn nodig voor een critical power.</p>
+    {efforts.map((e, i) => <div key={`${e.date}:${e.durationSeconds}:${e.powerW}:${i}`} className="row between text-small" style={{ marginBottom: 4 }}>
+      <span>{e.date} · {Math.floor(e.durationSeconds / 60)}:{String(Math.round(e.durationSeconds % 60)).padStart(2, '0')} · {e.powerW} W</span>
+      <button className="btn btn-ghost btn-sm" aria-label={`Verwijder inspanning van ${e.date}`} onClick={() => void store(efforts.filter((_, j) => j !== i))}>Verwijderen</button></div>)}
+    <div className="setup-row">
+      <label className="text-xs text-muted">Datum<input className="form-input" type="date" value={date} max={localDate()} onChange={e => setDate(e.target.value)} /></label>
+      <label className="text-xs text-muted">Gemiddeld vermogen (W)<input className="form-input" inputMode="numeric" value={power} onChange={e => setPower(e.target.value)} /></label>
+      <label className="text-xs text-muted">Minuten<input className="form-input" inputMode="numeric" value={minutes} onChange={e => setMinutes(e.target.value)} /></label>
+      <label className="text-xs text-muted">Seconden<input className="form-input" inputMode="numeric" value={seconds} onChange={e => setSeconds(e.target.value)} /></label>
+    </div>
+    {error && <p role="alert" className="editor-error">{error}</p>}
+    <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => void add()}>Inspanning toevoegen</button>
+  </details>;
+}
+
+export default function Vandaag({ profile, onStartTraining, onEditTraining, isDemo, onProfileChanged }: Props) {
   const [plan, setPlan] = useState<PlannedTraining | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showExpl, setShowExpl] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([api.getReadiness(), api.getTodayPlan()])
-      .then(([r, p]) => { setReadiness(r); setPlan(p); })
+    api.getTodayPlan()
+      .then(p => { setPlan(p); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -46,12 +87,6 @@ export default function Vandaag({ profile, onStartTraining, onEditTraining, isDe
       <div className="empty-state"><p className="text-muted">Laden…</p></div>
     </div>
   );
-
-  const overall = readiness?.overall ?? null;
-  const overallPct = overall !== null ? Math.round(overall * 100) : null;
-  const overallColor = overall !== null
-    ? overall >= 0.75 ? 'var(--c-success)' : overall >= 0.55 ? 'var(--c-accent)' : 'var(--c-warn)'
-    : 'var(--c-text2)';
 
   return (
     <div className="screen">
@@ -65,71 +100,8 @@ export default function Vandaag({ profile, onStartTraining, onEditTraining, isDe
         </div>
       )}
 
-      {/* Readiness overview */}
-      <div className="card">
-        <div className="row between" style={{ marginBottom: 12 }}>
-          <div className="card-title" style={{ margin: 0 }}>Belastbaarheid vandaag</div>
-          <button
-            className="collapse-toggle"
-            onClick={() => setShowExpl(v => !v)}
-            aria-expanded={showExpl}
-            aria-label="Toelichting belastbaarheid"
-          >
-            <IconInfo />
-          </button>
-        </div>
-
-        {readiness === null ? (
-          <p className="text-muted text-small">Onvoldoende gegevens om belastbaarheid te schatten.</p>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                background: `conic-gradient(${overallColor} ${(overall ?? 0) * 360}deg, var(--c-surface2) 0)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <div style={{
-                  width: 50, height: 50, borderRadius: '50%', background: 'var(--c-surface)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, fontWeight: 700, color: overallColor,
-                }}>
-                  {overallPct !== null ? `${overallPct}%` : '—'}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: overallColor }}>
-                  {overallPct !== null
-                    ? overallPct >= 75 ? 'Goed'
-                      : overallPct >= 55 ? 'Matig'
-                      : 'Laag'
-                    : 'Onbekend'}
-                </div>
-                <div className="text-muted text-small">
-                  {readiness.assessment_status === 'demo_schatting'
-                    ? 'Demoschatting'
-                    : 'Modelschatting — experimenteel'}
-                </div>
-              </div>
-            </div>
-
-            {Object.entries(readiness.per_lift).map(([lift, val]) => (
-              <ReadinessBar key={lift} label={LIFT_NAMES[lift] ?? lift} value={val} />
-            ))}
-            {readiness.endurance !== null && (
-              <ReadinessBar label="Duurvermogen" value={readiness.endurance} />
-            )}
-
-            {showExpl && readiness.explanations.length > 0 && (
-              <div style={{ marginTop: 10, borderTop: '1px solid var(--c-border)', paddingTop: 10 }}>
-                {readiness.explanations.map((e, i) => (
-                  <p key={i} className="text-muted text-small" style={{ marginBottom: 4 }}>• {e}</p>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {/* What the engine can state from the user's own records */}
+      <EngineCard compact />
 
       {/* Today's plan */}
       <div className="card">
@@ -199,6 +171,8 @@ export default function Vandaag({ profile, onStartTraining, onEditTraining, isDe
         )}
       </div>
 
+      <ProgramSettingsCard profile={profile} onSaved={p => onProfileChanged?.(p)} />
+
       {/* Quick stats */}
       <div className="card">
         <div className="card-title">Profiel</div>
@@ -220,6 +194,8 @@ export default function Vandaag({ profile, onStartTraining, onEditTraining, isDe
             <div style={{ fontWeight: 700, marginTop: 2 }}>{profile.availableDays.length}</div>
           </div>
         </div>
+        {profile.hasVbt && <VelocitySetup profile={profile} />}
+        <MaximalEfforts profile={profile} />
       </div>
     </div>
   );

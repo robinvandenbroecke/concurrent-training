@@ -55,9 +55,26 @@ export interface PlannedEndurance {
   description: string;
 }
 
+export type EquipmentTag = 'halter' | 'rek' | 'bank' | 'dumbbells' | 'kettlebell' | 'machines' | 'kabel' | 'optrekstang' | 'bumpers' | 'trapbar';
+export type ProgramGoal = 'algemeen' | 'powerlifting' | 'hypertrofie' | 'power' | 'concurrent';
+export type ExperienceLevel = 'beginner' | 'gevorderd' | 'ervaren';
+/** Choices behind the generated strength programme. Absent = the original fixed starting schedule. */
+export interface ProgramSettings {
+  goal: ProgramGoal; experience: ExperienceLevel; equipment: EquipmentTag[];
+  returning: boolean;       // restart after a break: two lighter weeks from cycleStart
+  lighterWeek: boolean;     // optional lighter fourth week; a convention, not a requirement
+  cycleStart: string;       // YYYY-MM-DD from which programme weeks are counted
+}
+export interface MaximalEffort { date: string; durationSeconds: number; powerW: number }
+export type VelocityMetric = 'mean_concentric' | 'mean_propulsive' | 'peak' | 'unspecified';
+/** How a velocity was measured. Velocities from different metrics or devices are never pooled. */
+export interface VelocityMeta { metric: VelocityMetric; deviceId: string; source: 'manual' | 'file' | 'ble' | 'unspecified'; }
+
 export interface WorkoutSession {
   id?: number | string;
   date: string;
+  /** ISO instant at which the session was started. Absent on older records and on sessions logged afterwards. */
+  startTime?: string;
   type: 'kracht' | 'duur';
   title: string;
   durationMinutes: number;
@@ -82,6 +99,7 @@ export interface CompletedSet {
   targetReps: number;
   completedReps: number;
   velocities: (number | null)[];
+  velocityMeta?: VelocityMeta;
   rpe?: number;
   note?: string;
   kind?: 'work' | 'warmup';
@@ -130,6 +148,11 @@ export interface AthleteProfile {
   hasStravaSync: boolean;
   capacities: Partial<Record<LiftType, number>>;
   enduranceThreshold?: number;
+  /** The meter and velocity metric the athlete uses; copied onto each set that has velocities. */
+  velocitySetup?: { metric: VelocityMetric; deviceId: string };
+  /** All-out cycling efforts entered by the athlete, used for a critical-power fit. */
+  maximalEfforts?: MaximalEffort[];
+  program?: ProgramSettings;
   onboardingComplete: boolean;
 }
 

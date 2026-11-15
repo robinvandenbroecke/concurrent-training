@@ -67,3 +67,11 @@ test('trends are measured work weights, with no invented history', () => {
   assert.deepEqual(measuredTrend([session], 'squat'), [{ date: '2026-10-20', value: 50, isEstimate: false }]);
 });
 test('local date retains the calendar day', () => assert.equal(localDate(new Date(2026, 9, 20, 0, 5)), '2026-10-20'));
+test('import refuses a date that matches the pattern but does not exist', () => {
+  const s = storage();
+  const bad = { format: 'concurrent-training-local', version: 1, sessions: [{ ...session, date: '2026-02-30' }] };
+  assert.throws(() => importLocal(JSON.stringify(bad), s), /ongeldige sessie/);
+  assert.deepEqual(readSessions(s), []);
+  importLocal(JSON.stringify({ ...bad, sessions: [{ ...session, date: '2028-02-29' }] }), s);
+  assert.equal(readSessions(s).length, 1);
+});

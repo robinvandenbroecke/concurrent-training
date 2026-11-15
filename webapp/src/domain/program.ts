@@ -3,7 +3,8 @@ import { createExercise, definition } from '../data/exercises';
 
 export function strengthSlots(profile:AthleteProfile): number {
   const n=new Set(profile.availableDays).size;
-  return profile.priority==='kracht' ? (n<=2?n:Math.ceil(n*2/3)) : profile.priority==='duur' ? Math.floor(n/3) : Math.ceil(n/2);
+  // With a chosen strength programme an endurance-first athlete on two or more days keeps one strength session.
+  return profile.priority==='kracht' ? (n<=2?n:Math.ceil(n*2/3)) : profile.priority==='duur' ? (profile.program&&n>=2?Math.max(1,Math.floor(n/3)):Math.floor(n/3)) : Math.ceil(n/2);
 }
 export function strengthOrdinal(profile:AthleteProfile,index:number): number {
   const n=new Set(profile.availableDays).size, s=strengthSlots(profile);

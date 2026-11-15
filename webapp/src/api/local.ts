@@ -1,6 +1,7 @@
 import type { AthleteProfile, CompletedExercise, LiftType, PlannedTraining, WeekDay, WorkoutSession } from '../types';
 import { normalizePlan, definition } from '../data/exercises';
-import { strengthProgram, strengthSlots } from '../domain/program';
+import { strengthOrdinal, strengthProgram, strengthSlots } from '../domain/program';
+import { generateStrength } from '../domain/generator';
 
 export const KEYS = { profile: 'ct_profile', sessions: 'ct_local_sessions_v1', draft: 'ct_workout_draft_v1', overrides: 'ct_week_overrides_v1', volumeTargets: 'ct_volume_targets_v1' };
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -29,6 +30,13 @@ export function writeJson(key: string, value: unknown, storage: StorageLike = ge
 
 export function localDate(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** True only for an existing day: 2026-02-30 matches the pattern but is not a date. */
+export function isCalendarDate(text: unknown): text is string {
+  if (typeof text !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const [y, m, d] = text.split('-').map(Number), date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
 export function readProfile(storage: StorageLike = getLocalStore()): AthleteProfile | null {
@@ -72,7 +80,8 @@ export function planForDay(profile: AthleteProfile, date: string, index: number,
   if (!strength) return { date, type: 'duur', title: 'Rustige duurtraining', durationMinutes,
     reason: 'Voorlopige weekindeling binnen jouw gekozen dagen en tijd. Kies zelf een passende inspanning.',
     endurance: { sport: 'cycling', durationMinutes, intensityType: 'easy', description: 'Handmatig plan; geen berekende vermogensdoelstelling.' } };
-  return strengthProgram(profile,date,index,sessions);
+  // Accounts without programme settings keep the original starting schedule unchanged.
+  return profile.program ? generateStrength(profile,date,strengthOrdinal(profile,index),sessions).plan : strengthProgram(profile,date,index,sessions);
 }
 
 export function buildWeek(profile: AthleteProfile, now = new Date(), sessions: WorkoutSession[] = [], overrides: Record<string, PlannedTraining | null> = {}): WeekDay[] {
@@ -133,7 +142,7 @@ export function importLocal(text: string, storage: StorageLike = getLocalStore()
   const data = JSON.parse(text);
   if (data.format !== 'concurrent-training-local' || data.version !== 1 || !Array.isArray(data.sessions)) throw new Error('Dit is geen ondersteund CT-exportbestand.');
   for (const s of data.sessions) {
-    if (!['kracht', 'duur'].includes(s.type) || !/^\d{4}-\d{2}-\d{2}$/.test(s.date) || typeof s.title !== 'string'
+    if (!['kracht', 'duur'].includes(s.type) || !isCalendarDate(s.date) || typeof s.title !== 'string'
       || !Number.isFinite(s.durationMinutes) || s.durationMinutes < 0) throw new Error('Het bestand bevat een ongeldige sessie.');
     if (s.exercises) for (const ex of s.exercises as CompletedExercise[]) for (const set of ex.sets) {
       if (!Number.isFinite(set.weight) || set.weight < 0 || set.weight > 500 || (set.weight===0 && !['bodyweight','assistance'].includes(definition(ex)?.load??'')) || !Number.isInteger(set.completedReps) || set.completedReps < 1

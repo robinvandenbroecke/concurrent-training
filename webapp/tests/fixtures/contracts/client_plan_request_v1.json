@@ -1,0 +1,170 @@
+{
+  "contractVersion": "1",
+  "asOfDate": "2026-11-10",
+  "endurance": {
+    "thresholdPowerW": 250,
+    "maximalEfforts": []
+  },
+  "sessions": [
+    {
+      "id": "d1",
+      "date": "2026-11-10",
+      "type": "duur",
+      "durationMinutes": 60,
+      "startTime": "2026-11-10T16:00:00.000Z",
+      "exercises": [],
+      "enduranceResult": {
+        "sport": "cycling",
+        "durationMinutes": 60,
+        "intensityType": "tempo",
+        "rpe": 6,
+        "averagePowerW": 210
+      }
+    },
+    {
+      "id": "k1",
+      "date": "2026-11-10",
+      "type": "kracht",
+      "durationMinutes": 55,
+      "startTime": "2026-11-10T17:30:00.000Z",
+      "exercises": [
+        {
+          "exerciseId": "power_clean",
+          "lift": "power_clean",
+          "power": true,
+          "loadType": "weight",
+          "region": "unknown",
+          "sets": [
+            {
+              "setNum": 1,
+              "weight": 60,
+              "completedReps": 2,
+              "velocities": [
+                1.42,
+                null
+              ],
+              "kind": "work",
+              "velocityMeta": {
+                "metric": "mean_concentric",
+                "deviceId": "encoder-1",
+                "source": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "exerciseId": "back_squat",
+          "lift": "squat",
+          "power": false,
+          "loadType": "weight",
+          "region": "lower",
+          "sets": [
+            {
+              "setNum": 1,
+              "weight": 60,
+              "completedReps": 3,
+              "velocities": [
+                0.82,
+                0.8,
+                0.79
+              ],
+              "kind": "warmup",
+              "velocityMeta": {
+                "metric": "mean_concentric",
+                "deviceId": "encoder-1",
+                "source": "manual"
+              }
+            },
+            {
+              "setNum": 2,
+              "weight": 100,
+              "completedReps": 4,
+              "velocities": [
+                0.52,
+                0.5,
+                null,
+                0.44
+              ],
+              "rpe": 8,
+              "kind": "work",
+              "velocityMeta": {
+                "metric": "mean_concentric",
+                "deviceId": "encoder-1",
+                "source": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "exerciseId": "bench_press",
+          "lift": "bench",
+          "power": false,
+          "loadType": "weight",
+          "region": "upper",
+          "sets": [
+            {
+              "setNum": 1,
+              "weight": 70,
+              "completedReps": 4,
+              "velocities": [
+                null,
+                null,
+                null,
+                null
+              ],
+              "rpe": 7.5,
+              "kind": "work"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "old",
+      "date": "2026-11-07",
+      "type": "duur",
+      "durationMinutes": 40,
+      "exercises": [],
+      "enduranceResult": {
+        "sport": "running",
+        "durationMinutes": 40,
+        "intensityType": "z2"
+      }
+    }
+  ],
+  "planSessions": [
+    {
+      "label": "2026-11-11",
+      "kind": "strength_lower",
+      "workSets": 5,
+      "minutes": 0,
+      "relativeIntensity": 0.7,
+      "key": true
+    },
+    {
+      "label": "2026-11-12",
+      "kind": "endurance",
+      "workSets": 0,
+      "minutes": 50,
+      "relativeIntensity": 1.1,
+      "key": false
+    },
+    {
+      "label": "2026-11-14",
+      "kind": "strength_upper",
+      "workSets": 4,
+      "minutes": 0,
+      "relativeIntensity": 0.7,
+      "key": false
+    }
+  ],
+  "availableDates": [
+    "2026-11-11",
+    "2026-11-12",
+    "2026-11-14"
+  ],
+  "slotHours": [
+    18
+  ],
+  "priority": "balans"
+}

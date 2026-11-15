@@ -1,0 +1,23 @@
+{
+  "run_date": "2026-11-14",
+  "data_source": "database_provenance_unverified",
+  "requested_source": "db",
+  "scientific_validation": false,
+  "n_athletes": 1,
+  "holdout_policy": "per-athlete first 70% dates train, final 30% dates test",
+  "no_lookahead": false,
+  "limitations": [
+    "Current mutable load-velocity/capacity profiles can contain later observations",
+    "Persisted day states and stored rep predictions lack complete model-version provenance",
+    "Synthetic/real provenance cannot be inferred from a command-line label",
+    "Legacy baseline calibration and update exposure are not equivalent",
+    "Use research/evaluate.py for isolated prefix-only evaluation"
+  ],
+  "reports": [
+    {
+      "athlete_id": 1,
+      "note": "Insufficient target-bearing sessions",
+      "n_sessions": 0
+    }
+  ]
+}

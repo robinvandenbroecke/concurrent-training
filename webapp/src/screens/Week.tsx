@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import type { WeekDay, PlannedTraining } from '../types';
 import { api } from '../api/adapter';
-import { LIFT_NAMES, SPORT_NAMES, INTENSITY_NAMES } from '../data/demoData';
+import { LIFT_NAMES, SPORT_NAMES, INTENSITY_NAMES } from '../data/names';
 import { IconClock } from '../components/Icons';
+import WeekPlanner from '../components/WeekPlanner';
 
 interface Props {
   onStartTraining: (plan: PlannedTraining) => void;
@@ -75,7 +76,7 @@ export default function Week({ onStartTraining, onEditTraining, onChanged }: Pro
 
         <div style={{ marginTop: 10, padding: 10, background: 'var(--c-surface2)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--c-text2)' }}>
           ℹ️ Planning gebruikt eenvoudige regels op basis van jouw beschikbare dagen en prioriteit.
-          Optimalisatie door het onderzoeksmodel is nog niet volledig geïntegreerd.
+          Onderaan kun je de volgorde van de komende trainingen laten doorrekenen.
         </div>
       </div>
 
@@ -178,6 +179,7 @@ export default function Week({ onStartTraining, onEditTraining, onChanged }: Pro
           Volledige integratie met het trainingsmodel is toekomstig werk.
         </p>
       </div>
+      <WeekPlanner onChanged={onChanged} />
     </div>
   );
 }

@@ -1,18 +1,9 @@
 #!/bin/bash
-# Start script for Concurrent Training API
+# Local development start. The database file is kept between starts; delete it
+# yourself if you really want an empty one.
+set -euo pipefail
+cd "$(dirname "$0")"
+[ -f .venv/bin/activate ] && source .venv/bin/activate
 
-cd /root/clawd/projects/concurrent-training
-source .venv/bin/activate
-
-echo "Starting Concurrent Training API..."
-echo "UI will be available at: http://localhost:8000/static/index.html"
-echo "API docs at: http://localhost:8000/docs"
-echo ""
-echo "Press Ctrl+C to stop"
-echo ""
-
-# Remove old db for clean start
-rm -f concurrent_training.db
-
-# Start server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+echo "API docs: http://localhost:8000/docs"
+exec uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload

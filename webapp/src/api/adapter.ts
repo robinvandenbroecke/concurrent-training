@@ -6,9 +6,6 @@ import type {
   AthleteProfile, ReadinessData, PlannedTraining, WorkoutSession, WeekDay, TrendPoint,
   LiftType, EnduranceSport, IntensityType, CompletedExercise
 } from '../types';
-import {
-  DEMO_READINESS, DEMO_TODAY, DEMO_WEEK_DAYS, getDemoHistory, getDemoTrend, DEMO_PROFILE
-} from '../data/demoData';
 import { KEYS, readJson, writeJson, readProfile, readSessions, appendSession, buildWeek, measuredTrend, localDate } from './local';
 import type { CloudStore } from './cloud';
 
@@ -49,6 +46,15 @@ export interface SaveEnduranceSession {
   intensityType: IntensityType;
   rpe?: number;
   averagePowerW?: number;
+  /** False when the session is logged afterwards and the start time is only a guess. */
+  startTimeKnown?: boolean;
+}
+
+/** Stamp sets that carry velocities with the athlete's meter and metric; never overwrite an existing stamp. */
+export function withVelocityMeta(exercises: CompletedExercise[], setup?: AthleteProfile['velocitySetup']): CompletedExercise[] {
+  if (!setup) return exercises;
+  const meta = { metric: setup.metric, deviceId: setup.deviceId.trim().slice(0, 64) || 'unspecified', source: 'manual' as const };
+  return exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => s.velocityMeta || !s.velocities.some(v => v !== null) ? s : { ...s, velocityMeta: meta }) }));
 }
 
 class ApiAdapter {
@@ -163,7 +169,7 @@ class ApiAdapter {
       const existing = store ? readSessions(store.storage).find(s=>String(s.id)===String(workout.sessionId)) : undefined;
       const record = existing ?? appendSession({ id: workout.sessionId, date: localDate(new Date(workout.startTime)), type: 'kracht',
         title: workout.title ?? 'Krachttraining', durationMinutes: workout.durationMinutes ?? 0, savedToServer: false,
-        exercises: workout.completedExercises ?? [] });
+        startTime: workout.startTime, exercises: withVelocityMeta(workout.completedExercises ?? [], readProfile()?.velocitySetup) });
       if (store) await store.saveSession(record.id!);
       return { sessionIds: [record.id!] };
     }
@@ -189,6 +195,7 @@ class ApiAdapter {
       const existing = store ? readSessions(store.storage).find(s=>String(s.id)===String(session.sessionId)) : undefined;
       const record = existing ?? appendSession({ id: session.sessionId, date: localDate(new Date(session.startTime)), type: 'duur',
         title: `Duur — ${session.sport}`, durationMinutes: session.durationMinutes, savedToServer: false,
+        ...(session.startTimeKnown ? { startTime: session.startTime } : {}),
         enduranceResult: { sport: session.sport, durationMinutes: session.durationMinutes, intensityType: session.intensityType,
           rpe: session.rpe, averagePowerW: session.averagePowerW } });
       if (store) await store.saveSession(record.id!);
@@ -207,15 +214,6 @@ class ApiAdapter {
     return this.fetch('/sessions/endurance', { method: 'POST', body: JSON.stringify(payload) });
   }
 
-  async getProfile(): Promise<AthleteProfile> {
-    if (this.config.mode !== 'backend') {
-      const stored = readProfile();
-      if (stored) return stored;
-      return { ...DEMO_PROFILE };
-    }
-    throw new Error('Backend profiel ophalen nog niet geïmplementeerd');
-  }
-
   async saveProfile(profile: AthleteProfile): Promise<void> {
     writeJson(KEYS.profile, profile);
     await this.confirmStorage();
@@ -224,6 +222,30 @@ class ApiAdapter {
   async skipDay(date: string): Promise<void> {
     const overrides = readJson<Record<string, PlannedTraining | null>>(KEYS.overrides, {});
     writeJson(KEYS.overrides, { ...overrides, [date]: null });
+    await this.confirmStorage();
+  }
+
+  /** Planned trainings from tomorrow up to seven days ahead, across the week boundary. */
+  async getUpcomingDays(now = new Date()): Promise<WeekDay[]> {
+    const profile = readProfile();
+    if (!profile) return [];
+    const overrides = readJson<Record<string, PlannedTraining | null>>(KEYS.overrides, {}), sessions = readSessions();
+    const next = new Date(now); next.setDate(next.getDate() + 7);
+    const today = localDate(now), limit = localDate(next);
+    return [...buildWeek(profile, now, sessions, overrides), ...buildWeek(profile, next, sessions, overrides)]
+      .filter(d => d.date > today && d.date <= limit && d.planned && d.planned.type !== 'rust' && !d.completed);
+  }
+
+  /** Re-order whole training days in one write: every listed training moves to its new date. */
+  async applyArrangement(moves: { from: string; to: string }[], now = new Date()): Promise<void> {
+    const upcoming = await this.getUpcomingDays(now);
+    const dates = new Set(upcoming.map(d => d.date));
+    const sources = new Set(moves.map(m => m.from)), targets = new Set(moves.map(m => m.to));
+    // A permutation of still-planned days: nothing is dropped and no training lands on an occupied or past day.
+    if (!moves.length || sources.size !== moves.length || targets.size !== moves.length || [...sources].some(d => !targets.has(d) || !dates.has(d))) throw new Error('De volgorde past niet meer bij je planning. Reken ze opnieuw door.');
+    const plans = new Map(upcoming.map(d => [d.date, d.planned!]));
+    const overrides = readJson<Record<string, PlannedTraining | null>>(KEYS.overrides, {});
+    writeJson(KEYS.overrides, { ...overrides, ...Object.fromEntries(moves.map(m => [m.to, { ...plans.get(m.from)!, date: m.to }])) });
     await this.confirmStorage();
   }
 

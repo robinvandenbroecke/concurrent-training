@@ -44,7 +44,7 @@ test('onboarding → plan → workout → navigation → reload → save → rea
     const weights = [...host.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
     await fill(weights[0], '50'); await fill(weights[1], '40');
     await click(button(/^Volgende$/)); await click(button(/^Start$/));
-    assert.match(host.textContent!, /Onbekend/); assert.doesNotMatch(host.textContent!, /82%/);
+    assert.match(host.textContent!, /Inzicht uit je eigen gegevens/); assert.match(host.textContent!, /Log in om berekeningen op te vragen/); assert.doesNotMatch(host.textContent!, /82%/);
     await click(button(/^Start training$/)); await click(button(/Start training/));
     let screen = activeTraining();
     const row = button(/Bevestig set 1/, screen)!.parentElement!;
